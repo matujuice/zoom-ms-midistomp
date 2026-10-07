@@ -3,7 +3,9 @@
 Custom firmware for the Zoom MultiStomp **MS-60B**, **MS-50G** and **MS-70CDR**
 (the original models, not the "+" versions), built by patching Zoom's OS.
 See [docs/roadmap.md](docs/roadmap.md) for the planned features and
-[docs/flashing.md](docs/flashing.md) to build and flash.
+[docs/flashing.md](docs/flashing.md) to build and flash. How work is
+organized (backlog issues, cycles, test firmware, releases) is in
+[docs/workflow.md](docs/workflow.md).
 
 The three pedals share one platform: the same `.ZDL` effect modules (TI C6000
 code) and the same updater flash layout. This repo is one shared codebase with
