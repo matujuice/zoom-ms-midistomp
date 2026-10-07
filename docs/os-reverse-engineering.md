@@ -121,3 +121,27 @@ Manager in normal mode left the modded OS intact (MOD 0.1 still shown).
 
 Button/knob handlers in `Task_UpdateUI`, the audio chain loop, display drawing
 behind `Semaphore_LCDUpdate`, and a confirmed free-RAM region.
+
+### Planned MIDI CC patch (issue #4, not built yet)
+
+Design worked out in the v0.2 thread, for the next build thread to implement:
+
+- **Space for new code:** the OS sets L2 to 128 KB cache (`L2CFG` value 3,
+  read from `0xC00ED178`), so L2 SRAM is `0x11800000`-`0x1181FFFF`. Nothing in
+  the OS or bootloader references `0x1181DE84`-`0x1181FFFF` (checked: no
+  constants or data pointers into it), so about 8 KB there is free. It is
+  loaded as an extra AIS section (`AisImage.add_section`).
+- **Reaching it:** DDR code cannot `callp` into L2 (out of the ±4 MB range).
+  The 24 zero bytes at `0xC00AF408` (padding after a function return, never a
+  branch target) can hold a three-instruction far jump. The CC call site at
+  `0xC00AF088` (`callp 0xC00AE0F8`) is retargeted to that jump.
+- **Handler:** CC numbers outside the map go straight on to the stock
+  `midi_channel_msg`. Mapped CCs call `fx_set_param(slot, param, value, 0, 1)`
+  between `Semaphore_pend/post` on `B14+784`, then the UI refresh, mirroring the
+  SysEx `0x31` path. Knob values are scaled from 0-127 to the parameter's range
+  (max at offset 12 of the descriptor returned by `0xC00B07AC(slot, param)`).
+  From L2, calls into DDR go through a register.
+- **CC map:** effect n (1-6) on/off = CC 10n+4 (14, 24 ... 64; value >= 64 is
+  on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
+  the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
+  MS-70CDR), 4 (MS-60B OS).
