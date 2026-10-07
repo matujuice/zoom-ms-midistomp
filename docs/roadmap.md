@@ -8,7 +8,7 @@ Feasibility is an estimate from the disassembly so far, not a promise.
 
 | Feature | Where it lives in the OS | Feasibility | Notes |
 |---|---|---|---|
-| Flash a modified OS and boot it | build pipeline | **ready to test** | `patches/hello.yaml`, see flashing.md |
+| Flash a modified OS and boot it | build pipeline | **done, tested on MS-60B** | `patches/hello.yaml`, see flashing.md |
 | MIDI: program change loads patch, CC controls parameters and on/off, MIDI clock sets tempo | `Task_MIDI`, USB MIDI | high | MS pedals only have USB MIDI, so this needs a computer or a USB-MIDI host box |
 | Performance mode: remap buttons and knobs, faster toggling | `Task_UpdateUI`, button/knob handlers | high | |
 | Better screen feedback (levels, LFO/tempo, what an effect is doing) | `Semaphore_LCDUpdate`, display driver | medium | needs the drawing routines mapped |

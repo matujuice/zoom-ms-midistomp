@@ -29,6 +29,10 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
 
 ## First test (Luca's MS-60B running the MS-50G 3.10 OS)
 
+**Result 2026-10-07: passed.** The patched OS flashed with the bootloader steps
+skipped, booted normally, and the menu showed MOD 0.1. So the bootloader does
+not reject a modified OS.
+
 1. Keep both `ms50g-3.10-stock-keepboot.exe` and Zoom's original MS-50G v3.10
    updater at hand.
 2. Pedal off. Hold the top and bottom buttons while plugging in USB: it should
