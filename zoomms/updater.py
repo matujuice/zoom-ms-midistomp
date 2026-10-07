@@ -141,25 +141,29 @@ def _read_chain(img: bytes, entry: FileEntry, owner: dict[int, str], problems: l
 
 def rebuild(fw: FlashImage, fill: int = 0xFF) -> bytes:
     """Re-serialise the image from the parsed file list, keeping each file's
-    original block chain. Bytes we don't model (system blocks, table headers,
-    stale data in free blocks, slack after a block's payload) come out as
-    ``fill``, except the system blocks and table headers, which are copied.
+    original block chain.
 
-    Comparing the result with ``fw.image`` shows how much of the image the
-    parser actually understands; a modified image must never be flashed until
-    this round trip is exact for the stock updater it came from.
+    Only the live file table and the blocks owned by live files are generated.
+    The system blocks, the older file-table copies (each table header starts
+    with a generation counter; the live one is the newest) and free data blocks
+    (which in stock updaters still hold stale chains from earlier builds) are
+    copied from the source. Slack after a block's payload comes out as ``fill``.
+
+    So an exact match with ``fw.image`` means every byte of the live file
+    system is understood. A modified image must never be flashed until this
+    round trip is exact for the stock updater it came from.
     """
     src = fw.image
-    out = bytearray([fill]) * len(src)
-    out[:SYS_BLOCKS * BLOCK] = src[:SYS_BLOCKS * BLOCK]
-    for b in TABLE_BLOCKS:
-        pos = b * BLOCK
-        if not _table_valid(src, pos):
-            continue
-        out[pos + TABLE_HEADER:pos + TABLE_SIZE] = b"\xff" * (TABLE_SIZE - TABLE_HEADER)
-        for i, f in enumerate(fw.files):
-            p = pos + TABLE_HEADER + i * ENTRY
-            out[p:p + ENTRY] = f.raw_entry
+    out = bytearray(src)
+    pos = fw.table_block * BLOCK
+    out[pos + TABLE_HEADER:pos + TABLE_SIZE] = b"\xff" * (TABLE_SIZE - TABLE_HEADER)
+    for i, f in enumerate(fw.files):
+        p = pos + TABLE_HEADER + i * ENTRY
+        out[p:p + ENTRY] = f.raw_entry
+    for f in fw.files:
+        for block in f.blocks:
+            off = _data_off(block)
+            out[off:off + BLOCK] = bytes([fill]) * BLOCK
     for f in fw.files:
         for i, block in enumerate(f.blocks):
             prev = f.blocks[i - 1] if i else END
@@ -171,9 +175,18 @@ def rebuild(fw: FlashImage, fill: int = 0xFF) -> bytes:
     return bytes(out)
 
 
-def diff_regions(a: bytes, b: bytes, block: int = BLOCK) -> list[int]:
-    """Return the indices of ``block``-sized regions that differ."""
-    return [i for i in range(0, len(a), block) if a[i:i + block] != b[i:i + block]]
+def diff_blocks(a: bytes, b: bytes) -> list[int]:
+    """Return the indices of image blocks that differ."""
+    return [i // BLOCK for i in range(0, len(a), BLOCK) if a[i:i + BLOCK] != b[i:i + BLOCK]]
+
+
+def free_blocks(fw: FlashImage) -> tuple[int, int]:
+    """Return (free data blocks, of which still holding stale data)."""
+    used = {b for f in fw.files for b in f.blocks} | {0}
+    img = fw.image
+    free = [b for b in range(fw.block_count - FIRST_DATA_BLOCK) if b not in used]
+    stale = sum(1 for b in free if img[_data_off(b):_data_off(b) + BLOCK] != b"\xff" * BLOCK)
+    return len(free), stale
 
 
 def load(path: str | Path) -> FlashImage:

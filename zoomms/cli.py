@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import models, updater, zdl
+from . import models, parts, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -39,9 +39,25 @@ def cmd_updater_info(args) -> int:
             except zdl.ZdlError as e:
                 extra = f"  (bad ZDL: {e})"
         print(f"  {f.name:<12} {f.size:>8}{extra}")
+    free, stale = updater.free_blocks(fw)
+    print(f"free        {free} data blocks (~{free * updater.PAYLOAD // 1024} KiB)")
     for p in fw.problems:
         print(f"PROBLEM {p}")
     return 1 if fw.problems else 0
+
+
+def cmd_updater_parts(args) -> int:
+    found = parts.find_parts(args.updater)
+    for p in found:
+        h = hashlib.sha256(parts.read_part(args.updater, p)).hexdigest()[:16]
+        print(f"BIN/{p.resource_id:<4} {p.role:<16} offset 0x{p.offset:07X} {p.size:>8} B  {p.kind:<18} sha256 {h}")
+    if args.out:
+        out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        for p in found:
+            (out / f"{p.resource_id}_{p.role.replace(' ', '_')}.bin").write_bytes(parts.read_part(args.updater, p))
+        print(f"wrote {len(found)} parts to {out}")
+    return 0
 
 
 def cmd_updater_extract(args) -> int:
@@ -57,11 +73,13 @@ def cmd_updater_extract(args) -> int:
 def cmd_updater_verify(args) -> int:
     fw = updater.load(args.updater)
     rebuilt = updater.rebuild(fw)
-    diffs = updater.diff_regions(fw.image, rebuilt)
+    diffs = updater.diff_blocks(fw.image, rebuilt)
+    free, stale = updater.free_blocks(fw)
+    print(f"live file system: {len(fw.files)} files; {free} free data blocks, {stale} holding stale data (kept as-is)")
     if fw.problems:
         print("\n".join(f"PROBLEM {p}" for p in fw.problems))
     if not diffs:
-        print("round trip exact: every byte of the image is accounted for")
+        print("round trip exact: the live file system is fully understood")
         return 1 if fw.problems else 0
     print(f"round trip differs in {len(diffs)} of {fw.block_count} blocks: {diffs[:20]}{' ...' if len(diffs) > 20 else ''}")
     return 1
@@ -90,6 +108,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("updater-info", help="list files inside an official updater")
     p.add_argument("updater")
     p.set_defaults(func=cmd_updater_info)
+    p = sub.add_parser("updater-parts", help="list (and optionally extract) bootloader, OS, patches and file system")
+    p.add_argument("updater")
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_updater_parts)
     p = sub.add_parser("updater-extract", help="extract files from an official updater")
     p.add_argument("updater")
     p.add_argument("out")

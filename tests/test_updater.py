@@ -52,3 +52,20 @@ def test_broken_chain_is_reported():
     off = fw.offset + (u.FIRST_DATA_BLOCK + 2) * u.BLOCK
     struct.pack_into("<H", data, off, 99)  # corrupt prev pointer of A.ZDL's 2nd block
     assert any("prev=99" in p for p in u.parse(bytes(data)).problems)
+
+
+def test_round_trip_keeps_stale_table_and_free_blocks():
+    data = bytearray(make_updater(FILES))
+    fw = u.parse(bytes(data))
+    img_off = fw.offset
+    # An older table generation at block 5 and leftover data in a free block,
+    # as found in the stock MS-50G / MS-60B / MS-70CDR updaters.
+    old = img_off + 5 * u.BLOCK
+    data[old:old + 8] = bytes([0x01, 0xA5, 0, 0, 0, 0xFF, 0xFF, 0xFF])
+    data[old + 8:old + 40] = fw.files[0].raw_entry
+    free = img_off + (u.FIRST_DATA_BLOCK + 40) * u.BLOCK
+    data[free:free + 6] = b"\xff\xff\xff\xff\x10\x00"
+    fw = u.parse(bytes(data))
+    assert fw.problems == []
+    assert u.rebuild(fw) == fw.image
+    assert u.free_blocks(fw)[1] == 1

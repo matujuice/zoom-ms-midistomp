@@ -15,7 +15,7 @@ a build config per pedal in [`models/`](models/).
 | Phase | What | Writes to pedal? | Status |
 |---|---|---|---|
 | 0 | Record firmware versions, back up patches and effect lists | no | |
-| 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **started** |
+| 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **round trip exact on all 3 stock updaters** |
 | 2 | Per-model effect sets installed via Effect Manager / SysEx | effect files only | |
 | 3 | Our own DSP effects built with TI CGT C6000 | effect files only | |
 | 4 | Repacked updater images | firmware | gated on exact round trip |
@@ -26,6 +26,7 @@ a build config per pedal in [`models/`](models/).
 ```sh
 pip install -e '.[midi,dev]'
 zoomms identify                         # model + firmware version over USB MIDI
+zoomms updater-parts firmware/MS-60B_v2.10_Win_E/'ZOOM MS-60B v2.10 Updater.exe'
 zoomms updater-info firmware/MS-60B_v2.00.exe
 zoomms updater-extract firmware/MS-60B_v2.00.exe out/ms60b
 zoomms updater-verify firmware/MS-60B_v2.00.exe
