@@ -114,6 +114,8 @@ it is not assumed free.
 This is the path the v0.2 MIDI CC patch reuses. Effect Manager writes effects
 over the same SysEx path (issue #15), so the CC patch must leave the SysEx
 handlers unchanged.
+Tested 2026-10-07 on Luca's MS-60B with the MOD 0.1 build: using Effect
+Manager in normal mode left the modded OS intact (MOD 0.1 still shown).
 
 ### Still open for issue #2
 
