@@ -1,0 +1,10 @@
+# Zoom's firmware, updaters, stock effects and pedal backups are Zoom's copyright.
+firmware/*
+!firmware/README.md
+*.ZDL
+*.zdl
+!effects/**/*.ZDL.keep
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/out/

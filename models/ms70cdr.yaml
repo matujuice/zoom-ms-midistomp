@@ -1,0 +1,14 @@
+# MS-70CDR per-model build config.
+name: MS-70CDR
+kind: modulation/delay/reverb
+# Zoom SysEx model id. Community-reported; confirm with "zoomms identify".
+sysex_model_id: 0x61
+max_effects_in_chain: 6
+patches: 50
+effect_format: zdl
+# Fill in from your pedal (shown at power-up) and the matching official updater.
+firmware_version: null
+stock_updater: null        # file name inside firmware/, never committed
+stock_updater_sha256: null
+# ZDL file names to place on this pedal. Empty means "stock list unchanged".
+effects: []
