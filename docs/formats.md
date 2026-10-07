@@ -8,7 +8,7 @@ lists and extracts them. Measured on MS-50G v3.10, MS-60B v2.10, MS-70CDR v2.10:
 |---|---|---|---|
 | BIN/136 | 256 KiB | bootloader, TI AIS image | **byte-identical** |
 | BIN/129 | 704 KiB | main OS, TI AIS image | per model; ~99% of strings shared, so one codebase built per model |
-| BIN/133 | 12 KiB | factory patches | per model |
+| BIN/133 | 12 KiB | unknown, looks like bitmap data | per model |
 | BIN/137 | 2.8 MiB | flash file system with the effects | per model |
 
 AIS (magic `0x41504954`) is the boot-script format read by the ROM bootloader

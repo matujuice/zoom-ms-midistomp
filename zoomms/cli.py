@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import models, parts, updater, zdl
+from . import ais, models, parts, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -57,6 +57,16 @@ def cmd_updater_parts(args) -> int:
         for p in found:
             (out / f"{p.resource_id}_{p.role.replace(' ', '_')}.bin").write_bytes(parts.read_part(args.updater, p))
         print(f"wrote {len(found)} parts to {out}")
+    return 0
+
+
+def cmd_ais(args) -> int:
+    img = ais.parse(Path(args.image).read_bytes())
+    print("\n".join(img.log))
+    print(f"entry 0x{img.entry:08X}, {sum(len(s.data) for s in img.sections)} bytes in {len(img.sections)} sections")
+    if args.elf:
+        Path(args.elf).write_bytes(ais.to_elf(img))
+        print(f"wrote {args.elf}; disassemble with tic6x-elf-objdump -d")
     return 0
 
 
@@ -112,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("updater")
     p.add_argument("--out")
     p.set_defaults(func=cmd_updater_parts)
+    p = sub.add_parser("ais", help="decode a TI AIS boot image (bootloader or main OS part)")
+    p.add_argument("image")
+    p.add_argument("--elf", help="also write an ELF for tic6x-elf-objdump")
+    p.set_defaults(func=cmd_ais)
     p = sub.add_parser("updater-extract", help="extract files from an official updater")
     p.add_argument("updater")
     p.add_argument("out")

@@ -5,7 +5,7 @@ three executables are the same size and use the same resource ids):
 
     BIN/136  256 KiB  bootloader, TI AIS image   identical on all three models
     BIN/129  704 KiB  main OS, TI AIS image      per model
-    BIN/133   12 KiB  factory patches            per model
+    BIN/133   12 KiB  unknown, bitmap-like data  per model
     BIN/137  2.8 MiB  flash file system (effects) per model, see updater.py
 
 AIS (magic 0x41504954) is the boot-script format read by the ROM bootloader of
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 AIS_MAGIC = b"\x54\x49\x50\x41"
-ROLES = {129: "main OS", 133: "factory patches", 136: "bootloader", 137: "file system"}
+ROLES = {129: "main OS", 133: "data 133", 136: "bootloader", 137: "file system"}
 
 
 @dataclass
