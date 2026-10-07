@@ -1,4 +1,4 @@
-"""zoomms command line. Every command here is read-only."""
+"""zoomms command line. Nothing here talks to a pedal except `identify`, which only reads."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import ais, models, parts, updater, zdl
+from . import ais, flash, models, parts, patcher, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -70,6 +70,34 @@ def cmd_ais(args) -> int:
     return 0
 
 
+def cmd_build(args) -> int:
+    stock = Path(args.updater).read_bytes()
+    os_part = next(p for p in parts.find_parts(args.updater) if p.resource_id == 129)
+    original = parts.read_part(args.updater, os_part)
+    img = ais.parse(original)
+    for patch_path in args.patch:
+        patch = patcher.load(patch_path)
+        for line in patcher.apply(img, patch, args.build_id):
+            print(f"{patch['name']}: {line}")
+    new_os = ais.build_part(img, original)
+    exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps)
+
+    # Re-read what we are about to write and check it.
+    check = ais.parse(exe[os_part.offset:os_part.offset + os_part.size])
+    assert [s.addr for s in check.sections] == [s.addr for s in img.sections]
+    assert check.entry == ais.parse(original).entry
+    assert exe[os_part.offset + os_part.size - 32:os_part.offset + os_part.size] == original[-32:]
+    outside = [i for i in range(min(len(stock), len(exe))) if stock[i] != exe[i]
+               and not os_part.offset <= i < os_part.offset + os_part.size]
+    changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
+    print(f"OS bytes changed: {changed_os}; other bytes changed: {len(outside)} "
+          f"(flash script and PE header); Zoom's signature removed ({len(stock) - len(exe)} B)")
+    print("flash steps: " + "; ".join(s.describe() for s in flash.find_script(exe)))
+    Path(args.out).write_bytes(exe)
+    print(f"wrote {args.out}  sha256 {hashlib.sha256(exe).hexdigest()}")
+    return 0
+
+
 def cmd_updater_extract(args) -> int:
     fw = updater.load(args.updater)
     out = Path(args.out)
@@ -122,6 +150,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("updater")
     p.add_argument("--out")
     p.set_defaults(func=cmd_updater_parts)
+    p = sub.add_parser("build", help="build a modified updater from a stock one plus patch files")
+    p.add_argument("updater", help="stock official updater .exe")
+    p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
+    p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
+    p.add_argument("--out", required=True)
+    p.add_argument("--keep-boot-steps", action="store_true",
+                   help="also rewrite the bootloader like the stock updater does (not recommended)")
+    p.set_defaults(func=cmd_build)
     p = sub.add_parser("ais", help="decode a TI AIS boot image (bootloader or main OS part)")
     p.add_argument("image")
     p.add_argument("--elf", help="also write an ELF for tic6x-elf-objdump")

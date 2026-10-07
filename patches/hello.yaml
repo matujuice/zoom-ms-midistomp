@@ -1,0 +1,8 @@
+# First test patch: proves we can build, flash and boot a modified OS.
+# Renames the VERSION menu entry. Pure data change, no code touched.
+name: hello
+description: Rename the VERSION menu entry to "MOD 0.1"
+replace:
+  - find: "VERSION\0"
+    with: "MOD 0.1\0"
+    count: 2   # the menu list and the version screen title

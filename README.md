@@ -1,7 +1,9 @@
 # zoom-ms-modding
 
-Custom firmware and effects for the Zoom MultiStomp **MS-60B**, **MS-50G** and
-**MS-70CDR** (the original models, not the "+" versions).
+Custom firmware for the Zoom MultiStomp **MS-60B**, **MS-50G** and **MS-70CDR**
+(the original models, not the "+" versions), built by patching Zoom's OS.
+See [docs/roadmap.md](docs/roadmap.md) for the planned features and
+[docs/flashing.md](docs/flashing.md) to build and flash.
 
 The three pedals share one platform: the same `.ZDL` effect modules (TI C6000
 code) and the same updater flash layout. This repo is one shared codebase with
@@ -18,7 +20,7 @@ a build config per pedal in [`models/`](models/).
 | 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **round trip exact on all 3 stock updaters** |
 | 2 | Per-model effect sets installed via Effect Manager / SysEx | effect files only | |
 | 3 | Our own DSP effects built with TI CGT C6000 | effect files only | |
-| 4 | Repacked updater images | firmware | gated on exact round trip |
+| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **first test patch ready** |
 | 5 | Core firmware research (UI, routing, chain limits) | firmware | research only |
 
 ## Usage

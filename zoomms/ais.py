@@ -48,6 +48,36 @@ class AisImage:
     entry: int | None = None
     end_offset: int = 0
     log: list[str] = field(default_factory=list)
+    # Raw stream in order: (opcode, raw argument bytes) or (SECTION_LOAD, index
+    # into sections), so build() can re-emit it with modified section data.
+    ops: list[tuple[int, object]] = field(default_factory=list)
+
+    def section_at(self, addr: int) -> tuple[Section, int]:
+        for s in self.sections:
+            if s.addr <= addr < s.addr + len(s.data):
+                return s, addr - s.addr
+        raise AisError(f"0x{addr:08X} is not inside any loaded section")
+
+    def read(self, addr: int, n: int) -> bytes:
+        s, off = self.section_at(addr)
+        if off + n > len(s.data):
+            raise AisError(f"0x{addr:08X}+{n} crosses the end of its section")
+        return s.data[off:off + n]
+
+    def write(self, addr: int, data: bytes) -> None:
+        s, off = self.section_at(addr)
+        if off + len(data) > len(s.data):
+            raise AisError(f"0x{addr:08X}+{len(data)} crosses the end of its section")
+        s.data = s.data[:off] + bytes(data) + s.data[off + len(data):]
+
+    def add_section(self, addr: int, data: bytes) -> None:
+        """Load extra data (e.g. new code) before the final jump."""
+        for s in self.sections:
+            if addr < s.addr + len(s.data) and s.addr < addr + len(data):
+                raise AisError(f"new section 0x{addr:08X} overlaps 0x{s.addr:08X}")
+        self.sections.append(Section(addr, bytes(data)))
+        jump = next(i for i, (op, _) in enumerate(self.ops) if op in (JUMP, JUMP_CLOSE))
+        self.ops.insert(jump, (SECTION_LOAD, len(self.sections) - 1))
 
 
 def parse(data: bytes) -> AisImage:
@@ -65,14 +95,17 @@ def parse(data: bytes) -> AisImage:
         if op == SECTION_LOAD:
             addr, size = word(o), word(o + 4)
             img.sections.append(Section(addr, data[o + 8:o + 8 + size]))
+            img.ops.append((op, len(img.sections) - 1))
             img.log.append(f"load 0x{addr:08X} +0x{size:X}")
             o += 8 + ((size + 3) & ~3)
         elif op == SECTION_FILL:
             img.fills.append(tuple(word(o + 4 * i) for i in range(4)))
+            img.ops.append((op, data[o:o + 16]))
             img.log.append("fill 0x%08X +0x%X type %d pattern 0x%08X" % img.fills[-1])
             o += 16
         elif op == SET:
             img.sets.append(tuple(word(o + 4 * i) for i in range(4)))
+            img.ops.append((op, data[o:o + 16]))
             img.log.append("set type 0x%X [0x%08X] = 0x%08X delay %d" % img.sets[-1])
             o += 16
         elif op == FUNCTION_EXECUTE:
@@ -80,15 +113,19 @@ def parse(data: bytes) -> AisImage:
             n, idx = hdr >> 16, hdr & 0xFFFF
             args = [word(o + 4 + 4 * i) for i in range(n)]
             img.functions.append((idx, args))
+            img.ops.append((op, data[o:o + 4 + 4 * n]))
             img.log.append(f"function {idx}(" + ", ".join(f"0x{a:X}" for a in args) + ")")
             o += 4 + 4 * n
         elif op == REQUEST_CRC:
             img.log.append(f"crc 0x{word(o):08X} seek {word(o + 4)}")
+            img.ops.append((op, data[o:o + 8]))
             o += 8
         elif op in (ENABLE_CRC, DISABLE_CRC, NOARG_63):
             img.log.append(f"op 0x{op:08X}")
+            img.ops.append((op, b""))
         elif op in (JUMP, JUMP_CLOSE):
             img.entry = word(o)
+            img.ops.append((op, data[o:o + 4]))
             img.log.append(f"{'jump and close' if op == JUMP_CLOSE else 'jump'} 0x{img.entry:08X}")
             o += 4
             if op == JUMP_CLOSE:
@@ -96,6 +133,33 @@ def parse(data: bytes) -> AisImage:
                 return img
         else:
             raise AisError(f"unknown opcode 0x{op:08X} at 0x{o - 4:X}")
+
+
+def build(img: AisImage) -> bytes:
+    """Serialise the AIS stream, with current section data."""
+    out = bytearray(struct.pack("<I", MAGIC))
+    for op, arg in img.ops:
+        out += struct.pack("<I", op)
+        if op == SECTION_LOAD:
+            sec = img.sections[arg]
+            out += struct.pack("<II", sec.addr, len(sec.data))
+            out += sec.data + b"\0" * (-len(sec.data) % 4)
+        else:
+            out += arg
+    return bytes(out)
+
+
+def build_part(img: AisImage, original: bytes) -> bytes:
+    """Rebuild a fixed-size flash part: new AIS stream, 0xFF padding, and the
+    original trailer (version string and "ZOOM Corporation" marker at the end
+    of the part, which the bootloader may check) kept in place."""
+    stream = build(img)
+    tail_start = img.end_offset
+    while tail_start < len(original) and original[tail_start] == 0xFF:
+        tail_start += 1
+    if len(stream) > tail_start:
+        raise AisError(f"AIS stream ({len(stream)} B) would overwrite the trailer at 0x{tail_start:X}")
+    return stream + b"\xff" * (tail_start - len(stream)) + original[tail_start:]
 
 
 def to_elf(img: AisImage) -> bytes:

@@ -1,0 +1,47 @@
+# Building and flashing a modified OS
+
+## What our updaters do differently from Zoom's
+
+The stock updater runs a fixed script (see `zoomms/flash.py`):
+
+1. erase the last 4 KiB of the OS area (its trailer)
+2. erase and rewrite the **bootloader**
+3. erase and rewrite a 12 KiB block at 0x3FD000
+4. (MS-60B, MS-70CDR only) erase and rewrite the effects file system
+5. erase and write the main OS
+
+Updaters built by `zoomms build` skip steps 2 and 3. The bootloader holds the
+USB update mode, so never touching it keeps that recovery path intact even if
+an update is interrupted. Built from the MS-50G updater, the effects file
+system (step 4) is not touched either, so your installed effects stay.
+
+They are also unsigned: Zoom's signature is removed because it no longer
+matches. Windows SmartScreen will warn; choose "More info" then "Run anyway".
+
+## Build
+
+```sh
+zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
+  --patch patches/hello.yaml --out build/out/ms50g-3.10-hello.exe
+zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
+  --out build/out/ms50g-3.10-stock-keepboot.exe      # recovery: stock OS, bootloader untouched
+```
+
+## First test (Luca's MS-60B running the MS-50G 3.10 OS)
+
+1. Keep both `ms50g-3.10-stock-keepboot.exe` and Zoom's original MS-50G v3.10
+   updater at hand.
+2. Pedal off. Hold the top and bottom buttons while plugging in USB: it should
+   show the firmware update screen.
+3. Run `ms50g-3.10-hello.exe` and let it finish. Do not unplug during the update.
+4. Power-cycle the pedal normally. In the menu, the VERSION entry should now
+   read **MOD 0.1**.
+
+If it does not boot, or shows an error:
+
+1. Enter update mode again (step 2) and run `ms50g-3.10-stock-keepboot.exe`.
+2. Only if that fails, run Zoom's original updater (which also rewrites the
+   bootloader, as it did when you first installed the MS-50G firmware).
+
+Report back what you saw in each case; a failure to boot is also a useful
+result (it would mean the bootloader checks something we have not found).
