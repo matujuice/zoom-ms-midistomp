@@ -17,8 +17,8 @@
 ;     to 480..3000 ms, so bpm stays 40..250 like tap tempo;
 ;   - smoothing: a value 2 or more away from the tempo last applied is
 ;     applied at once; a value 1 away only when the next measurement agrees;
-;     a tempo changed by hand (tap, menu, patch change) is overridden on the
-;     next beat.
+;     the same value is never applied again (it would restart a delay); the
+;     first measurement after the clock (re)starts is always applied.
 ; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
 ; change callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
@@ -96,6 +96,7 @@ tick:
         cmpgtu  .L1     a0, a1, a2          ; first tick after a gap:
   [a2]  stw     .D1T1   a3, *+a10(V_COUNT)  ;   restart counting
   [a2]  stw     .D1T1   a3, *+a10(V_BEATS)
+  [a2]  stw     .D1T1   a3, *+a10(V_APPLIED) ;   and apply the next tempo
 
         ; Count ticks; only every 24th (count was 0) is a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12
@@ -140,24 +141,19 @@ tick:
         mv      .L1     a4, a12             ; a12 = measured bpm (40..250)
 
         ; Smoothing, against the tempo this code applied last (V_APPLIED).
-        ; The first build compared with the tempo variable read directly and
-        ; never applied on the pedal; a build without smoothing worked. So the
-        ; tempo is now read the way set_setting reads it (through the
-        ; setting's value pointer) and only used to notice a manual change.
+        ; Only a new tempo is applied: set_setting restarts a stock delay
+        ; even when the value is the same (fix4). fix1-fix3 also re-applied
+        ; when the tempo read back differed from V_APPLIED, to override a
+        ; manual change; that read never matched on the pedal, so the tempo
+        ; was re-applied every beat and the delay kept restarting. A manual
+        ; change now holds until the clock tempo changes or the clock stops
+        ; for more than GAP_MS and starts again.
         ldw     .D1T1   *+a10(V_PEND), a3
         ldw     .D1T1   *+a10(V_APPLIED), a13
-        mvkl    .S1     TEMPO_SETTING, a0
-        mvkh    .S1     TEMPO_SETTING, a0
-        ldw     .D1T1   *a0, a0             ; value pointer
         nop     4
-        ldw     .D1T1   *a0, a0             ; tempo now
-        nop     4
-        cmpeq   .L1     a0, a13, a1
-        xor     .L1     1, a1, a2           ; tempo changed by hand (or first run)
         sub     .L1     a12, a13, a0
         abs     .L1     a0, a0
         cmpltu  .L1     1, a0, a1           ; 2 or more away
-        or      .L1     a1, a2, a1
         cmpeq   .L1     a12, a3, a2         ; same 1-off value twice
         or      .L1     a1, a2, a1          ; a1 = apply now
         cmpeq   .L1     a12, a13, a2        ; already there
