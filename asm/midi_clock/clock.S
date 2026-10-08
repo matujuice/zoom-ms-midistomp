@@ -12,13 +12,16 @@
 ;
 ; Tempo from the clock (24 ticks per quarter note):
 ;   - a gap of more than GAP_MS between ticks restarts the measurement;
-;   - every 24th tick is a beat; from the ninth beat on, the time of the
-;     last eight beats gives 10 x bpm = (4800000 + span/2) / span, span
-;     clamped to 1920..12000 ms, so bpm stays 40..250 like tap tempo;
-;   - a tempo is applied only when it is 0.8 BPM or more from the one
-;     applied last (fix5), because every apply restarts a stock delay and a
-;     2-beat measurement flipped between 140 and 141 on the pedal; the first
-;     measurement after the clock (re)starts is always applied.
+;   - every 24th tick is a beat; beat times go in a ring of the last 8;
+;   - from the third beat on, the last 2 beats give a quick tempo; when it
+;     is 4 BPM or more from the tempo applied last on two beats in a row (or
+;     nothing was applied since the clock started), it is applied and the
+;     average restarts (fix6: lock in 2 beats, follow a change in 3);
+;   - otherwise the average over all beats in the ring (4 to 8) is applied
+;     only when it is 0.8 BPM or more from the tempo applied last (fix5):
+;     every apply restarts a stock delay, and with a 2-beat measurement
+;     clock jitter flipped the tempo between 140 and 141 on the pedal;
+;   - tempos are kept as 10 x BPM and clamped to 40..250 BPM like tap tempo.
 ; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
 ; change callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
@@ -41,11 +44,15 @@
         .equ    V_BEATS, 8                  ; beats seen since restart (0..8)
         .equ    V_IDX, 12                   ; next slot in the beat ring (0..7)
         .equ    V_APPLIED10, 16             ; 10 x tempo applied last, 0 = none
+        .equ    V_N, 20                     ; beats in the ring before this one
+        .equ    V_JUMP, 24                  ; last beat's quick tempo was a jump
         .equ    V_RING, 32                  ; times of the last 8 beats
-        .equ    HYST10, 8                   ; apply when 0.8 BPM or more away
+        .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
+        .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
+        .equ    N_MIN, 4                    ; beats the average needs
         .equ    GAP_MS, 250
-        .equ    SPAN_MIN, 1920              ; 8 beats at 250 BPM
-        .equ    SPAN_MAX, 12000             ; 8 beats at 40 BPM
+        .equ    BPM10_MIN, 400              ; 40 BPM, like tap tempo
+        .equ    BPM10_MAX, 2500             ; 250 BPM
 
 ; Far call: B5 = target, B3 = return label. Arguments must be set before.
         .macro  FARCALL target
@@ -97,6 +104,7 @@ tick:
   [a2]  stw     .D1T1   a3, *+a10(V_COUNT)  ;   restart counting
   [a2]  stw     .D1T1   a3, *+a10(V_BEATS)
   [a2]  stw     .D1T1   a3, *+a10(V_APPLIED10) ; and apply the next tempo
+  [a2]  stw     .D1T1   a3, *+a10(V_JUMP)
 
         ; Count ticks; only every 24th (count was 0) is a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12
@@ -110,51 +118,114 @@ tick:
   [a1]  b       .S1     out
         nop     5
 
-        ; Beat: ring of the last 8 beat times; measure once it is full.
+        ; Beat: ring of the last 8 beat times (n = how many it holds).
         ldw     .D1T1   *+a10(V_IDX), a1
         ldw     .D1T1   *+a10(V_BEATS), a2
         nop     4
-        addaw   .D1     a10, a1, a0         ; a0 + V_RING = this slot
-        ldw     .D1T1   *+a0(V_RING), a12   ; the beat 8 beats ago
+        add     .L1     -2, a1, a0
+        and     .L1     7, a0, a0
+        addaw   .D1     a10, a0, a0
+        ldw     .D1T1   *+a0(V_RING), a12   ; a12 = time 2 beats ago
+        sub     .L1     a1, a2, a0
+        and     .L1     7, a0, a0
+        addaw   .D1     a10, a0, a0
+        ldw     .D1T1   *+a0(V_RING), a13   ; a13 = time n beats ago
+        addaw   .D1     a10, a1, a0
+        stw     .D1T1   a11, *+a0(V_RING)   ; this beat
         add     .L1     1, a1, a1
         and     .L1     7, a1, a1
         stw     .D1T1   a1, *+a10(V_IDX)
+        stw     .D1T1   a2, *+a10(V_N)
         mvk     .S1     8, a1
         cmplt   .L1     a2, a1, a1          ; ring not full yet
-        stw     .D1T1   a11, *+a0(V_RING)
-  [a1]  add     .L1     1, a2, a2
-  [a1]  stw     .D1T1   a2, *+a10(V_BEATS)
+  [a1]  add     .L1     1, a2, a0
+  [a1]  stw     .D1T1   a0, *+a10(V_BEATS)
+        mvk     .S1     2, a1
+        cmplt   .L1     a2, a1, a1          ; need two earlier beats
   [a1]  b       .S1     out
         nop     5
 
-        ; bpm10 = (4800000 + span/2) / span, span = ms for the last 8 beats
-        sub     .L1     a11, a12, a12
-        mvk     .S1     SPAN_MIN, a0
-        cmpltu  .L1     a12, a0, a1
-  [a1]  mv      .L1     a0, a12
-        mvk     .S1     SPAN_MAX, a0
-        cmpgtu  .L1     a12, a0, a1
-  [a1]  mv      .L1     a0, a12
-        shru    .S1     a12, 1, a4
-        mvkl    .S1     4800000, a0
-        mvkh    .S1     4800000, a0
-        add     .L1     a0, a4, a4
-        mv      .L2X    a12, b4
+        ; Quick measurement over the last 2 beats: 10 x bpm =
+        ; (1200000 + span/2) / span. A change of 4 BPM or more on two beats
+        ; in a row is a real tempo change (the first 2-beat window after a
+        ; change straddles both tempos): apply it and restart the average
+        ; from this beat. The first tempo after the clock starts needs no
+        ; second beat.
+        sub     .L1     a11, a12, a0
+  [!a0] mvk     .L1     1, a0               ; never divide by 0
+        shru    .S1     a0, 1, a4
+        mvkl    .S1     1200000, a1
+        mvkh    .S1     1200000, a1
+        add     .L1     a1, a4, a4
+        mv      .L2X    a0, b4
         FARCALL DIVU
-        mv      .L1     a4, a13             ; a13 = 10 x tempo (400..2500)
+        mvk     .S1     BPM10_MIN, a0
+        cmplt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        mvk     .S1     BPM10_MAX, a0
+        cmpgt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        ldw     .D1T1   *+a10(V_APPLIED10), a3
+        ldw     .D1T1   *+a10(V_JUMP), a2
+        mvk     .S1     JUMP10, a1
+        nop     3
+        sub     .L1     a4, a3, a0
+        abs     .L1     a0, a0
+        cmplt   .L1     a0, a1, a1          ; a1 = no jump
+        cmpeq   .L1     0, a3, a0           ; nothing applied since the start
+        or      .L1     a0, a2, a2          ; a2 = jump confirmed
+        xor     .L1     1, a1, a0           ; a0 = jump now
+        xor     .L1     1, a2, a3
+        and     .L1     a0, a3, a3          ; jump not confirmed yet
+        stw     .D1T1   a3, *+a10(V_JUMP)
+  [a1]  b       .S1     steady
+        nop     5
+  [!a2] b       .S1     out                 ; wait for the next beat
+        nop     5
+        mvk     .L1     1, a0
+        stw     .D1T1   a0, *+a10(V_BEATS)  ; the average starts again here
+        mv      .L1     a4, a12
+        b       .S1     apply
+        nop     5
 
-        ; Apply only a tempo at least 0.8 BPM from the one applied last:
-        ; set_setting restarts a stock delay even for the same value, and
-        ; clock jitter must not flip the rounded tempo back and forth.
+        ; Steady tempo: average over all n beats in the ring (4 to 8),
+        ; 10 x bpm = (n x 600000 + span/2) / span, applied only when it is
+        ; 0.8 BPM or more from the tempo applied last. Each apply restarts
+        ; a stock delay, and with 2 beats clock jitter flipped 140/141 BPM.
+steady:
+        ldw     .D1T1   *+a10(V_N), a1
+        mvk     .S1     9375, a3            ; 600000 = 9375 << 6
+        mvk     .S1     N_MIN, a0
+        nop     2
+        cmplt   .L1     a1, a0, a2
+  [a2]  b       .S1     out
+        nop     5
+        mpyu    .M1     a1, a3, a4
+        sub     .L1     a11, a13, a0
+  [!a0] mvk     .L1     1, a0
+        shl     .S1     a4, 6, a4
+        shru    .S1     a0, 1, a3
+        add     .L1     a3, a4, a4
+        mv      .L2X    a0, b4
+        FARCALL DIVU
+        mvk     .S1     BPM10_MIN, a0
+        cmplt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        mvk     .S1     BPM10_MAX, a0
+        cmpgt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
         ldw     .D1T1   *+a10(V_APPLIED10), a0
         mvk     .S1     HYST10, a1
         nop     3
-        sub     .L1     a13, a0, a0
+        sub     .L1     a4, a0, a0
         abs     .L1     a0, a0
         cmplt   .L1     a0, a1, a1
   [a1]  b       .S1     out
         nop     5
-        add     .L1     5, a13, a4          ; bpm = (bpm10 + 5) / 10
+        mv      .L1     a4, a12
+
+apply:  ; a12 = 10 x tempo
+        add     .L1     5, a12, a4          ; bpm = (bpm10 + 5) / 10
         mvk     .S2     10, b4
         FARCALL DIVU
         mv      .L1     a4, a12             ; a12 = tempo to apply (40..250)
