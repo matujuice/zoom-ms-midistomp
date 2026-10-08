@@ -1,0 +1,128 @@
+# MIDI settings page (issue #26, v0.5). MS-50G 3.10 OS only for now.
+# Apply after midi-cc.yaml and midi-clock.yaml (it reroutes the CC call site
+# those set up and clock.S reads the flags it keeps).
+#   Menu > SETTINGS gets four more rows, MIDI CLOCK, MIDI START/STOP,
+#   MIDI PROG CHANGE and MIDI CC, each with an OFF/ON screen like AUTO SAVE.
+#   All ON by default; saved with the stock settings.
+# Design and addresses: docs/os-reverse-engineering.md, "MIDI settings page".
+# The hex below is generated from asm/midi_settings/*.S with
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
+# and tests/test_midi_settings_patch.py checks it still matches the source.
+name: midi-settings
+description: MIDI receive on/off for clock, Start/Stop, program change and CC in SETTINGS
+builds: [ms50g-3.10]
+write:
+  # Key switch table, screen 1 (SETTINGS list) -> list_keys
+  - model: ms50g-3.10
+    addr: 0xC00EF300
+    expect: "04840ac0"
+    data: "00ea8111"
+  # Key switch table, screen 13 (unused by stock) -> midi_keys
+  - model: ms50g-3.10
+    addr: 0xC00EF330
+    expect: "60830ac0"
+    data: "08ea8111"
+  # Draw switch table, screen 13 -> midi_draw
+  - model: ms50g-3.10
+    addr: 0xC00EF2EC
+    expect: "00940ac0"
+    data: "10ea8111"
+  # SETTINGS list draw: row names from our 11-entry table (mvkl/mvkh a1)
+  - model: ms50g-3.10
+    addr: 0xC00A8914
+    expect: "28b4e6006807e000"
+    data: "2820f500e8c08800"
+  # ... row icons from our table (mvkl/mvkh b1)
+  - model: ms50g-3.10
+    addr: 0xC00A8930
+    expect: "2ad4e2006a07e000"
+    data: "2a38f500eac08800"
+  # ... scrollbar for 11 rows (mvk .L2 7,b4 -> 11)
+  - model: ms50g-3.10
+    addr: 0xC00A89C8
+    expect: "5aa31c02"
+    data: "5aa32c02"
+  # Settings save: callp pack -> pack trampoline
+  - model: ms50g-3.10
+    addr: 0xC00B9CF4
+    expect: "93f13310"
+    data: "1361ff1f"
+  - model: ms50g-3.10
+    addr: 0xC00B97E8
+    expect: "00000000000000000000000000000000"
+    data: "2a0c7500eac008006203000000800000"
+    source: asm/midi_settings/pack_trampoline.S
+  # Settings load at boot: callp unpack -> unpack trampoline
+  - model: ms50g-3.10
+    addr: 0xC00BA09C
+    expect: "13603310"
+    data: "93580710"
+  - model: ms50g-3.10
+    addr: 0xC00BDB44
+    expect: "00000000000000000000000000000000"
+    data: "2a107500eac008006203000000800000"
+    source: asm/midi_settings/unpack_trampoline.S
+  # Task_MIDI CC call site (midi-cc.yaml's trampoline) and PC call site
+  # (stock midi_channel_msg) -> gate trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AF088
+    expect: "13710010"
+    data: "93e50710"
+  - model: ms50g-3.10
+    addr: 0xC00AF0AC
+    expect: "130bfe1f"
+    data: "93e10710"
+  - model: ms50g-3.10
+    addr: 0xC00B2FAC
+    expect: "00000000000000000000000000000000"
+    data: "2a147500eac008006203000000800000"
+    source: asm/midi_settings/gate_trampoline.S
+section:
+  # Handlers, tables and the flags word (base + 48), in free L2 after poll.S
+  - model: ms50g-3.10
+    addr: 0x1181EA00
+    source: asm/midi_settings/settings.S
+    data: >-
+      12200000008000009239000000800000925c000000800000928b000000800000
+      1294000000800000929f00000080000000000000000000000000000000000000
+      b5940ec0c8940ec0da940ec0eb940ec0f5940ec002950ec010950ec0bdea8111
+      c8ea8111d8ea8111e9ea8111000000001c3e4f417b361c00001f601f00001c22
+      404f40221c70444c5f4c4470007e7f7f7f7e007f415d5d5d417f1c2271797d3e
+      1c1c22554155221c1c22554155221c1c22554155221c1c22554155221c4d4944
+      4920434c4f434b004d4944492053544152542f53544f50004d4944492050524f
+      47204348414e4745004d49444920434300000000000000000000000000000000
+      e4233c020060000028110000788a8000100e008028500000788a0001900700a0
+      008000002a06c2016a05e0012a823c006a0560006203000000800000d80f1402
+      5aa32c022a6a39006a056000620300002aaef501eac088010040000058a30402
+      2a0642006a05600062030000008000002a2038006a056000620300002ac4f501
+      eac0880100400000a8030000f88a8000e4233c8290f4ff8f00800000f8800002
+      28007500e8c0080074a2010258a334025aa300022af03a006a05600062030000
+      2aaef501eac0880100400000e4233c022800f501e8c0880164a20d0364828d03
+      00000000a8200000788a80009006008028500000788a0001100b00a000800000
+      58a300022a0642006a056000620300000080000058e01800da1f000258a30402
+      2af03a006a056000620300002aaef501eac088010040000058a30404e0cc2004
+      780f1d00580a000078001400d80a8000d82d8400780f1d00580a0000d82d0000
+      780a040190dfffaf00800000f80d9d0374828d032a306c02ea046002e6029002
+      aa000003a2ec1b0300200000facd9402f6029002584f2000782f000090dbffdf
+      008000002880ff02e8c08802e20304035acf9b03a2039c006422140300600000
+      582018037422140358a30000744214005820180374221403a203980090d3ff0f
+      0080000052f8ff07f4423c05f462bc0528007505e8c0080564a2290000600000
+      401ca80064e20602006000002abcb9026a05e002620314002a92f601eac08801
+      0040000058a38005281ce9016807e001666a0d02a8040000806c010058a30002
+      58a3040358800100da1f00032a70fe02ea04e002620314002ab2f601eac08801
+      004000005820ac05d8482c0010f9ffcf0080000064a229006482a90000400000
+      58a30401e00c0801784f8400580a04025aa300022ad2b9026a05e00262031400
+      2ad6f601eac088010040000058a300022a00ba026a05e002620314002ae4f601
+      eac088010040000058a300022ace4a026a07600258a300032a78fc02ea04e002
+      620314002af8f601eac088010040000058a30402aacb4a026a07600258a30003
+      2a78fc02ea04e002620314002a0cf701eac088010040000058a308022ace4a02
+      6a07600258a300032a78fc02ea04e002620314002a20f701eac0880100400000
+      e4423c05e462bc05520880072a344a006a056000620300000080000052f8ff07
+      f642bc01f4623c022a369e02ea06e002620314002a40f701eac0880100400000
+      e4623c0228187500e8c00800640200000040000014e2920058ef0100a02c0000
+      00200000f80f840034e29200e642bc01520880070040000062030c0000800000
+      52f8ff07f642bc01f6623c022ac09d02ea06e002620314002a72f701eac08801
+      00400000e6623c020060000096e2120028187500e8c0080000200000a2290000
+      5aef010076020000e642bc01520880070040000062030c000080000028187500
+      e8c0080064020000d80f100158a3a00058a390a000200000782f000062030cc0
+      008000002a506f00eac008002a7c70a06a0560a0620300000080000000000000
