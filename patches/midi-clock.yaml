@@ -6,7 +6,7 @@
 #   measurements (2 beats each), so jittery USB clock does not wobble it.
 # Design and addresses: docs/os-reverse-engineering.md, "MIDI clock patch".
 # The hex below is generated from asm/midi_clock/*.S with
-#   zoomms asm <file> --addr <addr>
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_clock_patch.py checks it still matches the source.
 name: midi-clock
 description: Patch tempo follows incoming MIDI clock
@@ -45,7 +45,7 @@ section:
       004000002a52e7026a05e002620314002afef001eac08801004000006ca90002
       2a2000022a40e3026a06e002620314002a0ef101eac0880100400000da0fa807
       00000000e642bc01e4623c05e482bc05e4a23c06e4c2bc06e6e23c0552108007
-      6e38000062030c0000800000
+      6e38000062030c00008000000000000000000000000000000000000000000000
   # Its variables, zeroed at boot (the private stack above them needs no load)
   - model: ms50g-3.10
     addr: 0x1181E3C0

@@ -19,7 +19,7 @@ def available() -> bool:
     return Path(PREFIX + "as").exists()
 
 
-def assemble(src: str | Path, addr: int) -> bytes:
+def assemble(src: str | Path, addr: int, whole_packets: bool = False) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         obj, elf, out, ld = (os.path.join(tmp, n) for n in ("a.o", "a.elf", "a.bin", "a.ld"))
         Path(ld).write_text(f"SECTIONS {{ . = 0x{addr:08X}; .text : {{ *(.text) }} /DISCARD/ : {{ *(*) }} }}\n")
@@ -32,4 +32,10 @@ def assemble(src: str | Path, addr: int) -> bytes:
     # slots, so that padding is never executed: drop it.
     while code.endswith(b"\0" * 4):
         code = code[:-4]
+    # Code loaded as a new section must fill its last fetch packet, though:
+    # the CPU fetches whole 32-byte packets, and a stray word 7 that happens to
+    # look like a compact-instruction header (0xE...) would change how the
+    # whole packet decodes. Zero words are plain nops.
+    if whole_packets:
+        code += b"\0" * (-(addr + len(code)) % 32)
     return code

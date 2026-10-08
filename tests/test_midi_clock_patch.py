@@ -12,9 +12,11 @@ CC = patcher.load(ROOT / "patches/midi-cc.yaml")
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_patch_bytes_match_assembly_source():
-    for entry in PATCH["write"] + PATCH["section"]:
-        if "source" in entry:
-            code = asm.assemble(ROOT / entry["source"], entry["addr"])
+    for kind in ("write", "section"):
+        for entry in PATCH[kind]:
+            if "source" not in entry:
+                continue
+            code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section")
             assert code == bytes.fromhex(entry["data"]), entry["source"]
 
 
