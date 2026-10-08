@@ -214,7 +214,7 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   applied at once, a change of 1 only when the next measurement agrees, and
   a tempo changed by hand (read through the setting's value pointer) is
   overridden on the next beat. Applying is `set_setting(TEMPO, bpm,
-  0)` then the same UI refresh as the CC patch. Variables: 32 bytes at
+  0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 32 bytes at
   `0x1181E3C0`, loaded as a zero section.
 - Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
 - **Flash tests 2026-10-08:** the first build never changed the tempo. A
@@ -224,6 +224,11 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   smoothing step, which compared against a direct read of `0xC009C06C`;
   why that read misled it is not known. The smoothing now compares against
   its own last applied value.
+- **fix1 flash test:** the tempo followed the clock, but the pedal froze on a
+  tempo change while a delay was on (not with the delay off). fix2 drops the
+  direct UI refresh (`0xC00ACEA4`) after the tempo change and only posts the
+  UI event, so all drawing stays in the UI task; the private stack may now
+  use everything down to the variables (about 7 KB). Cause not confirmed.
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray

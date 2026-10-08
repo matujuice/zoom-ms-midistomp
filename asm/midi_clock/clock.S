@@ -20,17 +20,18 @@
 ;     a tempo changed by hand (tap, menu, patch change) is overridden on the
 ;     next beat.
 ; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
-; change callback takes the effect semaphore and retunes the effects, then the
-; same UI refresh the MIDI CC patch uses.
+; change callback takes the effect semaphore and retunes the effects, then
+; Event_post(UI, 0x40) so the UI task redraws.
 ;
 ; Task_MIDI has a 2 KB stack and the tempo callback goes deep into the effect
-; code, so the slow path switches to a private 4 KB stack in free L2.
+; code, so the slow path switches to a private stack in free L2: it starts at
+; 0x1181FFF8 and may grow down to 0x1181E3E0 (about 7 KB) before it would
+; reach the variables.
 
         .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
         .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
         .equ    SET_SETTING, 0xC00CAC64     ; (setting, value, notify)
         .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
-        .equ    UI_REFRESH, 0xC00ACEA4
         .equ    EVENT_POST, 0xC00CC680
         .equ    UI_EVENT_OFS, 676
         .equ    VARS, 0x1181E3C0            ; 32 zero bytes, clock_vars section
@@ -41,7 +42,7 @@
         .equ    V_BEATS, 16                 ; beats seen since restart (0..2)
         .equ    V_PEND, 20                  ; tempo 1 off, waiting to be confirmed
         .equ    V_APPLIED, 24               ; tempo this code applied last
-        .equ    STACK_TOP, 0x1181FFF8       ; private stack 0x1181F000-0x1181FFFF
+        .equ    STACK_TOP, 0x1181FFF8       ; private stack, down to 0x1181E3E0
         .equ    GAP_MS, 250
         .equ    SPAN_MIN, 480               ; 2 beats at 250 BPM
         .equ    SPAN_MAX, 3000              ; 2 beats at 40 BPM
@@ -169,13 +170,15 @@ tick:
         nop     5
         stw     .D1T1   a12, *+a10(V_APPLIED)
 
-        ; Apply like tap tempo (no notification to an editor), then refresh.
+        ; Apply like tap tempo (no notification to an editor), then wake the
+        ; UI task to redraw. No direct UI_REFRESH here (fix2): fix1 froze the
+        ; pedal on a tempo change with a delay on, and drawing from Task_MIDI
+        ; while the UI task redraws the delay's synced time is the suspect.
         mvkl    .S1     TEMPO_SETTING, a4
         mvkh    .S1     TEMPO_SETTING, a4
         mv      .L2X    a12, b4
         mvk     .L1     0, a6
         FARCALL SET_SETTING
-        FARCALL UI_REFRESH
         ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
         mvk     .S2     64, b4
         FARCALL EVENT_POST
