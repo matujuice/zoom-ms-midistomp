@@ -155,10 +155,11 @@ so building an updater does not need binutils.
   parameters (descriptor flag bit 2 at +44, at most 11) and ignores a param
   past that count, clamps the value to 0..max, and does nothing when the value
   is unchanged. It walks 6 slots, so slots 0-5 are valid on this OS.
-- **Open question:** the SysEx `0x31` handler only edits slots 0-2 (slot 4 is
-  a patch-level setting, 3 and 5 are ignored). Why is not known; the CC patch
-  calls `fx_set_param` directly for slots 0-5, and the flash test checks
-  effects 4-6.
+- **Tested 2026-10-08** on Luca's MS-60B (MS-50G 3.10 OS, MOD 0.2 build) with
+  MIDI-OX: program change loads patches; CC on/off works for effects 1-6 and
+  the knob CCs change values. The SysEx `0x31` handler only edits slots 0-2
+  (slot 4 is a patch-level setting, 3 and 5 are ignored), but calling
+  `fx_set_param` directly works for all six slots.
 - **CC map:** effect n (1-6) on/off = CC 10n+4 (14, 24 ... 64; value >= 64 is
   on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
   the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
