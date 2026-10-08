@@ -164,3 +164,53 @@ so building an updater does not need binutils.
   on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
   the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
   MS-70CDR), 4 (MS-60B OS).
+
+### Tempo (MS-50G 3.10)
+
+- The patch tempo is a setting object at `0xC00EE3D8` (in `.cinit` data):
+  value pointer `0xC009C06C` (an int in the current patch buffer, right
+  after the six 44-byte effect slots), min 40, max 250, name `TEMPO`, change
+  callback `0xC00B9A44` at +36. `0xC00C0A2E` resets an out-of-range tempo to 120.
+- `0xC00CAC64` is the generic `set_setting(setting, value, notify)`: clamps
+  to min/max, does nothing when unchanged, stores, runs the callback.
+- The tempo callback takes the effect semaphore (`B14+784`), retunes the
+  effects (`0xC00C4064`), releases it, and with `notify` set sends the new
+  tempo to an editor over SysEx (`0xC00AF2D0`, only while editor mode is on).
+- Tap tempo is `0xC00B9DA8`: times taps with `Clock_getTicks` (`0xC00DF360`,
+  1 ms), bpm = 60000 * taps / total ms (unsigned divide `0xC00DCA20`), clamped
+  to 40..250, then `set_setting(0xC00EE3D8, bpm, 1)`.
+- `Task_MIDI` ignores realtime bytes (`0xF8`-`0xFF`): the branch at `0xC00AF0C6`
+  skips straight to the loop end at `0xC00AF0F8`.
+
+Task stacks (from the `.cinit` task table): `Task_MainApp` and `Task_UpdateUI`
+8 KB, `Task_MIDI`, `Task_UpdateLED`, `Task_SwitchNrmlSpdRead`,
+`Task_TunerService` 2 KB.
+
+### MIDI clock patch (issue #5, `patches/midi-clock.yaml`)
+
+Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
+
+- **Hook:** every received byte ends Task_MIDI's loop at `0xC00AF0F8`
+  (`ldw *+b14(224),b0`, a 32-bit word in a header fetch packet with no
+  parallel bits), with the byte saved at `B14+234`. That word becomes
+  `callp 0xC00A1A50`; the hook runs the replaced load before returning to
+  `0xC00AF100`. Only callee-saved A10 is live there.
+- **Trampoline:** 16 zero bytes at `0xC00A1A50`, after `bnop b3,5` at
+  `0xC00A1A4C`, the last four words of a plain fetch packet, not a branch
+  target. Far jump to the handler at `0x1181E040` (L2, after the CC handler).
+- **Handler (`clock.S`):** any byte but `0xF8` returns at once. For a tick it
+  switches to a private 4 KB stack (`0x1181F000`-`0x1181FFFF`, because the
+  tempo callback goes deep and Task_MIDI's stack is only 2 KB), reads
+  `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
+  24th tick (a beat), from the third beat on, measures the last two beats:
+  bpm = (120000 + span/2) / span with span clamped to 480..3000 ms (40..250
+  BPM). Smoothing: a change of 2 or more is applied at once, a change of 1
+  only when the next measurement agrees. Applying is `set_setting(TEMPO, bpm,
+  0)` then the same UI refresh as the CC patch. Variables: 32 bytes at
+  `0x1181E3C0`, loaded as a zero section.
+- Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
+- **Fetch-packet padding:** new sections are now zero-padded to a whole
+  32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
+  leaves the rest of that packet as whatever L2 held at boot, and a stray
+  word 7 that looks like a compact header (`0xE...`) would change how the
+  packet decodes. The CC handler section went from 404 to 416 bytes.
