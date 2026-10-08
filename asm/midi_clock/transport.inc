@@ -11,7 +11,7 @@
         .equ    B_TICKS, 16                 ; clocks since Start
         .equ    B_TEMPO, 20                 ; BPM x 100
 
-; Clock handler variables, zeroed at boot (clock_vars section).
+; Clock handler variables, 192 bytes zeroed at boot (clock_vars section).
         .equ    VARS, 0x1181E700
         .equ    V_COUNT, 0                  ; ticks since the last beat (0..23)
         .equ    V_LAST, 4                   ; time of the last tick
@@ -24,6 +24,12 @@
         .equ    V_RING, 32                  ; tick-time sums of the last 8 beats
         .equ    V_STARTT, 64                ; time of the last Start
         .equ    V_PSEEN, 68                 ; patch TEMPO the poll saw last
+        .equ    V_NTK, 72                   ; tick times in V_TR (0..24)
+        .equ    V_TIDX, 76                  ; next slot in V_TR (0..23)
+        .equ    V_RUN, 80                   ; fast path: agreeing ticks so far
+        .equ    V_RQ, 84                    ; fast path: first value of the run
+        .equ    V_QS, 88                    ; fast path: sum of the run's values
+        .equ    V_TR, 96                    ; times of the last 24 ticks
 
         .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
         .equ    TEMPO_VALUE, 0xC009C06C     ; patch TEMPO, int BPM

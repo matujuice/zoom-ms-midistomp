@@ -7,7 +7,7 @@
         .text
         .global poll_trampoline
 poll_trampoline:
-        mvkl    .S2     0x1181E780, b0
-        mvkh    .S2     0x1181E780, b0
+        mvkl    .S2     0x1181E800, b0
+        mvkh    .S2     0x1181E800, b0
         b       .S2     b0
         nop     5

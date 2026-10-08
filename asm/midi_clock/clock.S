@@ -47,6 +47,8 @@
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
         .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
         .equ    N_MIN, 4                    ; beats the average needs
+        .equ    FAST_TICKS, 12              ; fast path: half a beat agreeing
+        .equ    FAST_REL, 33                ; fast path: 1/33 = 3%
         .equ    GAP_MS, 250
         .equ    BPM10_MIN, 400              ; 40 BPM, like tap tempo
         .equ    BPM10_MAX, 2500             ; 250 BPM
@@ -149,6 +151,104 @@ tick:
   [a2]  stw     .D1T1   a3, *+a10(V_APPLIED10) ; and apply the next tempo
   [a2]  stw     .D1T1   a3, *+a10(V_SUM)
   [a2]  stw     .D1T1   a3, *+a10(V_PREVQ)
+  [a2]  stw     .D1T1   a3, *+a10(V_NTK)
+  [a2]  stw     .D1T1   a3, *+a10(V_RUN)
+
+        ; Fast path (v0.4 fix1): every tick, the last 24 tick intervals (one
+        ; beat) give 10 x bpm = (600000 + span/2) / span. When it is more
+        ; than 3% from the tempo applied last for FAST_TICKS ticks in a row,
+        ; each within 3% of the first, the average of those values is applied
+        ; and the beat measurement starts again from here. A tempo change
+        ; lands in about 1.5 beats instead of 3 to 4. Smaller changes still
+        ; go through the beat path below. Simulated with up to 3 ms tick
+        ; jitter: steady tempos are never re-applied; a change is applied
+        ; once, now and then twice (the second time a fine correction).
+        ldw     .D1T1   *+a10(V_TIDX), a1
+        ldw     .D1T1   *+a10(V_NTK), a2
+        nop     4
+        addaw   .D1     a10, a1, a0
+        ldw     .D1T1   *+a0(V_TR), a12     ; a12 = time 24 ticks ago
+        stw     .D1T1   a11, *+a0(V_TR)
+        add     .L1     1, a1, a1
+        mvk     .S1     24, a5
+        cmpeq   .L1     a1, a5, a0
+  [a0]  mvk     .L1     0, a1
+        stw     .D1T1   a1, *+a10(V_TIDX)
+        cmplt   .L1     a2, a5, a0          ; ring not full yet
+  [a0]  add     .L1     1, a2, a2
+  [a0]  stw     .D1T1   a2, *+a10(V_NTK)
+  [a0]  b       .S1     fast_out
+        ldw     .D1T1   *+a10(V_APPLIED10), a13
+        nop     4
+        mv      .L1     a13, a0
+  [!a0] b       .S1     fast_out            ; nothing applied yet
+        nop     5
+        sub     .L1     a11, a12, a0
+  [!a0] mvk     .L1     1, a0               ; never divide by 0
+        shru    .S1     a0, 1, a4
+        mvkl    .S1     600000, a1
+        mvkh    .S1     600000, a1
+        add     .L1     a1, a4, a4
+        mv      .L2X    a0, b4
+        FARCALL DIVU
+        mvk     .S1     BPM10_MIN, a0
+        cmplt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        mvk     .S1     BPM10_MAX, a0
+        cmpgt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        ldw     .D1T1   *+a10(V_RUN), a2
+        ldw     .D1T1   *+a10(V_RQ), a5
+        sub     .L1     a4, a13, a0
+        abs     .L1     a0, a0
+        mvk     .S1     FAST_REL, a1
+        mpy     .M1     a0, a1, a0
+        nop     1
+        cmpgt   .L1     a0, a13, a0         ; more than 3% away
+  [!a0] b       .S1     fast_reset
+        nop     5
+  [!a2] b       .S1     fast_new
+        nop     5
+        sub     .L1     a4, a5, a0
+        abs     .L1     a0, a0
+        mpy     .M1     a0, a1, a0
+        nop     1
+        cmpgt   .L1     a0, a5, a0          ; strays from the run
+  [a0]  b       .S1     fast_reset
+        ldw     .D1T1   *+a10(V_QS), a6
+        nop     4
+        b       .S1     fast_add
+        nop     5
+fast_new:
+        stw     .D1T1   a4, *+a10(V_RQ)
+        mvk     .L1     0, a6
+fast_add:
+        add     .L1     1, a2, a2
+        add     .L1     a4, a6, a6
+        stw     .D1T1   a2, *+a10(V_RUN)
+        stw     .D1T1   a6, *+a10(V_QS)
+        mvk     .S1     FAST_TICKS, a0
+        cmplt   .L1     a2, a0, a0
+  [a0]  b       .S1     fast_out
+        nop     5
+        mv      .L1     a6, a4              ; their average
+        mvk     .S2     FAST_TICKS, b4
+        FARCALL DIVU
+        mvk     .L1     0, a3
+        stw     .D1T1   a3, *+a10(V_RUN)
+        stw     .D1T1   a3, *+a10(V_BEATS)  ; beats start again from here
+        stw     .D1T1   a3, *+a10(V_COUNT)
+        stw     .D1T1   a3, *+a10(V_SUM)
+        stw     .D1T1   a3, *+a10(V_PREVQ)
+        PUBTEMPO
+        mv      .L1     a4, a12
+        b       .S1     apply
+        nop     5
+fast_reset:
+        mvk     .L1     0, a0
+        stw     .D1T1   a0, *+a10(V_RUN)
+fast_out:
+        mvk     .L1     0, a3
 
         ; Count ticks and add up their times; the 24th completes a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12

@@ -285,11 +285,20 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   compact fetch packet). Only that call's displacement changes, to a
   trampoline in the 16 zero bytes at `0xC00C8050` (after `bnop b3,5` at
   `0xC00C804C`, nothing branches there), which jumps to `poll.S` at
-  `0x1181E780`. `poll.S` returns the time like `Clock_getTicks` does.
+  `0x1181E800`. `poll.S` returns the time like `Clock_getTicks` does.
 - **Why not hook the TEMPO callback:** `0xC00B9A44` runs for `set_setting`
   (tap, menu, clock), but a patch load may write the TEMPO int
   (`0xC009C06C`) without it (not checked); the poll reads the int itself, so
   it catches every path.
 - **L2 use from v0.4:** CC handler `0x1181DEA0`, clock handler `0x1181E040`
-  (1248 B), clock variables `0x1181E700` (96 B), poll `0x1181E780` (288 B),
+  (1664 B), clock variables `0x1181E700` (192 B), poll `0x1181E800` (288 B),
   transport block `0x1181FF00` (32 B).
+- **fix1 (faster follow):** Luca found the tempo needs 2-4 beats to follow a
+  DAW change. The beat path cannot be quicker without jitter flips (its
+  windows straddle two beats). `clock.S` now also keeps the last 24 tick
+  times and measures one beat every tick; 12 ticks in a row more than 3%
+  from the applied tempo, each within 3% of the first, apply their average.
+  Host simulation (1 ms clock, up to ±3 ms tick jitter, tempos 60-220):
+  changes of 3% or more land in 1.5-2 beats (beat path: 3-4), steady tempos
+  are never re-applied, about one change in four gets a second, fine
+  correction a few beats later. Changes under 3% still take the beat path.
