@@ -179,6 +179,12 @@ so building an updater does not need binutils.
 - Tap tempo is `0xC00B9DA8`: times taps with `Clock_getTicks` (`0xC00DF360`,
   1 ms), bpm = 60000 * taps / total ms (unsigned divide `0xC00DCA20`), clamped
   to 40..250, then `set_setting(0xC00EE3D8, bpm, 1)`.
+- Matches the effects-pack findings (`zoom-ms-zdl-effects-pack`,
+  docs/TEMPO-SYNC.md section 7): the pedal sends `31 03 08 <tempo>` when the
+  tempo is tapped (that is the `notify` SysEx), and the incoming `31 03 08`
+  is not a tempo edit (the `0x31` handler only edits slots 0-2). Stock
+  sync-aware effects (TAPEECH3 and friends) ask the firmware for the tempo;
+  no route was found for a custom ZDL to read it.
 - `Task_MIDI` ignores realtime bytes (`0xF8`-`0xFF`): the branch at `0xC00AF0C6`
   skips straight to the loop end at `0xC00AF0F8`.
 
