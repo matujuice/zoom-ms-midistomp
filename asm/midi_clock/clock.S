@@ -94,3 +94,45 @@ tick:
         cmpgtu  .L1     a0, a1, a2          ; first tick after a gap:
   [a2]  stw     .D1T1   a3, *+a10(V_COUNT)  ;   restart counting
   [a2]  stw     .D1T1   a3, *+a10(V_BEATS)
+
+        ; Count ticks; only every 24th (count was 0) is a beat.
+        ldw     .D1T1   *+a10(V_COUNT), a12
+        mvk     .S1     24, a1
+        nop     3
+        add     .L1     1, a12, a0
+        cmpeq   .L1     a0, a1, a2
+  [a2]  mvk     .L1     0, a0
+        stw     .D1T1   a0, *+a10(V_COUNT)
+        mv      .L1     a12, a1
+  [a1]  b       .S1     out
+        nop     5
+
+        ; Beat: shift the beat times; need two earlier beats to measure.
+        ldw     .D1T1   *+a10(V_BEATS), a1
+        ldw     .D1T1   *+a10(V_BEAT1), a0
+        ldw     .D1T1   *+a10(V_BEAT2), a12 ; two beats ago
+        nop     4
+        stw     .D1T1   a0, *+a10(V_BEAT2)
+        stw     .D1T1   a11, *+a10(V_BEAT1)
+        mvk     .S1     2, a2
+        cmplt   .L1     a1, a2, a2          ; fewer than 2 beats so far
+  [a2]  add     .L1     1, a1, a1
+  [a2]  stw     .D1T1   a1, *+a10(V_BEATS)
+  [a2]  b       .S1     out
+        nop     5
+
+        ; bpm = (120000 + span/2) / span, span = ms for the last 2 beats
+        sub     .L1     a11, a12, a12
+        mvk     .S1     SPAN_MIN, a0
+        cmpltu  .L1     a12, a0, a1
+  [a1]  mv      .L1     a0, a12
+        mvk     .S1     SPAN_MAX, a0
+        cmpgtu  .L1     a12, a0, a1
+  [a1]  mv      .L1     a0, a12
+        shru    .S1     a12, 1, a4
+        mvkl    .S1     120000, a0
+        mvkh    .S1     120000, a0
+        add     .L1     a0, a4, a4
+        mv      .L2X    a12, b4
+        FARCALL DIVU
+        mv      .L1     a4, a12             ; a12 = measured bpm (40..250)
