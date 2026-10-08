@@ -65,7 +65,7 @@ need translating (patches locate code by byte pattern, not fixed address).
 
 | What | Address | Notes |
 |---|---|---|
-| Entry (`_c_int00`) | `0xC00DDCC0` | sets SP `0x1180CEF8` (L2), DP/B14 `0xC00EFCC0` |
+| Entry (`_c_int00`) | `0xC00DDCC0` | sets SP `0x1181CEF8` (L2), DP/B14 `0xC00EFCC0` |
 | `.cinit` copy table | `0xC00F17F8`-`0xC00F1958` | TI RLE (delimiter byte, `delim n v` = n copies, `delim 0 hi lo v` = 16-bit run, `delim 0 0 0` = end) plus zero-init records |
 | Zero-initialised RAM | `0xC0000000`+`0x9DFAC`, `0xC0200000`... | six `0x7800` and six `0xAC440` blocks at `0xC0200000`-`0xC0636980`, one block per effect slot (inferred: delay memory) |
 | Task table | `.cinit` data | `Task_MainApp 0xC00AD464`, `Task_UpdateUI 0xC00BA644`, `Task_MIDI 0xC00AEE98`, `Task_UpdateLED 0xC00C760C`, `Task_SwitchNrmlSpdRead 0xC00CA620`, `Task_TunerService 0xC00DC8A0` |
@@ -76,7 +76,7 @@ it is not assumed free.
 
 ### MIDI receive (`Task_MIDI`, `0xC00AEE98`)
 
-- Reads bytes from a ring buffer at `0xC0086B90` (read index `B14+224`, write
+- Reads bytes from a ring buffer at `0xC0096B90` (read index `B14+224`, write
   index `B14+228`) filled by the USB MIDI driver, which posts `Event_MIDIDataReady`.
 - Running status at `B14+232`, data byte count `B14+235`, first data byte `B14+233`.
 - `0xBn` (Control Change) and `0xCn` (Program Change) both call
@@ -99,7 +99,7 @@ it is not assumed free.
 
 ### SysEx parameter edit
 
-- Command byte (`F0 52 00 58 <cmd>`) stored at `0xC0087BA0`; per-command byte
+- Command byte (`F0 52 00 58 <cmd>`) stored at `0xC0097BA0`; per-command byte
   handlers in tables at `0xC00EF258` and `0xC00EF280`.
 - `0x50` editor mode on (sets `B14+344`), `0x51` off. Parameter edits are only
   accepted while editor mode is on.
@@ -108,7 +108,7 @@ it is not assumed free.
   `fx_set_param(slot, param, value, 0, 1)` at `0xC00BAEE0`, guarded by
   `Semaphore_pend/post` on the handle at `B14+784` (`0xC00C7C60` / `0xC00D70C0`),
   then a UI refresh (`0xC00ACEA4`, `Event_post(B14+676, 0x40)` via `0xC00CC680`).
-- Param 0 is on/off. Patch effect data: 44 bytes per slot at `0xC007BF58`
+- Param 0 is on/off. Patch effect data: 44 bytes per slot at `0xC009BF58`
   (11 words, word 0 = on/off).
 
 This is the path the v0.2 MIDI CC patch reuses. Effect Manager writes effects
@@ -133,7 +133,8 @@ so building an updater does not need binutils.
   L2 address the OS builds with `mvkl/mvkh` is `0x1181DE80` (re-checked over
   the whole disassembly), the bootloader builds none, and no data word points
   past `0x1181DCE0` except one unaligned coincidence. So `0x1181DE84`-
-  `0x1181FFFF` (about 8 KB) is free. The handler (404 bytes) loads at
+  `0x1181FFFF` (about 8 KB) is free. The boot stack starts at `0x1181CEF8` and
+  grows down, away from it. The handler (404 bytes) loads at
   `0x1181DEA0` as an extra AIS section.
 - **Reaching it:** DDR code cannot `callp` into L2 (out of the ±4 MB range).
   The 24 zero bytes at `0xC00AF408` (padding after a function return, in a
