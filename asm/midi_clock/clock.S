@@ -136,3 +136,47 @@ tick:
         mv      .L2X    a12, b4
         FARCALL DIVU
         mv      .L1     a4, a12             ; a12 = measured bpm (40..250)
+
+        ; Smoothing against the current tempo.
+        ldw     .D1T1   *+a10(V_PEND), a3
+        mvkl    .S1     TEMPO_VALUE, a0
+        mvkh    .S1     TEMPO_VALUE, a0
+        ldw     .D1T1   *a0, a13            ; a13 = current tempo
+        nop     4
+        sub     .L1     a12, a13, a0
+        abs     .L1     a0, a0
+        cmpltu  .L1     1, a0, a1           ; 2 or more away
+        cmpeq   .L1     a12, a3, a2         ; same 1-off value twice
+        or      .L1     a1, a2, a1          ; a1 = apply now
+        cmpeq   .L1     a12, a13, a2        ; already there
+        or      .L1     a1, a2, a2          ; a2 = forget the pending value
+        mv      .L1     a12, a3
+  [a2]  mvk     .L1     0, a3
+        stw     .D1T1   a3, *+a10(V_PEND)
+  [!a1] b       .S1     out
+        nop     5
+
+        ; Apply like tap tempo (no notification to an editor), then refresh.
+        mvkl    .S1     TEMPO_SETTING, a4
+        mvkh    .S1     TEMPO_SETTING, a4
+        mv      .L2X    a12, b4
+        mvk     .L1     0, a6
+        FARCALL SET_SETTING
+        FARCALL UI_REFRESH
+        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
+        mvk     .S2     64, b4
+        FARCALL EVENT_POST
+
+out:
+        mv      .L2     b10, b15            ; back to Task_MIDI's stack
+        nop     1
+        ldw     .D2T2   *+b15(8), b3
+        ldw     .D2T1   *+b15(12), a10
+        ldw     .D2T1   *+b15(16), a11
+        ldw     .D2T1   *+b15(20), a12
+        ldw     .D2T1   *+b15(24), a13
+        ldw     .D2T2   *+b15(28), b10
+        addk    .S2     32, b15
+        ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
+        b       .S2     b3
+        nop     5
