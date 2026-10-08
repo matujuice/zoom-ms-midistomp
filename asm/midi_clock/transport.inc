@@ -29,10 +29,15 @@
         .equ    V_RUN, 80                   ; fast path: agreeing ticks so far
         .equ    V_RQ, 84                    ; fast path: first value of the run
         .equ    V_QS, 88                    ; fast path: sum of the run's values
+        .equ    V_WANT, 92                  ; tempo for poll.S to apply, 0 = none
         .equ    V_TR, 96                    ; times of the last 24 ticks
 
         .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
         .equ    TEMPO_VALUE, 0xC009C06C     ; patch TEMPO, int BPM
+        .equ    SET_SETTING, 0xC00CAC64     ; (setting, value, notify)
+        .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
+        .equ    EVENT_POST, 0xC00CC680
+        .equ    UI_EVENT_OFS, 676
 
 ; Update the block atomically: interrupts off (nothing can read it half
 ; written on this single core), sequence odd while writing.

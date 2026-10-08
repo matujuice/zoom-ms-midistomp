@@ -291,7 +291,7 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   (`0xC009C06C`) without it (not checked); the poll reads the int itself, so
   it catches every path.
 - **L2 use from v0.4:** CC handler `0x1181DEA0`, clock handler `0x1181E040`
-  (1664 B), clock variables `0x1181E700` (192 B), poll `0x1181E800` (288 B),
+  (1600 B), clock variables `0x1181E700` (192 B), poll `0x1181E800` (416 B),
   transport block `0x1181FF00` (32 B).
 - **fix1 (faster follow):** Luca found the tempo needs 2-4 beats to follow a
   DAW change. The beat path cannot be quicker without jitter flips (its
@@ -303,3 +303,13 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   are never re-applied, about one change in four gets a second, fine
   correction a few beats later. Changes under 3% still take the beat path.
   **fix1 flash test 2026-10-08:** OK (Luca).
+- **fix2 (clocks lost on a tempo change):** with a pack EuGate reading the
+  block (effects pack PR #34), Luca saw EuGate sit a fixed amount off the
+  beat after each DAW tempo change until the next Start: the clock count
+  came out short. Task_MIDI's own receive ring cannot be the cause (4096
+  bytes, and the reader task `0xC00CF2E4` stops reading rather than
+  overwriting when it is full), so the likely cause is Task_MIDI blocking in
+  `set_setting(TEMPO)` while the effects retune, with bytes lost before the
+  ring. Not confirmed. fix2 no longer applies the tempo in Task_MIDI:
+  `clock.S` stores it in `V_WANT`, and `poll.S` applies it from the
+  footswitch task (same calls as before) on its next 16 ms round.

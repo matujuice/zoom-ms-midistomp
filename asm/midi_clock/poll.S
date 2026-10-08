@@ -6,6 +6,8 @@
 ; time in A4, keeps every callee-saved register) and on the way:
 ;   - clears "running" when no clock came for STALE_MS, neither since the
 ;     last clock nor since Start (a cable pulled without a Stop);
+;   - applies a tempo clock.S asked for (V_WANT) like tap tempo does, so
+;     Task_MIDI never waits while the effects retune (v0.4 fix2);
 ;   - copies a new patch TEMPO (tap, TEMPO setting, patch load) into the block
 ;     as BPM x 100, unless the clock is live: then clock.S owns the tempo.
 ;     A TEMPO change while the clock is live (the clock setting it) is only
@@ -19,9 +21,10 @@
         .nocmp
         .global poll_hook
 poll_hook:
-        addk    .S2     -8, b15
-        stw     .D2T2   b3, *+b15(8)
+        addk    .S2     -16, b15
+        stw     .D2T2   b3, *+b15(16)
         FARCALL CLOCK_GETTICKS              ; a4 = now, returned as is
+        stw     .D2T1   a4, *+b15(12)
         mvkl    .S1     VARS, a0
         mvkh    .S1     VARS, a0
         mvkl    .S2     TEMPO_VALUE, b0
@@ -65,8 +68,32 @@ tempo:
         PUB_END
 
 out:
-        ldw     .D2T2   *+b15(8), b3
-        addk    .S2     8, b15
+        ; A tempo from the clock: take it (interrupts off, Task_MIDI may
+        ; write a newer one any time) and apply it like tap tempo.
+        mvkl    .S1     VARS, a0
+        mvkh    .S1     VARS, a0
+        mvk     .L1     0, a2
+        mvc     .S2     csr, b6
+        and     .L2     -2, b6, b7
+        mvc     .S2     b7, csr
+        ldw     .D1T2   *+a0(V_WANT), b4
+        stw     .D1T1   a2, *+a0(V_WANT)
+        nop     3
+        mvc     .S2     b6, csr
+        mv      .L1X    b4, a1
+  [!a1] b       .S1     done
+        nop     5
+        mvkl    .S1     TEMPO_SETTING, a4
+        mvkh    .S1     TEMPO_SETTING, a4
+        mvk     .L1     0, a6               ; no editor notification
+        FARCALL SET_SETTING
+        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
+        mvk     .S2     64, b4
+        FARCALL EVENT_POST
+done:
+        ldw     .D2T1   *+b15(12), a4       ; now
+        ldw     .D2T2   *+b15(16), b3
+        addk    .S2     16, b15
         nop     4
         b       .S2     b3
         nop     5

@@ -27,8 +27,9 @@
 ;     every apply restarts a stock delay, and with a 2-beat measurement
 ;     clock jitter flipped the tempo between 140 and 141 on the pedal;
 ;   - tempos are kept as 10 x BPM and clamped to 40..250 BPM like tap tempo.
-; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
-; change callback takes the effect semaphore and retunes the effects, then
+; Applying hands the tempo to poll.S (V_WANT), which does what tap tempo does
+; (0xC00B9DA8) from the footswitch task: set_setting(TEMPO, bpm), whose change
+; callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
 ;
 ; The slow path runs on Task_MIDI's own 2 KB stack (fix3). Builds up to fix2
@@ -39,10 +40,6 @@
 
         .include "transport.inc"
         .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
-        .equ    SET_SETTING, 0xC00CAC64     ; (setting, value, notify)
-        .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
-        .equ    EVENT_POST, 0xC00CC680
-        .equ    UI_EVENT_OFS, 676
         .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
         .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
@@ -385,18 +382,11 @@ apply:  ; a12 = 10 x tempo
         add     .L1     a0, a1, a0
         stw     .D1T1   a0, *+a10(V_APPLIED10)
 
-        ; Apply like tap tempo (no notification to an editor), then wake the
-        ; UI task to redraw. No direct UI_REFRESH here (fix2): fix1 froze the
-        ; pedal on a tempo change with a delay on, and drawing from Task_MIDI
-        ; while the UI task redraws the delay's synced time is the suspect.
-        mvkl    .S1     TEMPO_SETTING, a4
-        mvkh    .S1     TEMPO_SETTING, a4
-        mv      .L2X    a12, b4
-        mvk     .L1     0, a6
-        FARCALL SET_SETTING
-        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
-        mvk     .S2     64, b4
-        FARCALL EVENT_POST
+        ; Hand the tempo to the poll (poll.S), which applies it from the
+        ; footswitch task within 16 ms (v0.4 fix2): applying here blocked
+        ; Task_MIDI while the effects retuned, and EuGate then came out a
+        ; fixed number of clocks late after each tempo change.
+        stw     .D1T1   a12, *+a10(V_WANT)
 
 out:
         mv      .L2     b10, b15            ; back to Task_MIDI's stack
