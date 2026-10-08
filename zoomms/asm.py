@@ -23,7 +23,7 @@ def assemble(src: str | Path, addr: int, whole_packets: bool = False) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         obj, elf, out, ld = (os.path.join(tmp, n) for n in ("a.o", "a.elf", "a.bin", "a.ld"))
         Path(ld).write_text(f"SECTIONS {{ . = 0x{addr:08X}; .text : {{ *(.text) }} /DISCARD/ : {{ *(*) }} }}\n")
-        subprocess.run([PREFIX + "as", "-mlittle-endian", "-march=c674x", "-o", obj, str(src)], check=True)
+        subprocess.run([PREFIX + "as", "-mlittle-endian", "-march=c674x", "-I", str(Path(src).parent), "-o", obj, str(src)], check=True)
         subprocess.run([PREFIX + "ld", "-EL", "-T", ld, "-e", hex(addr), "-o", elf, obj], check=True)
         subprocess.run([PREFIX + "objcopy", "-O", "binary", "-j", ".text", elf, out], check=True)
         code = Path(out).read_bytes()
