@@ -7,8 +7,9 @@
 ; runs the replaced load before returning. Only callee-saved A10 is live in
 ; Task_MIDI here, so B0-B2 are free on the fast path.
 ;
-; Every byte other than 0xF8 (timing clock) returns at once. Start, stop and
-; continue are ignored, as before.
+; Every byte other than 0xF8 (timing clock), 0xFA (start) and 0xFC (stop)
+; returns at once; continue (0xFB) is ignored. Start and stop only update the
+; transport block (transport.inc); every clock counts in it while running.
 ;
 ; Tempo from the clock (24 ticks per quarter note):
 ;   - a gap of more than GAP_MS between ticks restarts the measurement;
@@ -26,8 +27,9 @@
 ;     every apply restarts a stock delay, and with a 2-beat measurement
 ;     clock jitter flipped the tempo between 140 and 141 on the pedal;
 ;   - tempos are kept as 10 x BPM and clamped to 40..250 BPM like tap tempo.
-; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
-; change callback takes the effect semaphore and retunes the effects, then
+; Applying hands the tempo to poll.S (V_WANT), which does what tap tempo does
+; (0xC00B9DA8) from the footswitch task: set_setting(TEMPO, bpm), whose change
+; callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
 ;
 ; The slow path runs on Task_MIDI's own 2 KB stack (fix3). Builds up to fix2
@@ -36,39 +38,26 @@
 ; Stock Program Change already loads whole patches from Task_MIDI on its own
 ; stack, so that is the context the effects are used to.
 
-        .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
+        .include "transport.inc"
         .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
-        .equ    SET_SETTING, 0xC00CAC64     ; (setting, value, notify)
-        .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
-        .equ    EVENT_POST, 0xC00CC680
-        .equ    UI_EVENT_OFS, 676
-        .equ    VARS, 0x1181E3C0            ; 64 zero bytes, clock_vars section
-        .equ    V_COUNT, 0                  ; ticks since the last beat (0..23)
-        .equ    V_LAST, 4                   ; time of the last tick
-        .equ    V_BEATS, 8                  ; beats seen since restart (0..8)
-        .equ    V_IDX, 12                   ; next slot in the beat ring (0..7)
-        .equ    V_APPLIED10, 16             ; 10 x tempo applied last, 0 = none
-        .equ    V_N, 20                     ; beats in the ring before this one
-        .equ    V_SUM, 24                   ; sum of this beat's tick times
-        .equ    V_PREVQ, 28                 ; last beat's quick 10 x tempo
-        .equ    V_RING, 32                  ; tick-time sums of the last 8 beats
         .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
         .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
         .equ    N_MIN, 4                    ; beats the average needs
+        .equ    FAST_TICKS, 12              ; fast path: half a beat agreeing
+        .equ    FAST_REL, 33                ; fast path: 1/33 = 3%
         .equ    GAP_MS, 250
         .equ    BPM10_MIN, 400              ; 40 BPM, like tap tempo
         .equ    BPM10_MAX, 2500             ; 250 BPM
 
-; Far call: B5 = target, B3 = return label. Arguments must be set before.
-        .macro  FARCALL target
-        mvkl    .S2     \target, b5
-        mvkh    .S2     \target, b5
-        b       .S2     b5
-        mvkl    .S2     ret\@, b3
-        mvkh    .S2     ret\@, b3
-        nop     3
-ret\@:
+; Publish a4 = 10 x BPM as the block tempo (BPM x 100). Uses A5-A8, B6, B7.
+        .macro  PUBTEMPO
+        shl     .S1     a4, 3, a7
+        shl     .S1     a4, 1, a8
+        add     .L1     a7, a8, a7
+        PUB_BEGIN
+        stw     .D1T1   a7, *+a5(B_TEMPO)
+        PUB_END
         .endm
 
         .text
@@ -81,8 +70,48 @@ clock_hook:
         cmpeq   .L2     b0, b1, b2
   [b2]  b       .S2     tick
         nop     5
+        mvk     .S2     0xFA, b1
+        cmpeq   .L2     b0, b1, b2
+  [b2]  b       .S2     start
+        mvk     .S2     0xFC, b1
+        cmpeq   .L2     b0, b1, b1
+  [b1]  b       .S2     stop
+        nop     5
+done:
         ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
         b       .S2     b3
+        nop     5
+
+        ; Start: running, one more start, no clocks yet. Its time keeps the
+        ; poll (poll.S) from calling the clock stopped before the first one.
+start:
+        addk    .S2     -8, b15
+        stw     .D2T2   b3, *+b15(8)
+        FARCALL CLOCK_GETTICKS
+        mvkl    .S1     VARS, a0
+        mvkh    .S1     VARS, a0
+        stw     .D1T1   a4, *+a0(V_STARTT)
+        ldw     .D2T2   *+b15(8), b3
+        addk    .S2     8, b15
+        PUB_BEGIN
+        ldw     .D1T1   *+a5(B_STARTS), a0
+        mvk     .L1     1, a1
+        mvk     .L1     0, a2
+        nop     2
+        add     .L1     1, a0, a0
+        stw     .D1T1   a0, *+a5(B_STARTS)
+        stw     .D1T1   a1, *+a5(B_RUN)
+        stw     .D1T1   a2, *+a5(B_TICKS)
+        PUB_END
+        b       .S2     done
+        nop     5
+
+stop:
+        PUB_BEGIN
+        mvk     .L1     0, a0
+        stw     .D1T1   a0, *+a5(B_RUN)
+        PUB_END
+        b       .S2     done
         nop     5
 
 tick:
@@ -100,6 +129,13 @@ tick:
 
         FARCALL CLOCK_GETTICKS
         mv      .L1     a4, a11             ; a11 = now (ms)
+        PUB_BEGIN                           ; one more clock while running
+        ldw     .D1T1   *+a5(B_RUN), a1
+        ldw     .D1T1   *+a5(B_TICKS), a0
+        nop     4
+  [a1]  add     .L1     1, a0, a0
+        stw     .D1T1   a0, *+a5(B_TICKS)
+        PUB_END
         ldw     .D1T1   *+a10(V_LAST), a0
         stw     .D1T1   a11, *+a10(V_LAST)
         mvk     .S1     GAP_MS, a1
@@ -112,6 +148,104 @@ tick:
   [a2]  stw     .D1T1   a3, *+a10(V_APPLIED10) ; and apply the next tempo
   [a2]  stw     .D1T1   a3, *+a10(V_SUM)
   [a2]  stw     .D1T1   a3, *+a10(V_PREVQ)
+  [a2]  stw     .D1T1   a3, *+a10(V_NTK)
+  [a2]  stw     .D1T1   a3, *+a10(V_RUN)
+
+        ; Fast path (v0.4 fix1): every tick, the last 24 tick intervals (one
+        ; beat) give 10 x bpm = (600000 + span/2) / span. When it is more
+        ; than 3% from the tempo applied last for FAST_TICKS ticks in a row,
+        ; each within 3% of the first, the average of those values is applied
+        ; and the beat measurement starts again from here. A tempo change
+        ; lands in about 1.5 beats instead of 3 to 4. Smaller changes still
+        ; go through the beat path below. Simulated with up to 3 ms tick
+        ; jitter: steady tempos are never re-applied; a change is applied
+        ; once, now and then twice (the second time a fine correction).
+        ldw     .D1T1   *+a10(V_TIDX), a1
+        ldw     .D1T1   *+a10(V_NTK), a2
+        nop     4
+        addaw   .D1     a10, a1, a0
+        ldw     .D1T1   *+a0(V_TR), a12     ; a12 = time 24 ticks ago
+        stw     .D1T1   a11, *+a0(V_TR)
+        add     .L1     1, a1, a1
+        mvk     .S1     24, a5
+        cmpeq   .L1     a1, a5, a0
+  [a0]  mvk     .L1     0, a1
+        stw     .D1T1   a1, *+a10(V_TIDX)
+        cmplt   .L1     a2, a5, a0          ; ring not full yet
+  [a0]  add     .L1     1, a2, a2
+  [a0]  stw     .D1T1   a2, *+a10(V_NTK)
+  [a0]  b       .S1     fast_out
+        ldw     .D1T1   *+a10(V_APPLIED10), a13
+        nop     4
+        mv      .L1     a13, a0
+  [!a0] b       .S1     fast_out            ; nothing applied yet
+        nop     5
+        sub     .L1     a11, a12, a0
+  [!a0] mvk     .L1     1, a0               ; never divide by 0
+        shru    .S1     a0, 1, a4
+        mvkl    .S1     600000, a1
+        mvkh    .S1     600000, a1
+        add     .L1     a1, a4, a4
+        mv      .L2X    a0, b4
+        FARCALL DIVU
+        mvk     .S1     BPM10_MIN, a0
+        cmplt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        mvk     .S1     BPM10_MAX, a0
+        cmpgt   .L1     a4, a0, a1
+  [a1]  mv      .L1     a0, a4
+        ldw     .D1T1   *+a10(V_RUN), a2
+        ldw     .D1T1   *+a10(V_RQ), a5
+        sub     .L1     a4, a13, a0
+        abs     .L1     a0, a0
+        mvk     .S1     FAST_REL, a1
+        mpy     .M1     a0, a1, a0
+        nop     1
+        cmpgt   .L1     a0, a13, a0         ; more than 3% away
+  [!a0] b       .S1     fast_reset
+        nop     5
+  [!a2] b       .S1     fast_new
+        nop     5
+        sub     .L1     a4, a5, a0
+        abs     .L1     a0, a0
+        mpy     .M1     a0, a1, a0
+        nop     1
+        cmpgt   .L1     a0, a5, a0          ; strays from the run
+  [a0]  b       .S1     fast_reset
+        ldw     .D1T1   *+a10(V_QS), a6
+        nop     4
+        b       .S1     fast_add
+        nop     5
+fast_new:
+        stw     .D1T1   a4, *+a10(V_RQ)
+        mvk     .L1     0, a6
+fast_add:
+        add     .L1     1, a2, a2
+        add     .L1     a4, a6, a6
+        stw     .D1T1   a2, *+a10(V_RUN)
+        stw     .D1T1   a6, *+a10(V_QS)
+        mvk     .S1     FAST_TICKS, a0
+        cmplt   .L1     a2, a0, a0
+  [a0]  b       .S1     fast_out
+        nop     5
+        mv      .L1     a6, a4              ; their average
+        mvk     .S2     FAST_TICKS, b4
+        FARCALL DIVU
+        mvk     .L1     0, a3
+        stw     .D1T1   a3, *+a10(V_RUN)
+        stw     .D1T1   a3, *+a10(V_BEATS)  ; beats start again from here
+        stw     .D1T1   a3, *+a10(V_COUNT)
+        stw     .D1T1   a3, *+a10(V_SUM)
+        stw     .D1T1   a3, *+a10(V_PREVQ)
+        PUBTEMPO
+        mv      .L1     a4, a12
+        b       .S1     apply
+        nop     5
+fast_reset:
+        mvk     .L1     0, a0
+        stw     .D1T1   a0, *+a10(V_RUN)
+fast_out:
+        mvk     .L1     0, a3
 
         ; Count ticks and add up their times; the 24th completes a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12
@@ -194,6 +328,7 @@ tick:
         or      .L1     a0, a1, a1
   [!a1] b       .S1     out                 ; wait for the next beat
         nop     5
+        PUBTEMPO
         mvk     .L1     1, a0
         stw     .D1T1   a0, *+a10(V_BEATS)  ; the average starts again here
         mv      .L1     a4, a12
@@ -226,6 +361,7 @@ steady:
         mvk     .S1     BPM10_MAX, a0
         cmpgt   .L1     a4, a0, a1
   [a1]  mv      .L1     a0, a4
+        PUBTEMPO                            ; effects get every average
         ldw     .D1T1   *+a10(V_APPLIED10), a0
         mvk     .S1     HYST10, a1
         nop     3
@@ -246,18 +382,11 @@ apply:  ; a12 = 10 x tempo
         add     .L1     a0, a1, a0
         stw     .D1T1   a0, *+a10(V_APPLIED10)
 
-        ; Apply like tap tempo (no notification to an editor), then wake the
-        ; UI task to redraw. No direct UI_REFRESH here (fix2): fix1 froze the
-        ; pedal on a tempo change with a delay on, and drawing from Task_MIDI
-        ; while the UI task redraws the delay's synced time is the suspect.
-        mvkl    .S1     TEMPO_SETTING, a4
-        mvkh    .S1     TEMPO_SETTING, a4
-        mv      .L2X    a12, b4
-        mvk     .L1     0, a6
-        FARCALL SET_SETTING
-        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
-        mvk     .S2     64, b4
-        FARCALL EVENT_POST
+        ; Hand the tempo to the poll (poll.S), which applies it from the
+        ; footswitch task within 16 ms (v0.4 fix2): applying here blocked
+        ; Task_MIDI while the effects retuned, and EuGate then came out a
+        ; fixed number of clocks late after each tempo change.
+        stw     .D1T1   a12, *+a10(V_WANT)
 
 out:
         mv      .L2     b10, b15            ; back to Task_MIDI's stack

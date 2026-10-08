@@ -220,8 +220,9 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   restarts.
   Applying is `set_setting(TEMPO, bpm,
   0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 64 bytes at
-  `0x1181E3C0`, loaded as a zero section.
-- Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
+  `0x1181E3C0` (`0x1181E700` from v0.4), loaded as a zero section.
+- Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored (until v0.4,
+  see "MIDI transport block").
 - **Flash tests 2026-10-08:** the first build never changed the tempo. A
   diagnostic (`diag.S`: CC 80 sets the tempo, 24 clocks add 1 BPM) showed
   clock bytes reach the hook and `set_setting` works; a second (`diag2.S`,
@@ -268,3 +269,47 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   leaves the rest of that packet as whatever L2 held at boot, and a stray
   word 7 that looks like a compact header (`0xE...`) would change how the
   packet decodes. The CC handler section went from 404 to 416 bytes.
+
+### MIDI transport block (issue #24, v0.4)
+
+Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
+
+- **Start/Stop/clock count:** in the Task_MIDI hook (`clock.S`), which already
+  sees every byte. Updates run with GIE cleared (`mvc csr`), so the audio code
+  on the same core never sees a half-written block.
+- **A periodic context:** Task_MIDI pends without a timeout (it only wakes on
+  bytes), so it cannot notice a clock that stopped without a Stop, or a patch
+  TEMPO changed by tap or patch load. `Task_SwitchNrmlSpdRead` (entry
+  `0xC00CA620`, from the `.cinit` task table) sleeps 16 ms and starts every
+  round with `callp Clock_getTicks` at `0xC00CA630` (a 32-bit word in a
+  compact fetch packet). Only that call's displacement changes, to a
+  trampoline in the 16 zero bytes at `0xC00C8050` (after `bnop b3,5` at
+  `0xC00C804C`, nothing branches there), which jumps to `poll.S` at
+  `0x1181E800`. `poll.S` returns the time like `Clock_getTicks` does.
+- **Why not hook the TEMPO callback:** `0xC00B9A44` runs for `set_setting`
+  (tap, menu, clock), but a patch load may write the TEMPO int
+  (`0xC009C06C`) without it (not checked); the poll reads the int itself, so
+  it catches every path.
+- **L2 use from v0.4:** CC handler `0x1181DEA0`, clock handler `0x1181E040`
+  (1600 B), clock variables `0x1181E700` (192 B), poll `0x1181E800` (416 B),
+  transport block `0x1181FF00` (32 B).
+- **fix1 (faster follow):** Luca found the tempo needs 2-4 beats to follow a
+  DAW change. The beat path cannot be quicker without jitter flips (its
+  windows straddle two beats). `clock.S` now also keeps the last 24 tick
+  times and measures one beat every tick; 12 ticks in a row more than 3%
+  from the applied tempo, each within 3% of the first, apply their average.
+  Host simulation (1 ms clock, up to ±3 ms tick jitter, tempos 60-220):
+  changes of 3% or more land in 1.5-2 beats (beat path: 3-4), steady tempos
+  are never re-applied, about one change in four gets a second, fine
+  correction a few beats later. Changes under 3% still take the beat path.
+  **fix1 flash test 2026-10-08:** OK (Luca).
+- **fix2 (clocks lost on a tempo change):** with a pack EuGate reading the
+  block (effects pack PR #34), Luca saw EuGate sit a fixed amount off the
+  beat after each DAW tempo change until the next Start: the clock count
+  came out short. Task_MIDI's own receive ring cannot be the cause (4096
+  bytes, and the reader task `0xC00CF2E4` stops reading rather than
+  overwriting when it is full), so the likely cause is Task_MIDI blocking in
+  `set_setting(TEMPO)` while the effects retune, with bytes lost before the
+  ring. Not confirmed. fix2 no longer applies the tempo in Task_MIDI:
+  `clock.S` stores it in `V_WANT`, and `poll.S` applies it from the
+  footswitch task (same calls as before) on its next 16 ms round.
