@@ -122,25 +122,42 @@ Manager in normal mode left the modded OS intact (MOD 0.1 still shown).
 Button/knob handlers in `Task_UpdateUI`, the audio chain loop, display drawing
 behind `Semaphore_LCDUpdate`, and a confirmed free-RAM region.
 
-### Planned MIDI CC patch (issue #4, not built yet)
+### MIDI CC patch (issue #4, `patches/midi-cc.yaml`)
 
-Design worked out in the v0.2 thread, for the next build thread to implement:
+Built for the MS-50G 3.10 OS only (the patch refuses other builds). Source in
+`asm/midi_cc/`; `zoomms asm` assembles it and the patch file carries the bytes,
+so building an updater does not need binutils.
 
 - **Space for new code:** the OS sets L2 to 128 KB cache (`L2CFG` value 3,
-  read from `0xC00ED178`), so L2 SRAM is `0x11800000`-`0x1181FFFF`. Nothing in
-  the OS or bootloader references `0x1181DE84`-`0x1181FFFF` (checked: no
-  constants or data pointers into it), so about 8 KB there is free. It is
-  loaded as an extra AIS section (`AisImage.add_section`).
+  read from `0xC00ED178`), so L2 SRAM is `0x11800000`-`0x1181FFFF`. The highest
+  L2 address the OS builds with `mvkl/mvkh` is `0x1181DE80` (re-checked over
+  the whole disassembly), the bootloader builds none, and no data word points
+  past `0x1181DCE0` except one unaligned coincidence. So `0x1181DE84`-
+  `0x1181FFFF` (about 8 KB) is free. The handler (404 bytes) loads at
+  `0x1181DEA0` as an extra AIS section.
 - **Reaching it:** DDR code cannot `callp` into L2 (out of the ±4 MB range).
-  The 24 zero bytes at `0xC00AF408` (padding after a function return, never a
-  branch target) can hold a three-instruction far jump. The CC call site at
-  `0xC00AF088` (`callp 0xC00AE0F8`) is retargeted to that jump.
-- **Handler:** CC numbers outside the map go straight on to the stock
-  `midi_channel_msg`. Mapped CCs call `fx_set_param(slot, param, value, 0, 1)`
-  between `Semaphore_pend/post` on `B14+784`, then the UI refresh, mirroring the
-  SysEx `0x31` path. Knob values are scaled from 0-127 to the parameter's range
-  (max at offset 12 of the descriptor returned by `0xC00B07AC(slot, param)`).
-  From L2, calls into DDR go through a register.
+  The 24 zero bytes at `0xC00AF408` (padding after a function return, in a
+  plain non-compact fetch packet, never a branch target) hold a far jump
+  (`trampoline.S`, 16 bytes). The CC call site at `0xC00AF088`
+  (`callp 0xC00AE0F8`, in a compact fetch packet) only has its displacement
+  changed, to the trampoline. B3 still returns to Task_MIDI.
+- **Handler (`handler.S`):** CC numbers outside 14-73 tail-jump to the stock
+  `midi_channel_msg` with all arguments untouched. Mapped CCs do what the SysEx
+  `0x31` path does: `Semaphore_pend(B14+784, -1)`,
+  `fx_set_param(slot, param, value, 0, 1)`, `Semaphore_post`, UI refresh
+  `0xC00ACEA4`, `Event_post(B14+676, 0x40)`. Knob values are scaled
+  `(cc * max + 63) / 127` with max from offset 12 of the descriptor returned by
+  `0xC00B07AC(slot, param)`; the division is a multiply by `ceil(2^32/127)`
+  (exact for every max up to 300000). Calls into DDR go through B5 with B3 set
+  to a local return label.
+- **What fx_set_param checks itself** (`0xC00BAEE0`): it counts the effect's
+  parameters (descriptor flag bit 2 at +44, at most 11) and ignores a param
+  past that count, clamps the value to 0..max, and does nothing when the value
+  is unchanged. It walks 6 slots, so slots 0-5 are valid on this OS.
+- **Open question:** the SysEx `0x31` handler only edits slots 0-2 (slot 4 is
+  a patch-level setting, 3 and 5 are ignored). Why is not known; the CC patch
+  calls `fx_set_param` directly for slots 0-5, and the flash test checks
+  effects 4-6.
 - **CC map:** effect n (1-6) on/off = CC 10n+4 (14, 24 ... 64; value >= 64 is
   on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
   the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
