@@ -207,14 +207,14 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
 - **Handler (`clock.S`):** any byte but `0xF8` returns at once. For a tick it
   (since fix3 on Task_MIDI's own stack) reads
   `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
-  24th tick (a beat), from the third beat on, measures the last two beats:
-  bpm = (120000 + span/2) / span with span clamped to 480..3000 ms (40..250
-  BPM). Smoothing: a change of 2 or more from the tempo it applied last is
-  applied at once, a change of 1 only when the next measurement agrees,
-  and the same tempo is never applied again (fix4). The first measurement
-  after the clock (re)starts is always applied; a tempo changed by hand
-  holds until the clock tempo changes or the clock restarts. Applying is `set_setting(TEMPO, bpm,
-  0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 32 bytes at
+  24th tick (a beat) stores the time in a ring of 8; from the ninth beat on
+  it measures the last eight beats: 10 x bpm = (4800000 + span/2) / span with
+  span clamped to 1920..12000 ms (40..250 BPM). A tempo is applied only when
+  it is 0.8 BPM or more from the one applied last (fix5); the first
+  measurement after the clock (re)starts is always applied, and a tempo
+  changed by hand holds until the clock tempo changes or the clock restarts.
+  Applying is `set_setting(TEMPO, bpm,
+  0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 64 bytes at
   `0x1181E3C0`, loaded as a zero section.
 - Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
 - **Flash tests 2026-10-08:** the first build never changed the tempo. A
@@ -242,6 +242,11 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   manual-change check (tempo read through the value pointer compared with
   the last applied value) never matched, so the tempo was re-applied on
   every beat. fix4 drops that check and applies only a new tempo.
+- **fix4 flash test:** steady at 90 and 120 BPM; at 140 the delay still cut
+  out now and then. A two-beat span is 857 ms there and 1 BPM is only about
+  6 ms of it, so clock jitter flipped the rounded tempo between 140 and 141
+  and each flip re-applied it. fix5 measures over 8 beats and needs a change
+  of 0.8 BPM or more (about 20 ms of an 8-beat span at 140 BPM).
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray

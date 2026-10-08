@@ -12,13 +12,13 @@
 ;
 ; Tempo from the clock (24 ticks per quarter note):
 ;   - a gap of more than GAP_MS between ticks restarts the measurement;
-;   - every 24th tick is a beat; from the third beat on, the time of the last
-;     two beats (48 ticks) gives bpm = (120000 + span/2) / span, span clamped
-;     to 480..3000 ms, so bpm stays 40..250 like tap tempo;
-;   - smoothing: a value 2 or more away from the tempo last applied is
-;     applied at once; a value 1 away only when the next measurement agrees;
-;     the same value is never applied again (it would restart a delay); the
-;     first measurement after the clock (re)starts is always applied.
+;   - every 24th tick is a beat; from the ninth beat on, the time of the
+;     last eight beats gives 10 x bpm = (4800000 + span/2) / span, span
+;     clamped to 1920..12000 ms, so bpm stays 40..250 like tap tempo;
+;   - a tempo is applied only when it is 0.8 BPM or more from the one
+;     applied last (fix5), because every apply restarts a stock delay and a
+;     2-beat measurement flipped between 140 and 141 on the pedal; the first
+;     measurement after the clock (re)starts is always applied.
 ; Applying is what tap tempo does (0xC00B9DA8): set_setting(TEMPO, bpm), whose
 ; change callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
@@ -35,17 +35,17 @@
         .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
         .equ    EVENT_POST, 0xC00CC680
         .equ    UI_EVENT_OFS, 676
-        .equ    VARS, 0x1181E3C0            ; 32 zero bytes, clock_vars section
+        .equ    VARS, 0x1181E3C0            ; 64 zero bytes, clock_vars section
         .equ    V_COUNT, 0                  ; ticks since the last beat (0..23)
         .equ    V_LAST, 4                   ; time of the last tick
-        .equ    V_BEAT1, 8                  ; time of the last beat
-        .equ    V_BEAT2, 12                 ; time of the beat before
-        .equ    V_BEATS, 16                 ; beats seen since restart (0..2)
-        .equ    V_PEND, 20                  ; tempo 1 off, waiting to be confirmed
-        .equ    V_APPLIED, 24               ; tempo this code applied last
+        .equ    V_BEATS, 8                  ; beats seen since restart (0..8)
+        .equ    V_IDX, 12                   ; next slot in the beat ring (0..7)
+        .equ    V_APPLIED10, 16             ; 10 x tempo applied last, 0 = none
+        .equ    V_RING, 32                  ; times of the last 8 beats
+        .equ    HYST10, 8                   ; apply when 0.8 BPM or more away
         .equ    GAP_MS, 250
-        .equ    SPAN_MIN, 480               ; 2 beats at 250 BPM
-        .equ    SPAN_MAX, 3000              ; 2 beats at 40 BPM
+        .equ    SPAN_MIN, 1920              ; 8 beats at 250 BPM
+        .equ    SPAN_MAX, 12000             ; 8 beats at 40 BPM
 
 ; Far call: B5 = target, B3 = return label. Arguments must be set before.
         .macro  FARCALL target
@@ -96,7 +96,7 @@ tick:
         cmpgtu  .L1     a0, a1, a2          ; first tick after a gap:
   [a2]  stw     .D1T1   a3, *+a10(V_COUNT)  ;   restart counting
   [a2]  stw     .D1T1   a3, *+a10(V_BEATS)
-  [a2]  stw     .D1T1   a3, *+a10(V_APPLIED) ;   and apply the next tempo
+  [a2]  stw     .D1T1   a3, *+a10(V_APPLIED10) ; and apply the next tempo
 
         ; Count ticks; only every 24th (count was 0) is a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12
@@ -110,21 +110,24 @@ tick:
   [a1]  b       .S1     out
         nop     5
 
-        ; Beat: shift the beat times; need two earlier beats to measure.
-        ldw     .D1T1   *+a10(V_BEATS), a1
-        ldw     .D1T1   *+a10(V_BEAT1), a0
-        ldw     .D1T1   *+a10(V_BEAT2), a12 ; two beats ago
+        ; Beat: ring of the last 8 beat times; measure once it is full.
+        ldw     .D1T1   *+a10(V_IDX), a1
+        ldw     .D1T1   *+a10(V_BEATS), a2
         nop     4
-        stw     .D1T1   a0, *+a10(V_BEAT2)
-        stw     .D1T1   a11, *+a10(V_BEAT1)
-        mvk     .S1     2, a2
-        cmplt   .L1     a1, a2, a2          ; fewer than 2 beats so far
-  [a2]  add     .L1     1, a1, a1
-  [a2]  stw     .D1T1   a1, *+a10(V_BEATS)
-  [a2]  b       .S1     out
+        addaw   .D1     a10, a1, a0         ; a0 + V_RING = this slot
+        ldw     .D1T1   *+a0(V_RING), a12   ; the beat 8 beats ago
+        add     .L1     1, a1, a1
+        and     .L1     7, a1, a1
+        stw     .D1T1   a1, *+a10(V_IDX)
+        mvk     .S1     8, a1
+        cmplt   .L1     a2, a1, a1          ; ring not full yet
+        stw     .D1T1   a11, *+a0(V_RING)
+  [a1]  add     .L1     1, a2, a2
+  [a1]  stw     .D1T1   a2, *+a10(V_BEATS)
+  [a1]  b       .S1     out
         nop     5
 
-        ; bpm = (120000 + span/2) / span, span = ms for the last 2 beats
+        ; bpm10 = (4800000 + span/2) / span, span = ms for the last 8 beats
         sub     .L1     a11, a12, a12
         mvk     .S1     SPAN_MIN, a0
         cmpltu  .L1     a12, a0, a1
@@ -133,37 +136,32 @@ tick:
         cmpgtu  .L1     a12, a0, a1
   [a1]  mv      .L1     a0, a12
         shru    .S1     a12, 1, a4
-        mvkl    .S1     120000, a0
-        mvkh    .S1     120000, a0
+        mvkl    .S1     4800000, a0
+        mvkh    .S1     4800000, a0
         add     .L1     a0, a4, a4
         mv      .L2X    a12, b4
         FARCALL DIVU
-        mv      .L1     a4, a12             ; a12 = measured bpm (40..250)
+        mv      .L1     a4, a13             ; a13 = 10 x tempo (400..2500)
 
-        ; Smoothing, against the tempo this code applied last (V_APPLIED).
-        ; Only a new tempo is applied: set_setting restarts a stock delay
-        ; even when the value is the same (fix4). fix1-fix3 also re-applied
-        ; when the tempo read back differed from V_APPLIED, to override a
-        ; manual change; that read never matched on the pedal, so the tempo
-        ; was re-applied every beat and the delay kept restarting. A manual
-        ; change now holds until the clock tempo changes or the clock stops
-        ; for more than GAP_MS and starts again.
-        ldw     .D1T1   *+a10(V_PEND), a3
-        ldw     .D1T1   *+a10(V_APPLIED), a13
-        nop     4
-        sub     .L1     a12, a13, a0
+        ; Apply only a tempo at least 0.8 BPM from the one applied last:
+        ; set_setting restarts a stock delay even for the same value, and
+        ; clock jitter must not flip the rounded tempo back and forth.
+        ldw     .D1T1   *+a10(V_APPLIED10), a0
+        mvk     .S1     HYST10, a1
+        nop     3
+        sub     .L1     a13, a0, a0
         abs     .L1     a0, a0
-        cmpltu  .L1     1, a0, a1           ; 2 or more away
-        cmpeq   .L1     a12, a3, a2         ; same 1-off value twice
-        or      .L1     a1, a2, a1          ; a1 = apply now
-        cmpeq   .L1     a12, a13, a2        ; already there
-        or      .L1     a1, a2, a2          ; a2 = forget the pending value
-        mv      .L1     a12, a3
-  [a2]  mvk     .L1     0, a3
-        stw     .D1T1   a3, *+a10(V_PEND)
-  [!a1] b       .S1     out
+        cmplt   .L1     a0, a1, a1
+  [a1]  b       .S1     out
         nop     5
-        stw     .D1T1   a12, *+a10(V_APPLIED)
+        add     .L1     5, a13, a4          ; bpm = (bpm10 + 5) / 10
+        mvk     .S2     10, b4
+        FARCALL DIVU
+        mv      .L1     a4, a12             ; a12 = tempo to apply (40..250)
+        shl     .S1     a12, 3, a0
+        shl     .S1     a12, 1, a1
+        add     .L1     a0, a1, a0
+        stw     .D1T1   a0, *+a10(V_APPLIED10)
 
         ; Apply like tap tempo (no notification to an editor), then wake the
         ; UI task to redraw. No direct UI_REFRESH here (fix2): fix1 froze the
