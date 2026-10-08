@@ -205,8 +205,7 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   `0xC00A1A4C`, the last four words of a plain fetch packet, not a branch
   target. Far jump to the handler at `0x1181E040` (L2, after the CC handler).
 - **Handler (`clock.S`):** any byte but `0xF8` returns at once. For a tick it
-  switches to a private 4 KB stack (`0x1181F000`-`0x1181FFFF`, because the
-  tempo callback goes deep and Task_MIDI's stack is only 2 KB), reads
+  (since fix3 on Task_MIDI's own stack) reads
   `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
   24th tick (a beat), from the third beat on, measures the last two beats:
   bpm = (120000 + span/2) / span with span clamped to 480..3000 ms (40..250
@@ -229,6 +228,13 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   direct UI refresh (`0xC00ACEA4`) after the tempo change and only posts the
   UI event, so all drawing stays in the UI task; the private stack may now
   use everything down to the variables (about 7 KB). Cause not confirmed.
+- Then Luca checked on fix1: tap tempo with the delay on does not freeze, and
+  turning the delay's TIME by CC (v0.2 handler, which also redraws from
+  Task_MIDI) does not freeze. That makes the redraw an unlikely cause and
+  leaves the private L2 stack as the main difference from stock paths: the
+  delay's tempo code (called per slot by `0xC00C4064`, slot state at
+  `0x11F03000 + 212 * slot`) ran on it. fix3 keeps fix2 and runs on
+  Task_MIDI's own stack.
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray

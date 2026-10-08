@@ -30,7 +30,7 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
   --out build/out/ms50g-3.10-mod0.2-midicc.exe     # v0.2 test build
 zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
   --patch patches/version-0.3.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.3-midiclock-fix2.exe   # v0.3 test build
+  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.3-midiclock-fix3.exe   # v0.3 test build
 ```
 
 Changing assembly in `asm/` needs GNU binutils for tic6x

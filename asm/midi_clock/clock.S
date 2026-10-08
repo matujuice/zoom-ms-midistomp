@@ -23,10 +23,11 @@
 ; change callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
 ;
-; Task_MIDI has a 2 KB stack and the tempo callback goes deep into the effect
-; code, so the slow path switches to a private stack in free L2: it starts at
-; 0x1181FFF8 and may grow down to 0x1181E3E0 (about 7 KB) before it would
-; reach the variables.
+; The slow path runs on Task_MIDI's own 2 KB stack (fix3). Builds up to fix2
+; switched to a private stack in L2; the pedal froze when the tempo changed
+; with a delay on, i.e. when the delay's own tempo code ran on that stack.
+; Stock Program Change already loads whole patches from Task_MIDI on its own
+; stack, so that is the context the effects are used to.
 
         .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
         .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
@@ -42,7 +43,6 @@
         .equ    V_BEATS, 16                 ; beats seen since restart (0..2)
         .equ    V_PEND, 20                  ; tempo 1 off, waiting to be confirmed
         .equ    V_APPLIED, 24               ; tempo this code applied last
-        .equ    STACK_TOP, 0x1181FFF8       ; private stack, down to 0x1181E3E0
         .equ    GAP_MS, 250
         .equ    SPAN_MIN, 480               ; 2 beats at 250 BPM
         .equ    SPAN_MAX, 3000              ; 2 beats at 40 BPM
@@ -81,8 +81,7 @@ tick:
         stw     .D2T1   a13, *+b15(24)
         stw     .D2T2   b10, *+b15(28)
         mv      .L2     b15, b10            ; b10 = Task_MIDI's stack
-        mvkl    .S2     STACK_TOP, b15
-        mvkh    .S2     STACK_TOP, b15
+        nop     1                           ; fix3: stay on Task_MIDI's stack
         mvkl    .S1     VARS, a10
         mvkh    .S1     VARS, a10
 

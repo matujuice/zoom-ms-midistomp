@@ -41,7 +41,6 @@ def test_no_overlap_with_midi_cc_patch():
             assert b <= c or d <= a
     code, data = PATCH["section"]
     assert code["addr"] + len(bytes.fromhex(code["data"])) <= data["addr"]
-    assert data["addr"] + 32 <= 0x1181F000  # private stack 0x1181F000-0x1181FFFF
 
 
 def test_other_builds_refused():
