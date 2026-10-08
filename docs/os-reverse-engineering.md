@@ -302,3 +302,4 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   changes of 3% or more land in 1.5-2 beats (beat path: 3-4), steady tempos
   are never re-applied, about one change in four gets a second, fine
   correction a few beats later. Changes under 3% still take the beat path.
+  **fix1 flash test 2026-10-08:** OK (Luca).
