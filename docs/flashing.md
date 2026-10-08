@@ -34,6 +34,10 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
 zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
   --patch patches/version-0.4.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
   --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.4-transport.exe   # v0.4 test build
+zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
+  --patch patches/version-0.5.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
+  --patch patches/midi-settings.yaml \
+  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.5-midisettings.exe   # v0.5 test build
 ```
 
 The v0.3 line needs `patches/midi-clock.yaml` as tagged `v0.3`.

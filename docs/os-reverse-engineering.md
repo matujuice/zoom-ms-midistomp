@@ -313,3 +313,55 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   ring. Not confirmed. fix2 no longer applies the tempo in Task_MIDI:
   `clock.S` stores it in `V_WANT`, and `poll.S` applies it from the
   footswitch task (same calls as before) on its next 16 ms round.
+
+### Settings screen and the MIDI settings page (issue #26, v0.5)
+
+Menu (screen 0: DELETE EFFECT UNIT, EFFECT CHAIN, SETTINGS, VERSION) >
+SETTINGS (screen 1) > one screen per setting. Source: `asm/midi_settings/`,
+patch `patches/midi-settings.yaml`.
+
+- **Screens:** the current screen id is `B14+364`, written only by
+  `set_screen(id, row)` at `0xC00A75E0` (32 call sites, all with constant
+  ids). List row and top are `B14+368` / `B14+372`; `0xC00A7040` returns
+  row + top, `0xC00A72D4(delta, rows)` scrolls.
+- **Dispatch:** key events go through a switch on the screen id at
+  `0xC00A8300` (table `0xC00EF300`, ids 1-17, then 32-34), drawing through
+  `0xC00A93B0` (table `0xC00EF2BC`). Each case is a stub that calls the
+  handler and branches to the epilogue (`0xC00A840C`, `0xC00A9468`); the
+  event pair sits at `*+B15(8)`: A4 = event (34 enter, 65 exit, 160 knob
+  turn with A5 = steps), A4 returned = redraw. Ids 11, 13, 14, 15 fall to
+  the menu and are never set.
+- **Setting screens:** 1 list, 4 LCD BACKLIGHT, 5 LCD CONTRAST, 6 BATTERY
+  TYPE, 7 AUTO SAVE, 8 POWER MANAGEMENT, 10 BYPASS/MUTE TUNER, 12 HOLD FOR
+  TUNER/TAP. AUTO SAVE (keys `0xC00A8144`, draw `0xC00A9270`) is the
+  pattern: title `0xC00A7378`, rows `0xC009FCE0(0, text, 1, 12 + 9 row)`,
+  highlight `0xC00A73A4(row, 0)`, `0xC00A7400(0)`, knob labels
+  `0xC009F8F0(knob, text, 0)`; a turn clamps (`0xC00A766C`) and stores.
+- **List draw** (`0xC00A88F8`): names from a pointer table (`0xC00ECD68`,
+  mvkl/mvkh at `0xC00A8914`), 7x7 icons, 7 bytes each, one byte per column
+  with bit 0 at the top (`0xC00EC5A8`, at `0xC00A8930`), scrollbar
+  `0xC00A88CC(top, rows)` with rows at `0xC00A89C8`.
+- **Stored settings:** 38 words at `0xC009D8F8` (getters/setters
+  `0xC00B9B20`-`0xC00B9CE4`), bit-packed LSB first into a 24-byte record,
+  flash record 50 (patches are 0-49), with the bit widths at `0xC00EB538`
+  (185 of 192 bits used, so bits 1-7 of byte 23 are free). Pack
+  `0xC00D3C6C` (via `0xC00B9CE8`, also used by a SysEx dump), unpack
+  `0xC00D3B80` (via `0xC00BA090` at boot). The save (`0xC00B9D04`) runs
+  when leaving menus if the words differ from a shadow copy at
+  `0xC009D860` (compare `0xC00BA128`).
+- **What v0.5 does:** screen 1's key entry goes to our `list_keys` (11
+  rows; rows 7-10 open screen 13, the rest goes to the stock handler); the
+  list draw uses our 11-entry name and icon tables and an 11-row
+  scrollbar; screen 13's key and draw entries are ours (OFF/ON like AUTO
+  SAVE). The receive-off bits (1 clock, 2 Start/Stop, 4 PC, 8 CC) live at
+  `0x1181EA30` and go into bits 1-4 of byte 23 of the record (a stock
+  record has 0 there, i.e. all on); a change flips bit 31 of the shadow
+  copy so the stock save runs. `midi_gate` sits in front of both Task_MIDI
+  calls of `midi_channel_msg` (CC `0xC00AF088`, PC `0xC00AF0AC`, via the
+  zero bytes at `0xC00B2FAC`); the pack and unpack calls go through
+  `0xC00B97E8` and `0xC00BDB44`.
+- **L2 use from v0.5:** settings section `0x1181EA00` (1376 B); clock
+  handler grew to 1696 B (ends `0x1181E6E0`).
+- **Not checked:** what `0xC00B9D44` (resets the settings to defaults and
+  saves, called from `0xC00C5038`) is used for; the MIDI bits keep their
+  value through it.
