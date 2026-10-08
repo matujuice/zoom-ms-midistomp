@@ -210,9 +210,10 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   24th tick (a beat), from the third beat on, measures the last two beats:
   bpm = (120000 + span/2) / span with span clamped to 480..3000 ms (40..250
   BPM). Smoothing: a change of 2 or more from the tempo it applied last is
-  applied at once, a change of 1 only when the next measurement agrees, and
-  a tempo changed by hand (read through the setting's value pointer) is
-  overridden on the next beat. Applying is `set_setting(TEMPO, bpm,
+  applied at once, a change of 1 only when the next measurement agrees,
+  and the same tempo is never applied again (fix4). The first measurement
+  after the clock (re)starts is always applied; a tempo changed by hand
+  holds until the clock tempo changes or the clock restarts. Applying is `set_setting(TEMPO, bpm,
   0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 32 bytes at
   `0x1181E3C0`, loaded as a zero section.
 - Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
@@ -235,6 +236,12 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   delay's tempo code (called per slot by `0xC00C4064`, slot state at
   `0x11F03000 + 212 * slot`) ran on it. fix3 keeps fix2 and runs on
   Task_MIDI's own stack.
+- **fix3 flash test:** no freeze. But a stock delay went quiet and restarted
+  every beat or two even at a steady clock. Stock tap tempo restarts the
+  delay the same way, so every `set_setting(TEMPO)` restarts it. The
+  manual-change check (tempo read through the value pointer compared with
+  the last applied value) never matched, so the tempo was re-applied on
+  every beat. fix4 drops that check and applies only a new tempo.
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray
