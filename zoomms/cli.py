@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import ais, flash, models, parts, patcher, updater, zdl
+from . import ais, asm, flash, models, parts, patcher, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -98,6 +98,13 @@ def cmd_build(args) -> int:
     return 0
 
 
+def cmd_asm(args) -> int:
+    code = asm.assemble(args.source, int(args.addr, 0))
+    print(f"{len(code)} B at {args.addr}")
+    print(code.hex())
+    return 0
+
+
 def cmd_updater_extract(args) -> int:
     fw = updater.load(args.updater)
     out = Path(args.out)
@@ -162,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("image")
     p.add_argument("--elf", help="also write an ELF for tic6x-elf-objdump")
     p.set_defaults(func=cmd_ais)
+    p = sub.add_parser("asm", help="assemble asm/*.S at an address and print the bytes (needs tic6x binutils)")
+    p.add_argument("source")
+    p.add_argument("--addr", required=True)
+    p.set_defaults(func=cmd_asm)
     p = sub.add_parser("updater-extract", help="extract files from an official updater")
     p.add_argument("updater")
     p.add_argument("out")
