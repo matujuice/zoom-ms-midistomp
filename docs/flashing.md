@@ -25,7 +25,14 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
   --patch patches/hello.yaml --out build/out/ms50g-3.10-hello.exe
 zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
   --out build/out/ms50g-3.10-stock-keepboot.exe      # recovery: stock OS, bootloader untouched
+zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
+  --patch patches/version-0.2.yaml --patch patches/midi-cc.yaml --build-id ms50g-3.10 \
+  --out build/out/ms50g-3.10-mod0.2-midicc.exe     # v0.2 test build
 ```
+
+Changing assembly in `asm/` needs GNU binutils for tic6x
+(`scripts/build-c6x-binutils.sh`); regenerate the bytes in the patch file with
+`zoomms asm <file.S> --addr <addr>`. `pytest` checks they match.
 
 ## First test (Luca's MS-60B running the MS-50G 3.10 OS)
 

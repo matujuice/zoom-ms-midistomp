@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import ais, flash, models, parts, patcher, updater, zdl
+from . import ais, asm, flash, models, parts, patcher, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -77,7 +77,12 @@ def cmd_build(args) -> int:
     img = ais.parse(original)
     for patch_path in args.patch:
         patch = patcher.load(patch_path)
-        for line in patcher.apply(img, patch, args.build_id):
+        try:
+            lines = patcher.apply(img, patch, args.build_id)
+        except patcher.PatchError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        for line in lines:
             print(f"{patch['name']}: {line}")
     new_os = ais.build_part(img, original)
     exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps)
@@ -95,6 +100,13 @@ def cmd_build(args) -> int:
     print("flash steps: " + "; ".join(s.describe() for s in flash.find_script(exe)))
     Path(args.out).write_bytes(exe)
     print(f"wrote {args.out}  sha256 {hashlib.sha256(exe).hexdigest()}")
+    return 0
+
+
+def cmd_asm(args) -> int:
+    code = asm.assemble(args.source, int(args.addr, 0))
+    print(f"{len(code)} B at {args.addr}")
+    print(code.hex())
     return 0
 
 
@@ -162,6 +174,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("image")
     p.add_argument("--elf", help="also write an ELF for tic6x-elf-objdump")
     p.set_defaults(func=cmd_ais)
+    p = sub.add_parser("asm", help="assemble asm/*.S at an address and print the bytes (needs tic6x binutils)")
+    p.add_argument("source")
+    p.add_argument("--addr", required=True)
+    p.set_defaults(func=cmd_asm)
     p = sub.add_parser("updater-extract", help="extract files from an official updater")
     p.add_argument("updater")
     p.add_argument("out")

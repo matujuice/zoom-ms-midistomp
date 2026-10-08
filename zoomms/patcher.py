@@ -8,6 +8,13 @@ Patch kinds supported so far:
         or fails loudly.
     write:     - model: ms50g-3.10  addr: 0x...  expect: "hex"  data: "hex"
         Raw write at an address for one specific OS build; `expect` must match.
+    section:   - model: ms50g-3.10  addr: 0x...  data: "hex"  source: asm/...
+        New code or data loaded by the boot image as an extra section (into RAM
+        nothing else uses). `source` names the assembly it was built from;
+        tests check the bytes still match it.
+
+A patch may list `builds: [...]`; building it for any other OS build fails
+with a clear message instead of silently doing nothing.
 """
 
 from __future__ import annotations
@@ -29,6 +36,8 @@ def _bytes(v) -> bytes:
 
 def apply(img: ais.AisImage, patch: dict, build_id: str) -> list[str]:
     log = []
+    if "builds" in patch and build_id not in patch["builds"]:
+        raise PatchError(f"{patch['name']}: only written for {', '.join(patch['builds'])}, not {build_id or 'this build'}")
     for r in patch.get("replace", []):
         find, new = _bytes(r["find"]), _bytes(r["with"])
         if len(find) != len(new):
@@ -52,6 +61,15 @@ def apply(img: ais.AisImage, patch: dict, build_id: str) -> list[str]:
             raise PatchError(f"{patch['name']}: bytes at 0x{w['addr']:08X} are not the expected ones")
         img.write(w["addr"], data)
         log.append(f"write 0x{w['addr']:08X} {len(data)} B")
+    for sec in patch.get("section", []):
+        if sec["model"] != build_id:
+            continue
+        data = bytes.fromhex(sec["data"])
+        try:
+            img.add_section(sec["addr"], data)
+        except ais.AisError as e:
+            raise PatchError(f"{patch['name']}: {e}") from e
+        log.append(f"section 0x{sec['addr']:08X} {len(data)} B")
     if not log:
         raise PatchError(f"{patch['name']}: nothing applied for {build_id}")
     return log
