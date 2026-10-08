@@ -210,11 +210,20 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
   24th tick (a beat), from the third beat on, measures the last two beats:
   bpm = (120000 + span/2) / span with span clamped to 480..3000 ms (40..250
-  BPM). Smoothing: a change of 2 or more is applied at once, a change of 1
-  only when the next measurement agrees. Applying is `set_setting(TEMPO, bpm,
+  BPM). Smoothing: a change of 2 or more from the tempo it applied last is
+  applied at once, a change of 1 only when the next measurement agrees, and
+  a tempo changed by hand (read through the setting's value pointer) is
+  overridden on the next beat. Applying is `set_setting(TEMPO, bpm,
   0)` then the same UI refresh as the CC patch. Variables: 32 bytes at
   `0x1181E3C0`, loaded as a zero section.
 - Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
+- **Flash tests 2026-10-08:** the first build never changed the tempo. A
+  diagnostic (`diag.S`: CC 80 sets the tempo, 24 clocks add 1 BPM) showed
+  clock bytes reach the hook and `set_setting` works; a second (`diag2.S`,
+  no smoothing) followed 120 and 90 BPM correctly. So the fault was in the
+  smoothing step, which compared against a direct read of `0xC009C06C`;
+  why that read misled it is not known. The smoothing now compares against
+  its own last applied value.
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray
