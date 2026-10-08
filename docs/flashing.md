@@ -56,3 +56,16 @@ If it does not boot, or shows an error:
 
 Report back what you saw in each case; a failure to boot is also a useful
 result (it would mean the bootloader checks something we have not found).
+
+## v0.2 test (MIDI program change and CC)
+
+**Result 2026-10-08: passed** on Luca's MS-60B with `ms50g-3.10-mod0.2-midicc.exe`
+(sha256 `272d3d09d1cd6b260b7a6442e02b0db10e03d2d8259f38cfe4956e9f5d063371`),
+messages sent from MIDI-OX (View > Control Panel: the Patch buttons send
+Program Change, top row then bottom row; the Controller area with "Auto Send
+Value" sends CCs).
+
+- Program Change loads patches (PC 0 = patch 1, PC 9 = patch 10).
+- CC 14/24/34/44/54/64 switch effects 1-6 on and off; the knob CCs change values.
+- Unused CCs (CC 7) change nothing.
+- Effect Manager in normal mode still connects and lists the effects.
