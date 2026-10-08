@@ -77,7 +77,12 @@ def cmd_build(args) -> int:
     img = ais.parse(original)
     for patch_path in args.patch:
         patch = patcher.load(patch_path)
-        for line in patcher.apply(img, patch, args.build_id):
+        try:
+            lines = patcher.apply(img, patch, args.build_id)
+        except patcher.PatchError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        for line in lines:
             print(f"{patch['name']}: {line}")
     new_os = ais.build_part(img, original)
     exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps)
