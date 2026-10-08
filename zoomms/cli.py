@@ -104,7 +104,7 @@ def cmd_build(args) -> int:
 
 
 def cmd_asm(args) -> int:
-    code = asm.assemble(args.source, int(args.addr, 0))
+    code = asm.assemble(args.source, int(args.addr, 0), whole_packets=args.section)
     print(f"{len(code)} B at {args.addr}")
     print(code.hex())
     return 0
@@ -177,6 +177,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("asm", help="assemble asm/*.S at an address and print the bytes (needs tic6x binutils)")
     p.add_argument("source")
     p.add_argument("--addr", required=True)
+    p.add_argument("--section", action="store_true",
+                   help="code for a new section: zero-pad to a whole fetch packet")
     p.set_defaults(func=cmd_asm)
     p = sub.add_parser("updater-extract", help="extract files from an official updater")
     p.add_argument("updater")

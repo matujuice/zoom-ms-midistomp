@@ -6,7 +6,8 @@ from zoomms import ais, asm, patcher
 from tests.test_ais import make_ais
 
 ROOT = Path(__file__).resolve().parent.parent
-PATCH = patcher.load(ROOT / "patches/midi-cc.yaml")
+PATCH = patcher.load(ROOT / "patches/midi-clock.yaml")
+CC = patcher.load(ROOT / "patches/midi-cc.yaml")
 
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
@@ -19,32 +20,30 @@ def test_patch_bytes_match_assembly_source():
             assert code == bytes.fromhex(entry["data"]), entry["source"]
 
 
-def test_callsite_is_retargeted_to_trampoline():
+def test_hook_calls_trampoline():
     site, tramp = PATCH["write"]
     word = int.from_bytes(bytes.fromhex(site["data"]), "little")
-    old = int.from_bytes(bytes.fromhex(site["expect"]), "little")
     packet = site["addr"] & ~31  # callp is relative to its fetch packet
+    disp = (word >> 7) & 0x1FFFFF
+    disp = disp - (1 << 21) if disp & (1 << 20) else disp
+    assert packet + 4 * disp == tramp["addr"]
+    assert word & 0x7F == 0x12 and word >> 28 == 1  # callp .S2, p-bit clear
+    assert len(bytes.fromhex(tramp["data"])) <= 16  # the free gap
 
-    def target(w):
-        disp = (w >> 7) & 0x1FFFFF
-        return packet + 4 * (disp - (1 << 21) if disp & (1 << 20) else disp)
 
-    assert target(old) == 0xC00AE0F8  # stock midi_channel_msg
-    assert target(word) == tramp["addr"]
-    assert word & ~(0x1FFFFF << 7) == old & ~(0x1FFFFF << 7)
-    assert len(bytes.fromhex(tramp["data"])) <= 24  # the free gap
+def test_no_overlap_with_midi_cc_patch():
+    def spans(p):
+        for e in p.get("write", []) + p.get("section", []):
+            yield e["addr"], e["addr"] + len(bytes.fromhex(e["data"]))
+    ours = list(spans(PATCH))
+    for a, b in spans(CC):
+        for c, d in ours:
+            assert b <= c or d <= a
+    code, data = PATCH["section"]
+    assert code["addr"] + len(bytes.fromhex(code["data"])) <= data["addr"]
 
 
 def test_other_builds_refused():
     img = ais.parse(make_ais())
     with pytest.raises(patcher.PatchError, match="only written for"):
         patcher.apply(img, PATCH, "ms60b-2.10")
-
-
-def test_section_kind_adds_code():
-    img = ais.parse(make_ais())
-    p = {"name": "t", "section": [{"model": "m", "addr": 0x11900000, "data": "01 02 03 04"}]}
-    patcher.apply(img, p, "m")
-    assert ais.parse(ais.build(img)).sections[-1].data == b"\x01\x02\x03\x04"
-    with pytest.raises(patcher.PatchError):
-        patcher.apply(img, {"name": "t", "section": [{"model": "m", "addr": 0x11900002, "data": "00"}]}, "m")

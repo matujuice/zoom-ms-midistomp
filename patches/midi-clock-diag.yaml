@@ -1,0 +1,49 @@
+# DIAGNOSTIC build of midi-clock.yaml: asm/midi_clock/diag.S instead of clock.S.
+# See the header of diag.S. Not for a release.
+# MIDI clock sets the patch tempo (issue #5). MS-50G 3.10 OS only for now.
+#   Incoming MIDI timing clock (0xF8, 24 per quarter note, any source over USB)
+#   sets TEMPO like tap tempo does, so tempo-synced delay times and modulation
+#   rates follow a DAW or drum machine. Start/stop/continue are ignored.
+#   The tempo follows after about 2 beats; a step of 1 BPM needs two matching
+#   measurements (2 beats each), so jittery USB clock does not wobble it.
+# Design and addresses: docs/os-reverse-engineering.md, "MIDI clock patch".
+# The hex below is generated from asm/midi_clock/*.S with
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
+# and tests/test_midi_clock_patch.py checks it still matches the source.
+name: midi-clock-diag
+description: Diagnostic for the MIDI clock patch (CC 80 sets tempo, every 24 clocks +1 BPM)
+builds: [ms50g-3.10]
+write:
+  # End of Task_MIDI's byte loop: ldw *+b14(224),b0 -> callp trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AF0F8
+    expect: "6e380000"
+    data: "122ee51f"
+  # Trampoline into L2 (the 16 zero bytes after a return)
+  - model: ms50g-3.10
+    addr: 0xC00A1A50
+    expect: "00000000000000000000000000000000"
+    data: "2a207000eac008006203000000800000"
+    source: asm/midi_clock/trampoline.S
+section:
+  # The clock handler, in free L2 RAM after the MIDI CC handler
+  - model: ms50g-3.10
+    addr: 0x1181E040
+    source: asm/midi_clock/diag.S
+    data: >-
+      1eea00002a7c8000004000007a0a0401120c0060008000001eeb80001ee90001
+      00600000920600402a2880007a4a04011ee88000002000009206007000200000
+      a2898400aa0500017a2a080112040060008000006e38000062030c0000800000
+      52f0ff07f642bc01f4623c05f482bc05f4a23c06f6e23c05da0f3c052afcff07
+      eac0880728e07105e8c0080528366000e8046000640200061cea8005287c8000
+      00400000786a8500100400800080000058402d06500f0006900a000000800000
+      64022800280c80000040000058200000780a040158a300a074022800901200b0
+      0080000058203006287d8000f8880501281400a628ec710268076002da1f3002
+      58a300032a32d6026a06e002620314002aaef001eac08801004000002a52e702
+      6a05e002620314002abaf001eac08801004000006ca900022a2000022a40e302
+      6a06e002620314002acaf001eac0880100400000da0fa80700000000e642bc01
+      e4623c05e482bc05e4a23c06e6e23c05521080076e38000062030c0000800000
+  # Its variables, zeroed at boot (the private stack above them needs no load)
+  - model: ms50g-3.10
+    addr: 0x1181E3C0
+    data: "0000000000000000000000000000000000000000000000000000000000000000"

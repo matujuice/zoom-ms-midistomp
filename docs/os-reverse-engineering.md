@@ -164,3 +164,107 @@ so building an updater does not need binutils.
   on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
   the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
   MS-70CDR), 4 (MS-60B OS).
+
+### Tempo (MS-50G 3.10)
+
+- The patch tempo is a setting object at `0xC00EE3D8` (in `.cinit` data):
+  value pointer `0xC009C06C` (an int in the current patch buffer, right
+  after the six 44-byte effect slots), min 40, max 250, name `TEMPO`, change
+  callback `0xC00B9A44` at +36. `0xC00C0A2E` resets an out-of-range tempo to 120.
+- `0xC00CAC64` is the generic `set_setting(setting, value, notify)`: clamps
+  to min/max, does nothing when unchanged, stores, runs the callback.
+- The tempo callback takes the effect semaphore (`B14+784`), retunes the
+  effects (`0xC00C4064`), releases it, and with `notify` set sends the new
+  tempo to an editor over SysEx (`0xC00AF2D0`, only while editor mode is on).
+- Tap tempo is `0xC00B9DA8`: times taps with `Clock_getTicks` (`0xC00DF360`,
+  1 ms), bpm = 60000 * taps / total ms (unsigned divide `0xC00DCA20`), clamped
+  to 40..250, then `set_setting(0xC00EE3D8, bpm, 1)`.
+- Matches the effects-pack findings (`zoom-ms-zdl-effects-pack`,
+  docs/TEMPO-SYNC.md section 7): the pedal sends `31 03 08 <tempo>` when the
+  tempo is tapped (that is the `notify` SysEx), and the incoming `31 03 08`
+  is not a tempo edit (the `0x31` handler only edits slots 0-2). Stock
+  sync-aware effects (TAPEECH3 and friends) ask the firmware for the tempo;
+  no route was found for a custom ZDL to read it.
+- `Task_MIDI` ignores realtime bytes (`0xF8`-`0xFF`): the branch at `0xC00AF0C6`
+  skips straight to the loop end at `0xC00AF0F8`.
+
+Task stacks (from the `.cinit` task table): `Task_MainApp` and `Task_UpdateUI`
+8 KB, `Task_MIDI`, `Task_UpdateLED`, `Task_SwitchNrmlSpdRead`,
+`Task_TunerService` 2 KB.
+
+### MIDI clock patch (issue #5, `patches/midi-clock.yaml`)
+
+Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
+
+- **Hook:** every received byte ends Task_MIDI's loop at `0xC00AF0F8`
+  (`ldw *+b14(224),b0`, a 32-bit word in a header fetch packet with no
+  parallel bits), with the byte saved at `B14+234`. That word becomes
+  `callp 0xC00A1A50`; the hook runs the replaced load before returning to
+  `0xC00AF100`. Only callee-saved A10 is live there.
+- **Trampoline:** 16 zero bytes at `0xC00A1A50`, after `bnop b3,5` at
+  `0xC00A1A4C`, the last four words of a plain fetch packet, not a branch
+  target. Far jump to the handler at `0x1181E040` (L2, after the CC handler).
+- **Handler (`clock.S`):** any byte but `0xF8` returns at once. For a tick it
+  (since fix3 on Task_MIDI's own stack) reads
+  `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
+  24th tick completes a beat, whose time is the sum of its 24 tick times
+  (fix7), kept in a ring of 8 (differences mod 2^32, in 24ths of a ms).
+  From the third beat on, the last two beats give a quick tempo (10 x bpm =
+  (28800000 + span/2) / span); 4 BPM or more from the tempo applied last and
+  within 2 BPM of the previous beat's quick tempo (or the first tempo after
+  the clock starts) is applied at once and the average restarts. Otherwise,
+  with 4 to 8 beats in the ring, their average (10 x bpm = (n x 14400000 +
+  span/2) / span) is applied only when it is 0.8 BPM or
+  more from the tempo applied last. Tempos are clamped to 40..250 BPM. A
+  tempo changed by hand holds until the clock tempo changes or the clock
+  restarts.
+  Applying is `set_setting(TEMPO, bpm,
+  0)` then `Event_post(B14+676, 0x40)` for the UI task. Variables: 64 bytes at
+  `0x1181E3C0`, loaded as a zero section.
+- Start, stop and continue (`0xFA`/`0xFC`/`0xFB`) are ignored.
+- **Flash tests 2026-10-08:** the first build never changed the tempo. A
+  diagnostic (`diag.S`: CC 80 sets the tempo, 24 clocks add 1 BPM) showed
+  clock bytes reach the hook and `set_setting` works; a second (`diag2.S`,
+  no smoothing) followed 120 and 90 BPM correctly. So the fault was in the
+  smoothing step, which compared against a direct read of `0xC009C06C`;
+  why that read misled it is not known. The smoothing now compares against
+  its own last applied value.
+- **fix1 flash test:** the tempo followed the clock, but the pedal froze on a
+  tempo change while a delay was on (not with the delay off). fix2 drops the
+  direct UI refresh (`0xC00ACEA4`) after the tempo change and only posts the
+  UI event, so all drawing stays in the UI task; the private stack may now
+  use everything down to the variables (about 7 KB). Cause not confirmed.
+- Then Luca checked on fix1: tap tempo with the delay on does not freeze, and
+  turning the delay's TIME by CC (v0.2 handler, which also redraws from
+  Task_MIDI) does not freeze. That makes the redraw an unlikely cause and
+  leaves the private L2 stack as the main difference from stock paths: the
+  delay's tempo code (called per slot by `0xC00C4064`, slot state at
+  `0x11F03000 + 212 * slot`) ran on it. fix3 keeps fix2 and runs on
+  Task_MIDI's own stack.
+- **fix3 flash test:** no freeze. But a stock delay went quiet and restarted
+  every beat or two even at a steady clock. Stock tap tempo restarts the
+  delay the same way, so every `set_setting(TEMPO)` restarts it. The
+  manual-change check (tempo read through the value pointer compared with
+  the last applied value) never matched, so the tempo was re-applied on
+  every beat. fix4 drops that check and applies only a new tempo.
+- **fix4 flash test:** steady at 90 and 120 BPM; at 140 the delay still cut
+  out now and then. A two-beat span is 857 ms there and 1 BPM is only about
+  6 ms of it, so clock jitter flipped the rounded tempo between 140 and 141
+  and each flip re-applied it. fix5 measures over 8 beats and needs a change
+  of 0.8 BPM or more (about 20 ms of an 8-beat span at 140 BPM).
+- fix5 needed 8 beats to lock and to follow a change; Luca wants it quick.
+  fix6 keeps the 8-beat average for holding steady and adds the 2-beat
+  quick path for jumps (locks 2 beats after the clock starts, follows a
+  change in about 3). A host-side simulation with ±3 ms beat jitter gave one
+  apply per tempo change at 90-180 BPM and at most two extra near 250.
+- **fix6 flash test:** follows and holds steady at the tested tempos, but at
+  220 BPM the delay still cut out after a while. fix7 times each beat by the
+  sum of its 24 tick times instead of one tick, which cuts the effect of
+  jitter about five-fold, and applies a jump only once two quick readings
+  agree, so no in-between tempo is applied. Simulated with up to ±8 ms tick
+  jitter: one apply per tempo change from 40 to 250 BPM.
+- **Fetch-packet padding:** new sections are now zero-padded to a whole
+  32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
+  leaves the rest of that packet as whatever L2 held at boot, and a stray
+  word 7 that looks like a compact header (`0xE...`) would change how the
+  packet decodes. The CC handler section went from 404 to 416 bytes.

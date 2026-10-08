@@ -1,0 +1,7 @@
+# Marks the v0.3 test build: the VERSION menu entry reads "MOD 0.3".
+name: version-0.3
+description: Rename the VERSION menu entry to "MOD 0.3"
+replace:
+  - find: "VERSION\0"
+    with: "MOD 0.3\0"
+    count: 2   # the menu list and the version screen title

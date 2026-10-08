@@ -4,7 +4,7 @@
 # Any MIDI channel. Other CCs (and Program Change, SysEx) behave as stock.
 # Design and addresses: docs/os-reverse-engineering.md, "MIDI CC patch".
 # The hex below is generated from asm/midi_cc/*.S with
-#   zoomms asm <file> --addr <addr>
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_cc_patch.py checks it still matches the source.
 name: midi-cc
 description: Effect on/off and knobs from MIDI CC 14-73
@@ -39,4 +39,4 @@ section:
       6cc400022a60b802ea06e002620314002aeeef01eac08801004000002a52e702
       6a05e002620314002afaef01eac08801004000006ca900022a2000022a40e302
       6a06e002620314002a0af001eac0880100400000e642bc01e4623c05e482bc05
-      e4a23c06e4c2bc065210800762030c0000800000
+      e4a23c06e4c2bc065210800762030c0000800000000000000000000000000000
