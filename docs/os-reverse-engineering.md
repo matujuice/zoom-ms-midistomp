@@ -207,12 +207,14 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
 - **Handler (`clock.S`):** any byte but `0xF8` returns at once. For a tick it
   (since fix3 on Task_MIDI's own stack) reads
   `Clock_getTicks`, restarts after a gap of more than 250 ms, and on every
-  24th tick (a beat) stores the time in a ring of 8. From the third beat on,
-  the last two beats give a quick tempo (10 x bpm = (1200000 + span/2) /
-  span); 4 BPM or more from the tempo applied last on two beats in a row (or
-  the first tempo after the clock starts) is applied at once and the average
-  restarts. Otherwise, with 4 to 8 beats in the ring, their average (10 x
-  bpm = (n x 600000 + span/2) / span) is applied only when it is 0.8 BPM or
+  24th tick completes a beat, whose time is the sum of its 24 tick times
+  (fix7), kept in a ring of 8 (differences mod 2^32, in 24ths of a ms).
+  From the third beat on, the last two beats give a quick tempo (10 x bpm =
+  (28800000 + span/2) / span); 4 BPM or more from the tempo applied last and
+  within 2 BPM of the previous beat's quick tempo (or the first tempo after
+  the clock starts) is applied at once and the average restarts. Otherwise,
+  with 4 to 8 beats in the ring, their average (10 x bpm = (n x 14400000 +
+  span/2) / span) is applied only when it is 0.8 BPM or
   more from the tempo applied last. Tempos are clamped to 40..250 BPM. A
   tempo changed by hand holds until the clock tempo changes or the clock
   restarts.
@@ -255,6 +257,12 @@ Built for the MS-50G 3.10 OS only. Source in `asm/midi_clock/`.
   quick path for jumps (locks 2 beats after the clock starts, follows a
   change in about 3). A host-side simulation with ±3 ms beat jitter gave one
   apply per tempo change at 90-180 BPM and at most two extra near 250.
+- **fix6 flash test:** follows and holds steady at the tested tempos, but at
+  220 BPM the delay still cut out after a while. fix7 times each beat by the
+  sum of its 24 tick times instead of one tick, which cuts the effect of
+  jitter about five-fold, and applies a jump only once two quick readings
+  agree, so no in-between tempo is applied. Simulated with up to ±8 ms tick
+  jitter: one apply per tempo change from 40 to 250 BPM.
 - **Fetch-packet padding:** new sections are now zero-padded to a whole
   32-byte fetch packet (`zoomms asm --section`). A section ending mid-packet
   leaves the rest of that packet as whatever L2 held at boot, and a stray

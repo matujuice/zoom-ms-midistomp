@@ -12,11 +12,15 @@
 ;
 ; Tempo from the clock (24 ticks per quarter note):
 ;   - a gap of more than GAP_MS between ticks restarts the measurement;
-;   - every 24th tick is a beat; beat times go in a ring of the last 8;
+;   - a beat's time is the sum of its 24 tick times (24 x their mean;
+;     fix7): one late tick moves it by 1/24 as much as when one tick per
+;     beat was timed, and fix6 still re-applied at 220 BPM from that jitter;
+;     sums go in a ring of the last 8 beats, differences are mod 2^32;
 ;   - from the third beat on, the last 2 beats give a quick tempo; when it
-;     is 4 BPM or more from the tempo applied last on two beats in a row (or
-;     nothing was applied since the clock started), it is applied and the
-;     average restarts (fix6: lock in 2 beats, follow a change in 3);
+;     is 4 BPM or more from the tempo applied last and within 2 BPM of the
+;     previous beat's quick tempo (or nothing was applied since the clock
+;     started), it is applied and the average restarts (lock in 3 beats,
+;     follow a change in about 3 without applying in-between values);
 ;   - otherwise the average over all beats in the ring (4 to 8) is applied
 ;     only when it is 0.8 BPM or more from the tempo applied last (fix5):
 ;     every apply restarts a stock delay, and with a 2-beat measurement
@@ -45,10 +49,12 @@
         .equ    V_IDX, 12                   ; next slot in the beat ring (0..7)
         .equ    V_APPLIED10, 16             ; 10 x tempo applied last, 0 = none
         .equ    V_N, 20                     ; beats in the ring before this one
-        .equ    V_JUMP, 24                  ; last beat's quick tempo was a jump
-        .equ    V_RING, 32                  ; times of the last 8 beats
+        .equ    V_SUM, 24                   ; sum of this beat's tick times
+        .equ    V_PREVQ, 28                 ; last beat's quick 10 x tempo
+        .equ    V_RING, 32                  ; tick-time sums of the last 8 beats
         .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
+        .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
         .equ    N_MIN, 4                    ; beats the average needs
         .equ    GAP_MS, 250
         .equ    BPM10_MIN, 400              ; 40 BPM, like tap tempo
@@ -104,19 +110,24 @@ tick:
   [a2]  stw     .D1T1   a3, *+a10(V_COUNT)  ;   restart counting
   [a2]  stw     .D1T1   a3, *+a10(V_BEATS)
   [a2]  stw     .D1T1   a3, *+a10(V_APPLIED10) ; and apply the next tempo
-  [a2]  stw     .D1T1   a3, *+a10(V_JUMP)
+  [a2]  stw     .D1T1   a3, *+a10(V_SUM)
+  [a2]  stw     .D1T1   a3, *+a10(V_PREVQ)
 
-        ; Count ticks; only every 24th (count was 0) is a beat.
+        ; Count ticks and add up their times; the 24th completes a beat.
         ldw     .D1T1   *+a10(V_COUNT), a12
+        ldw     .D1T1   *+a10(V_SUM), a13
         mvk     .S1     24, a1
         nop     3
+        add     .L1     a11, a13, a13
         add     .L1     1, a12, a0
-        cmpeq   .L1     a0, a1, a2
+        cmpeq   .L1     a0, a1, a2          ; a2 = beat complete
   [a2]  mvk     .L1     0, a0
         stw     .D1T1   a0, *+a10(V_COUNT)
-        mv      .L1     a12, a1
-  [a1]  b       .S1     out
+  [!a2] stw     .D1T1   a13, *+a10(V_SUM)
+  [a2]  stw     .D1T1   a3, *+a10(V_SUM)
+  [!a2] b       .S1     out
         nop     5
+        mv      .L1     a13, a11            ; a11 = this beat's tick-time sum
 
         ; Beat: ring of the last 8 beat times (n = how many it holds).
         ldw     .D1T1   *+a10(V_IDX), a1
@@ -145,17 +156,17 @@ tick:
   [a1]  b       .S1     out
         nop     5
 
-        ; Quick measurement over the last 2 beats: 10 x bpm =
-        ; (1200000 + span/2) / span. A change of 4 BPM or more on two beats
-        ; in a row is a real tempo change (the first 2-beat window after a
-        ; change straddles both tempos): apply it and restart the average
-        ; from this beat. The first tempo after the clock starts needs no
-        ; second beat.
+        ; Quick measurement over the last 2 beats, span in 24ths of a ms:
+        ; 10 x bpm = (28800000 + span/2) / span. A change of 4 BPM or more
+        ; that agrees with the previous beat's quick value is a real tempo
+        ; change (the windows right after a change straddle both tempos):
+        ; apply it and restart the average from this beat. The first tempo
+        ; after the clock starts needs no agreement.
         sub     .L1     a11, a12, a0
   [!a0] mvk     .L1     1, a0               ; never divide by 0
         shru    .S1     a0, 1, a4
-        mvkl    .S1     1200000, a1
-        mvkh    .S1     1200000, a1
+        mvkl    .S1     28800000, a1
+        mvkh    .S1     28800000, a1
         add     .L1     a1, a4, a4
         mv      .L2X    a0, b4
         FARCALL DIVU
@@ -166,21 +177,22 @@ tick:
         cmpgt   .L1     a4, a0, a1
   [a1]  mv      .L1     a0, a4
         ldw     .D1T1   *+a10(V_APPLIED10), a3
-        ldw     .D1T1   *+a10(V_JUMP), a2
+        ldw     .D1T1   *+a10(V_PREVQ), a2
         mvk     .S1     JUMP10, a1
         nop     3
+        stw     .D1T1   a4, *+a10(V_PREVQ)
         sub     .L1     a4, a3, a0
         abs     .L1     a0, a0
         cmplt   .L1     a0, a1, a1          ; a1 = no jump
-        cmpeq   .L1     0, a3, a0           ; nothing applied since the start
-        or      .L1     a0, a2, a2          ; a2 = jump confirmed
-        xor     .L1     1, a1, a0           ; a0 = jump now
-        xor     .L1     1, a2, a3
-        and     .L1     a0, a3, a3          ; jump not confirmed yet
-        stw     .D1T1   a3, *+a10(V_JUMP)
   [a1]  b       .S1     steady
         nop     5
-  [!a2] b       .S1     out                 ; wait for the next beat
+        sub     .L1     a4, a2, a0
+        abs     .L1     a0, a0
+        mvk     .S1     AGREE10, a1
+        cmplt   .L1     a0, a1, a1          ; agrees with the last beat
+        cmpeq   .L1     0, a3, a0           ; nothing applied since the start
+        or      .L1     a0, a1, a1
+  [!a1] b       .S1     out                 ; wait for the next beat
         nop     5
         mvk     .L1     1, a0
         stw     .D1T1   a0, *+a10(V_BEATS)  ; the average starts again here
@@ -189,12 +201,12 @@ tick:
         nop     5
 
         ; Steady tempo: average over all n beats in the ring (4 to 8),
-        ; 10 x bpm = (n x 600000 + span/2) / span, applied only when it is
+        ; 10 x bpm = (n x 14400000 + span/2) / span, applied only when it is
         ; 0.8 BPM or more from the tempo applied last. Each apply restarts
         ; a stock delay, and with 2 beats clock jitter flipped 140/141 BPM.
 steady:
         ldw     .D1T1   *+a10(V_N), a1
-        mvk     .S1     9375, a3            ; 600000 = 9375 << 6
+        mvk     .S1     28125, a3           ; 14400000 = 28125 << 9
         mvk     .S1     N_MIN, a0
         nop     2
         cmplt   .L1     a1, a0, a2
@@ -203,7 +215,7 @@ steady:
         mpyu    .M1     a1, a3, a4
         sub     .L1     a11, a13, a0
   [!a0] mvk     .L1     1, a0
-        shl     .S1     a4, 6, a4
+        shl     .S1     a4, 9, a4
         shru    .S1     a0, 1, a3
         add     .L1     a3, a4, a4
         mv      .L2X    a0, b4
