@@ -92,7 +92,7 @@ it is not assumed free.
 
 - **Program Change 0-49** loads patch 1-50 (`0xC00B8D34`, current patch at
   `B14+332`). PC 127 has a separate handler (`0xC00AD700`). So issue #3 works
-  without code changes; it needs a flash test, not a patch.
+  without code changes. Flash-tested 2026-10-08: PC 0 loads patch 1, PC 9 patch 10.
 - **CC 0** value 0/1 is stored at `B14+172` (bank select, unused with 50 patches).
 - **CC 74 / CC 75** switch the UI into states 5 / 6 (value >= 64) or back.
 - Every other CC is ignored.
