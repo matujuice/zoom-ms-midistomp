@@ -1,9 +1,35 @@
-# zoom-ms-modding
+<p align="center"><img src="docs/img/banner.png" alt="MIDISTOMP V1.0" width="720"></p>
 
-**MIDISTOMP V1.0** is the current release: MIDI program change, CC, clock and
-Start/Stop, tempo screen, HOLD FOR and button combos for the MS-50G 3.10
-firmware (also on a cross-flashed MS-60B). Players start with the
-[user guide](docs/user-guide.md).
+<h1 align="center">MIDISTOMP</h1>
+
+<p align="center"><b>Custom firmware for the Zoom MultiStomp MS-50G (and a cross-flashed MS-60B)<br>
+that adds MIDI control, MIDI clock and new playing aids.</b></p>
+
+<p align="center"><a href="docs/user-guide.md"><b>User guide</b></a> ·
+<a href="https://github.com/matujuice/zoom-ms-modding/releases">Download</a> ·
+<a href="docs/user-guide.md#5-midi-cc-chart">MIDI chart</a></p>
+
+## What you get
+
+| | |
+|---|---|
+| **Program Change** | loads patches from a DAW, an app or a drum machine |
+| **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#5-midi-cc-chart) |
+| **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
+| **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
+| **Tempo screen** | turn the knob or tap, TEMPO LOCK across patches |
+| **HOLD FOR** | footswitch hold opens tuner, tempo, or works as a momentary switch |
+| **Button combos** | down + right = tuner, down + left = tempo |
+
+<p align="center"><img src="docs/img/tempo-screen.jpg" alt="Tempo screen" width="420"></p>
+
+**Getting it:** download Zoom's official MS-50G 3.10 updater, drag it onto
+`MIDISTOMP-builder.exe` from the [releases](https://github.com/matujuice/zoom-ms-modding/releases),
+flash the updater it writes. Full steps and recovery: [user guide](docs/user-guide.md).
+
+---
+
+## For developers
 
 Custom firmware for the Zoom MultiStomp **MS-60B**, **MS-50G** and **MS-70CDR**
 (the original models, not the "+" versions), built by patching Zoom's OS.
@@ -27,7 +53,7 @@ a build config per pedal in [`models/`](models/).
 | 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **round trip exact on all 3 stock updaters** |
 | 2 | Per-model effect sets installed via Effect Manager / SysEx | effect files only | |
 | 3 | Our own DSP effects built with TI CGT C6000 | effect files only | |
-| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **first test patch ready** |
+| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **MIDISTOMP V1.0** |
 | 5 | Core firmware research (UI, routing, chain limits) | firmware | research only |
 
 ## Usage

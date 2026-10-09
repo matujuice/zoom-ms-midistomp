@@ -1,4 +1,16 @@
-# MIDISTOMP V1.0 user guide
+<p align="center"><img src="img/banner.png" alt="MIDISTOMP V1.0" width="720"></p>
+
+<h1 align="center">MIDISTOMP V1.0 user guide</h1>
+
+<p align="center"><b>MIDI control, MIDI clock and playing aids for the Zoom MultiStomp</b></p>
+
+<p align="center">
+<a href="#2-getting-it-onto-the-pedal">Install</a> ·
+<a href="#3-recovery-and-going-back-to-stock">Recovery</a> ·
+<a href="#4-features">Features</a> ·
+<a href="#5-midi-cc-chart">MIDI chart</a> ·
+<a href="#7-known-limits-and-faq">FAQ</a>
+</p>
 
 ## 1. What MIDISTOMP is
 
@@ -30,10 +42,14 @@ updater yourself from Zoom's official one. This needs Windows.
 4. Windows may warn that the program is unknown (it is not signed). Choose
    "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** (above and below the
-   footswitch) while you plug in the USB cable: the pedal shows the update screen.
+   footswitch, see the photo below) while you plug in the USB cable: the pedal shows the update screen.
+   <img src="img/keys.jpg" alt="The four cursor keys around the footswitch" width="480">
+
 6. Run `MIDISTOMP V1.0 Updater.exe` and let it finish. Don't unplug during the update.
 7. Unplug and power on normally. The boot screen reads **MIDISTOMP V1.0** and
    the last menu entry reads **V1.0**.
+
+   <img src="img/boot-screen.png" alt="MIDISTOMP V1.0 boot screen" width="400">
 
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's bootloader, which keeps the update mode always available.
@@ -89,6 +105,8 @@ so they stay on the beat and restart on the downbeat.
 **TEMPO LOCK** (last row of SETTINGS, default OFF): changing patch keeps the
 current tempo. Tap tempo, the tempo screen and MIDI clock still change it.
 
+<img src="img/tempo-screen.jpg" alt="Tempo screen with TURN OR TAP" width="480">
+
 **Tempo screen.** Press the knob labelled **TEMPO**: the screen shows the BPM
 and **TURN OR TAP**. Turn the knob for 1 BPM steps or tap the footswitch; it
 closes 2 s after the last turn or tap. While MIDI clock arrives it reads
@@ -103,6 +121,9 @@ closes 2 s after the last turn or tap. While MIDI clock arrives it reads
 **Button combos** (effect chain or effect screen):
 - hold **down + right** about 1 s: tuner
 - hold **down + left** about 1 s: tempo screen
+
+The pedal already marks them: the note icon sits under down + left, the
+tuning fork under down + right (photo in section 2).
 
 In the tuner, pressing the middle knob (**EXIT**) goes back to the effects.
 
