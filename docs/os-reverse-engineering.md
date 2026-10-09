@@ -458,3 +458,26 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     (`0xC00ACAB0(32)`, how stock leaves the tuner). The tuner softkeys are
     drawn at `0xC00BA5E0`-`0xC00BA600` (blank, blank, SETTINGS); the middle
     one's call goes through a trampoline that passes "EXIT" instead.
+
+### RAM canary test (issue #19, diagnostic build)
+
+Source `asm/ram_test/ramtest.S`, patch `patches/ram-test.yaml` (applied
+after `midi-clock.yaml`, instead of a `version-*.yaml`). Never released.
+
+- **Code:** 672 B in DDR at `0xC00F1960`, right after the OS image, loaded
+  as an extra AIS section. Stock code reaches it with a plain `callp`.
+- **Fill:** Task_SwitchNrmlSpdRead's poll call (`0xC00CA630`, already
+  retargeted by midi-clock.yaml) goes to `ram_poll`, which on the first round
+  after boot writes `address ^ 0x5AA5C33C` to every word of five regions,
+  then jumps to the poll trampoline as before.
+- **Regions:** 1 `0xC00F2000`-`0xC0197FFF`, 2 `0xC01ADAD4`-`0xC01FFFFF`,
+  3 `0xC0636980`-`0xC07CFFFF`, 4 `0xC07F4000`-`0xC07FFFFF` (all four written
+  and read through the uncached alias `0xC8xxxxxx`, as the OS's DMA buffers
+  at `0xC87D0000` are), 5 `0x80000000`-`0x8001FFFF` (shared RAM).
+- **Count:** the screen 9 draw stub (`0xC00A9434`, stock `callp 0xC00A8474`)
+  calls `ram_draw`. It draws the title (VERSION renamed RAMTEST), then counts
+  the words that no longer hold the pattern and shows them on the stock
+  VERSION rows: `1:n 2:n`, `3:n 4:n`, `5:n`. The middle knob still exits.
+  The stock version draw: title `0xC00A7378`, `snprintf` at `0xC00DE3A0`
+  (buf, size; fmt and values on the stack from +4), text `0xC00A0040(0,
+  text, x, y)` at x 12, y 16/28/40, softkeys "", EXIT, "".
