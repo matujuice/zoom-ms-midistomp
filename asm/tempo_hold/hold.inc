@@ -14,8 +14,8 @@
         .equ    HOLD_WORD, 0xC009D920       ; stock HOLD FOR: 0 tuner, 1 tempo
         .equ    SW_STATE, 0xC009DF90        ; 7 switches, bit i clear = down
         .equ    BOTTOM, 3                   ; the type key under the footswitch
-        .equ    RIGHT, 4
-        .equ    LEFT, 5
+        .equ    RIGHT, 5                    ; i 4 is the left key (v0.6 r4 test)
+        .equ    LEFT, 4
         .equ    EV_KNOB1, 160               ; knob 1 turn, A5 = steps
         .equ    EV_CURSOR_HOLD, 230         ; 230/231 cursor, 228/229 type
         .equ    EV_CURSOR_REL, 72           ; 73/75 cursor, 69/71 type

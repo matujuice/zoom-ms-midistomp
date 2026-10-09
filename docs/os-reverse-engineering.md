@@ -446,7 +446,7 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     and RIGHT down it runs `0xC00ABE58(224)` with the HOLD FOR word set to 0
     (tuner), with BOTTOM and LEFT set to 1 (tempo screen), then puts the word
     back and clears `B14+360`. `swallow_hook` drops the two buttons' next
-    releases. BOTTOM = i 3, RIGHT = i 4, LEFT = i 5 (`hold.inc`): the cursor
+    releases. BOTTOM = i 3, RIGHT = i 5, LEFT = i 4 (`hold.inc`): the cursor
     keys around the footswitch (i 2 is the top one: with BOTTOM = i 2 the
     r1 combos worked with the top key on the MS-60B). Both keys' timers can
     be queued before the stock hold stops them, so `combo_go` ignores a
