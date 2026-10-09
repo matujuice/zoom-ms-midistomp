@@ -25,7 +25,7 @@ playing aids. It is not made or supported by Zoom.
 
 | Pedal | Status |
 |---|---|
-| MS-50G | Runs it (same firmware it was made from). |
+| MS-50G | Should run it (same firmware it was made from), not tested yet. |
 | MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; **the only pedal it has been tested on**. |
 | MS-70CDR | Untested. It should boot, but stereo may not work (inferred). A tested MS-70CDR version will follow once the author has one. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
