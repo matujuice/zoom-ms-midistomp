@@ -21,7 +21,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 | **HOLD FOR** | footswitch hold opens tuner, tempo, or works as a momentary switch |
 | **Button combos** | down + right = tuner, down + left = tempo |
 
-<p align="center"><img src="docs/img/tempo-screen.jpg" alt="Tempo screen" width="420"></p>
+<p align="center"><img src="docs/img/boot-screen.png" alt="Boot screen" width="260"> <img src="docs/img/midi-menu.png" alt="MIDI menu" width="260"> <img src="docs/img/hold-for.png" alt="HOLD FOR" width="260"></p>
+<p align="center"><img src="docs/img/tempo-screen.jpg" alt="Tempo screen on an MS-60B" width="420"></p>
 
 **Getting it:** download Zoom's official MS-50G 3.10 updater, drag it onto
 `MIDISTOMP-builder.exe` from the [releases](https://github.com/matujuice/zoom-ms-modding/releases),

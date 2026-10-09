@@ -12,6 +12,8 @@
 <a href="#7-known-limits-and-faq">FAQ</a>
 </p>
 
+<sub>Screen pictures are drawn with the pedal's own font from the firmware; the photos are of a real MS-60B.</sub>
+
 ## 1. What MIDISTOMP is
 
 MIDISTOMP is a modified version of Zoom's own MS-50G firmware 3.10. It keeps
@@ -71,6 +73,8 @@ firmware (4 effects per patch).
 All MIDI goes over the USB cable: from a computer, an iPad/iPhone, or a
 USB-MIDI host box for hardware like a drum machine.
 
+<p><img src="img/menu.png" alt="Menu with the MIDI entry" width="300"> <img src="img/midi-menu.png" alt="MIDI menu" width="300"></p>
+
 **MIDI menu.** The menu (press the left knob in the effect chain view) has a
 new **MIDI** entry:
 
@@ -102,6 +106,8 @@ TapeEcho changes smoothly.
 [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack),
 so they stay on the beat and restart on the downbeat.
 
+<img src="img/settings.png" alt="SETTINGS with TEMPO LOCK" width="300">
+
 **TEMPO LOCK** (last row of SETTINGS, default OFF): changing patch keeps the
 current tempo. Tap tempo, the tempo screen and MIDI clock still change it.
 
@@ -111,6 +117,8 @@ current tempo. Tap tempo, the tempo screen and MIDI clock still change it.
 and **TURN OR TAP**. Turn the knob for 1 BPM steps or tap the footswitch; it
 closes 2 s after the last turn or tap. While MIDI clock arrives it reads
 **MIDI CLOCK** and can't be changed by hand.
+
+<img src="img/hold-for.png" alt="HOLD FOR choices" width="300">
 
 **HOLD FOR** (SETTINGS): what holding the footswitch does.
 - TUNER (default): opens the tuner, as stock.
