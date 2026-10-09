@@ -447,5 +447,14 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     (tuner), with BOTTOM and LEFT set to 1 (tempo screen), then puts the word
     back and clears `B14+360`. `swallow_hook` drops the two buttons' next
     releases. BOTTOM = i 3, RIGHT = i 4, LEFT = i 5 (`hold.inc`): the cursor
-    keys around the footswitch (i 2 is the top one; i 2 for BOTTOM did
-    nothing on the MS-60B, v0.6 r1).
+    keys around the footswitch (i 2 is the top one: with BOTTOM = i 2 the
+    r1 combos worked with the top key on the MS-60B). Both keys' timers can
+    be queued before the stock hold stops them, so `combo_go` ignores a
+    combo whose releases are still waiting to be swallowed (else the second
+    event closed the tempo screen again).
+  - Tuner: event 65 (middle knob release, `0xC00AC8B0`, nothing in modes
+    5/6) goes to `tuner_exit.S` (`0x1181E7C0`, the free 64 bytes after the
+    clock variables), which in the tuner runs the stock footswitch press
+    (`0xC00ACAB0(32)`, how stock leaves the tuner). The tuner softkeys are
+    drawn at `0xC00BA5E0`-`0xC00BA600` (blank, blank, SETTINGS); the middle
+    one's call goes through a trampoline that passes "EXIT" instead.

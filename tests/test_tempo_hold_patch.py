@@ -43,6 +43,7 @@ def test_patch_bytes_match_assembly_source():
     (0xC00AD1F8, 0xC00D8B70, H2 + 16),  # type release 69
     (0xC00AD1A8, 0xC00D8B70, H2 + 16),  # type release 71
     (0xC00AD158, 0xC00D8B70, H2 + 16),  # cursor release 73/75
+    (0xC00AD290, 0xC00D9190, 0x1181E7C0),  # middle knob release
 ])
 def test_call_sites_reach_their_vector(site, tramp, vector):
     entry = _at(site)
@@ -57,6 +58,21 @@ def test_call_sites_reach_their_vector(site, tramp, vector):
     lo = (int.from_bytes(t[0:4], "little") >> 7) & 0xFFFF
     hi = (int.from_bytes(t[4:8], "little") >> 7) & 0xFFFF
     assert (hi << 16 | lo) == vector
+
+
+def test_tuner_label_trampoline():
+    entry = _at(0xC00BA5E8)
+    disp = (_word(entry) >> 7) & 0x1FFFFF
+    disp = disp - (1 << 21) if disp & (1 << 20) else disp
+    assert (0xC00BA5E8 & ~31) + 4 * disp == 0xC00DAFD0
+    t = bytes.fromhex(_at(0xC00DAFD0)["data"])
+    lo = (int.from_bytes(t[0:4], "little") >> 7) & 0xFFFF
+    hi = (int.from_bytes(t[4:8], "little") >> 7) & 0xFFFF
+    assert (hi << 16 | lo) == 0xC00E9597  # stock "EXIT"
+    b = int.from_bytes(t[8:12], "little")
+    d = (b >> 7) & 0x1FFFFF
+    d = d - (1 << 21) if d & (1 << 20) else d
+    assert b & 0xF000007F == 0x12 and 0xC00DAFC0 + 4 * d == 0xC009F8F0  # b .S2 softkey
 
 
 def test_word_patches():
@@ -92,7 +108,8 @@ def test_strings():
 
 
 def test_sections_fit_free_l2():
-    a, b = PATCH["section"]
+    a, b, c = PATCH["section"]
+    assert c["addr"] == 0x1181E7C0 and len(bytes.fromhex(c["data"])) <= 64  # clock vars end .. poll.S
     assert a["addr"] == H and H + len(bytes.fromhex(a["data"])) <= 0x1181FF00  # transport block
     assert b["addr"] == H2 and H2 + len(bytes.fromhex(b["data"])) <= 0x11820000  # end of L2
     settings = next(o for o in OTHERS if o["name"] == "midi-settings")["section"][0]

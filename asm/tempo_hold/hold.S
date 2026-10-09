@@ -239,6 +239,14 @@ combo_stock:
         b       .S2     b0
         nop     5
 combo_go:       ; A0 = HOLD FOR to use, B2 = releases to swallow
+        mvkl    .S1     HV, a1
+        mvkh    .S1     HV, a1
+        ldw     .D1T1   *+a1(V_SWALLOW), a2
+        nop     4
+        and     .L1X    a2, b2, a2          ; done already: the other key's
+  [a2]  mvk     .L1     0, a4               ; timer, queued at the same time
+  [a2]  b       .S2     b3
+        nop     5
         addk    .S2     -16, b15
         stw     .D2T2   b3, *+b15(4)
         mvkl    .S1     HV, a1
