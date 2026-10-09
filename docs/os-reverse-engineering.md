@@ -481,3 +481,9 @@ after `midi-clock.yaml`, instead of a `version-*.yaml`). Never released.
   The stock version draw: title `0xC00A7378`, `snprintf` at `0xC00DE3A0`
   (buf, size; fmt and values on the stack from +4), text `0xC00A0040(0,
   text, x, y)` at x 12, y 16/28/40, softkeys "", EXIT, "".
+- **Result 2026-10-09** (Luca's MS-60B, MS-50G 3.10 OS): all five counts 0
+  right after boot and after heavy use. A non-zero count was expected if
+  the fill had not run (the regions would not hold the pattern), so the
+  fill ran, the shared RAM at `0x80000000` exists, and nothing wrote to any
+  region. They are free for new code and data (about 2.7 MB, reserve
+  `0xC00F1958`-`0xC00F1FFF` too), loaded as extra AIS sections.
