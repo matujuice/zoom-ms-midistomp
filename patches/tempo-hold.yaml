@@ -1,0 +1,205 @@
+# Tempo screen, HOLD FOR MOMENTARY and button combos (issue #28, v0.6).
+# MS-50G 3.10 OS only for now. Apply after midi-settings.yaml (HOLD FOR's
+# choice screen and V_HOLDM live there).
+#   Tempo screen: knob 1 turns the tempo, TURN OR TAP / MIDI CLOCK line,
+#   closes 2 s after the last turn or tap; the TAP softkey reads TEMPO.
+#   HOLD FOR MOMENTARY; BOTTOM + RIGHT opens the tuner, BOTTOM + LEFT the
+#   tempo screen.
+# Design and addresses: docs/os-reverse-engineering.md, "Tempo screen,
+# HOLD FOR and combos". The hex below is generated from asm/tempo_hold/*.S
+# with
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
+# and tests/test_tempo_hold_patch.py checks it still matches the source.
+name: tempo-hold
+description: Tempo screen knob, HOLD FOR MOMENTARY, tuner and tempo combos
+builds: [ms50g-3.10]
+write:
+  # Footswitch press with the tempo screen open: never flips, whatever
+  # HOLD FOR says (callp HOLD FOR getter -> mvk .S1 1,a4)
+  - model: ms50g-3.10
+    addr: 0xC00ACBD8
+    expect: "12231a10"
+    data: "a8000002"
+  # Footswitch release with the tempo screen open: always taps (same)
+  - model: ms50g-3.10
+    addr: 0xC00ACA40
+    expect: "12531a10"
+    data: "a8000002"
+  # Tempo screen (state 2) timeout: set a6,0,30,a6 (forever) -> mvk .S1 2000,a6
+  - model: ms50g-3.10
+    addr: 0xC00CB96C
+    expect: "891e1803"
+    data: "29e80303"
+  # Softkey label "TAP" (0xC00ECDC7) -> "TEMPO" (0xC00EB13F, the tempo box title)
+  - model: ms50g-3.10
+    addr: 0xC00CB3C8
+    expect: "aae36602"
+    data: "aa9f5802"
+  # Call site: the overlay draw for states 2 and 5 (stock 0xC00AAC48) -> tempo_draw trampoline
+  - model: ms50g-3.10
+    addr: 0xC00BA930
+    expect: "1365e01f"
+    data: "132a2210"
+  - model: ms50g-3.10
+    addr: 0xC00CBA70
+    expect: "00000000000000000000000000000000"
+    data: "2a407d00eac008006203000000800000"
+    source: asm/tempo_hold/tempo_draw_trampoline.S
+  # Call site: the key loop's knob turn call (stock 0xC00AC214) -> knob trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD10C
+    expect: "9322fe1f"
+    data: "13564910"
+  - model: ms50g-3.10
+    addr: 0xC00D1BB0
+    expect: "00000000000000000000000000000000"
+    data: "2a447d00eac008006203000000800000"
+    source: asm/tempo_hold/knob_trampoline.S
+  # Call site: the knob press tap (stock 0xC00B9DA8) -> tap trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AC9F0
+    expect: "12791a10"
+    data: "12ca4a10"
+  # Call site: the footswitch release tap -> tap trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACA50
+    expect: "126d1a10"
+    data: "12be4a10"
+  - model: ms50g-3.10
+    addr: 0xC00D2030
+    expect: "00000000000000000000000000000000"
+    data: "2a487d00eac008006203000000800000"
+    source: asm/tempo_hold/tap_trampoline.S
+  # Call site: the footswitch press flip (stock 0xC00ABDE4) -> toggle trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACC2C
+    expect: "9238fe1f"
+    data: "12ea4c10"
+  - model: ms50g-3.10
+    addr: 0xC00D3370
+    expect: "00000000000000000000000000000000"
+    data: "2a4c7d00eac008006203000000800000"
+    source: asm/tempo_hold/toggle_trampoline.S
+  # Call site: the key loop's footswitch release call (stock 0xC00ACA1C) -> release trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD2D8
+    expect: "93ebfe1f"
+    data: "138e4d10"
+  - model: ms50g-3.10
+    addr: 0xC00D3F30
+    expect: "00000000000000000000000000000000"
+    data: "2a507d00eac008006203000000800000"
+    source: asm/tempo_hold/release_trampoline.S
+  # Call site: the key loop's type hold call, event 228 (stock 0xC00ABB80) -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD090
+    expect: "1360fd1f"
+    data: "138a4e10"
+  # event 229 too -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD064
+    expect: "1364fd1f"
+    data: "138e4e10"
+  # Call site: the cursor hold call, events 230/231 (stock 0xC00ABA90) -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD034
+    expect: "134efd1f"
+    data: "13964e10"
+  - model: ms50g-3.10
+    addr: 0xC00D44D0
+    expect: "00000000000000000000000000000000"
+    data: "2a547d00eac008006203000000800000"
+    source: asm/tempo_hold/combo_trampoline.S
+  # Call site: the key loop's footswitch hold call, event 224 (stock 0xC00ABE58) -> hold trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD0E4
+    expect: "13affd1f"
+    data: "13ba4e10"
+  - model: ms50g-3.10
+    addr: 0xC00D46B0
+    expect: "00000000000000000000000000000000"
+    data: "2a907f00eac008006203000000800000"
+    source: asm/tempo_hold/hold_trampoline.S
+  # Call site: AUTO SAVE's patch-changed check (stock 0xC00B87F4) -> dirty trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACCE4
+    expect: "92621710"
+    data: "12e24f10"
+  - model: ms50g-3.10
+    addr: 0xC00D4BF0
+    expect: "00000000000000000000000000000000"
+    data: "2a947f00eac008006203000000800000"
+    source: asm/tempo_hold/dirty_trampoline.S
+  # Call site: the type button release calls, events 69/71 (stock 0xC00AC574) -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD1F8
+    expect: "9372fe1f"
+    data: "13325710"
+  # event 71 too -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD1A8
+    expect: "937afe1f"
+    data: "133a5710"
+  # Call site: the cursor release call, events 73/75 (stock 0xC00AC434) -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD158
+    expect: "935efe1f"
+    data: "13465710"
+  - model: ms50g-3.10
+    addr: 0xC00D8B70
+    expect: "00000000000000000000000000000000"
+    data: "2a987f00eac008006203000000800000"
+    source: asm/tempo_hold/swallow_trampoline.S
+section:
+  # Vectors and handlers, in free L2 after settings.S
+  - model: ms50g-3.10
+    addr: 0x1181FA80
+    source: asm/tempo_hold/hold.S
+    data: >-
+      921200000080000012220000008000009244000000800000124b000000800000
+      9253000000800000126500000080000052f8ff07f622bc012ab0f902ea06e002
+      620314006281820128807300e8c008002a007500eac0080064228000e6028000
+      e622bc0100600000f880040128fa8001f8490c01580a8400f82f88005a2f8400
+      f83f8400d82d04025208800762030c000080000052f8ff07f622bc012a24d602
+      6a05e002620314006281830158a300025aa31c022a7c88026a05e00262031400
+      6281810112eeff1fd80f90002a627f02eac00802a80f00032a687f82eac00882
+      2811008358a300022a1c00032a70fe02ea04e0026203140062818701e622bc01
+      006000005208800762030c00008000006e5200002850000000400000788a8000
+      58a38020901e00900080000052f8ff07f622bc01f4423c02f462bc0258a30002
+      2a08dd026a06e0026203140062818401f4823c02584a900058aa1001f82f8800
+      101400900080000012daff1fd80f9000100d00800080000028366000e8046000
+      64020002e462bc022a140002287d000300400000788014022a36bb026a05e002
+      6203140062818201da1f100228ec71026807600258a304032a32d6026a06e002
+      620314006281820158a30002e6823c0228e80303006000002a52dc026a06e002
+      6203140062818201e622bc0158a30402004000005208800762030c0000800000
+      e622bc01e4423c02e462bc0200600000520880072a0a61006a05600062030000
+      0080000052f8ff07f622bc0112c2ff1fd80f9000e622bc010060000052088007
+      62030c80008000002ad44e00ea056000620300000080000052f8ff07f622bc01
+      f4423c02f462bc022ab0f902ea06e002620314006281860128127500e8c00800
+      66028000e442bc0074420002004000007662800074228000e622bc01e4423c02
+      e462bc0200600000520880072af25e006a056000620300000080000052f8ff07
+      f622bc01f4423c02f462bc022ab0f902ea06e002620314006281870128127500
+      e8c00800646200016442800058a3800128fa80020020000074628001f8808400
+      f82b940058a30081900400b064220002006000002af2de026a05e00262031400
+      62818101e622bc01e4423c02e462bc0200600000520880072a0e65006a056000
+      62030000008000006e5200006e57800028c86f00e80460006402800028020001
+      00400000fa0f040058a30021984f0401900900b028080001984f040158a30000
+      2a10010100200000900900a00080000028100001984f040158a304002a100401
+      00200000900500a00080000028730000f88a80002a485d006a0560002ac05d80
+      6a056080620300000080000052f8ff07f622bc012812f500e8c088002a906c00
+      ea04600064820401e6028000f40200002870000200200000f85f080174820401
+      f642bc002a2cdf026a05e00262031400628185012a906c00ea046000e642bc00
+      e622bc015aa300017e5a000158a3040200000000f60280005208800762030c00
+      008000005455524e204f5220544150004d49444920434c4f434b000000000000
+  # Vectors and the rest of the handlers, in free L2 after the transport block
+  - model: ms50g-3.10
+    addr: 0x1181FF20
+    source: asm/tempo_hold/hold2.S
+    data: >-
+      12030000008000009208000000800000120e00000080000028127500e8c00800
+      640280000060000058a3008262030c80008000002a2c5f006a05600062030000
+      0080000028127500e8c00800646280000060000058a3008262030c8000800000
+      2afa4300ea056000620300000080000028127500e8c008006482800028200001
+      f880080158a38401e04c8c0100000000782f0c01982f8ca0748280a058a300a2
+      62030ca028240000f88a80002a1a62006a0560002aba62806a05608000000000
+      6203000000800000000000000000000000000000000000000000000000000000

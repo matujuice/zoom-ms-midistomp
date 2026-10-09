@@ -158,7 +158,7 @@ vars:
         .word   0                           ; +28 V_PEND
         .word   BOOT_ROUNDS                 ; +32 V_BOOT
         .word   0                           ; +36 V_HOLDM
-        .word   0, 0, 0, 0, 0, 0
+        .word   0, 0, 0, 0, 0, 0            ; +40.. hold.S (asm/tempo_hold/hold.inc)
 ; +64: entry points at fixed offsets (the patch file names them by address)
 vectors:
         b       .S2     menu_keys           ; +64  called, menu stub
