@@ -5,7 +5,7 @@
         .text
         .global unpack_trampoline
 unpack_trampoline:
-        mvkl    .S2     0x1181EA20, b0
-        mvkh    .S2     0x1181EA20, b0
+        mvkl    .S2     0x1181EA88, b0
+        mvkh    .S2     0x1181EA88, b0
         b       .S2     b0
         nop     5
