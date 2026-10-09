@@ -40,8 +40,8 @@ every report helps.
 The release does not contain Zoom's firmware, so you make the MIDISTOMP
 updater yourself from Zoom's official one. This needs Windows.
 
-1. Download Zoom's **MS-50G System v3.10** updater for Windows from zoomcorp.com
-   (MS-50G support page) and unzip it.
+1. Download [Zoom's **MS-50G System v3.10** updater for Windows from zoomcorp.com
+   (MS-50G support page)](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-50g/ms-50g-support/) and unzip it.
 2. Download **MIDISTOMP-builder.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-modding/releases).
 3. Drag `ZOOM MS-50G System v3.10 Updater.exe` onto `MIDISTOMP-builder.exe`.
