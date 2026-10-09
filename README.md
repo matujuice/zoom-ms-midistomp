@@ -38,8 +38,9 @@ flash the updater it writes. Full steps and recovery: [user guide](docs/user-gui
 
 ## Demo
 
-<!-- DEMO: Luca's video goes here -->
-A short video of MIDISTOMP on an MS-60B is coming soon.
+<p align="center"><a href="https://www.youtube.com/watch?v=YFTa55yCxsM"><img src="https://img.youtube.com/vi/YFTa55yCxsM/hqdefault.jpg" alt="MIDISTOMP demo video on YouTube" width="560"></a></p>
+
+<p align="center">MIDISTOMP on an MS-60B. Click to watch on YouTube.</p>
 
 ## Custom effects
 
