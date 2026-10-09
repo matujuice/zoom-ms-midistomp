@@ -2,7 +2,7 @@
 
 <h1 align="center">MIDISTOMP</h1>
 
-<p align="center"><b>Custom firmware for the Zoom MultiStomp MS-50G (and a cross-flashed MS-60B)<br>
+<p align="center"><b>Custom firmware for the Zoom MultiStomp series of pedals<br>
 that adds MIDI control, MIDI clock and new playing aids.</b></p>
 
 <p align="center"><a href="docs/user-guide.md"><b>User guide</b></a> ·
@@ -26,7 +26,7 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 <p align="center"><img src="docs/img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="260"> <img src="docs/img/tempo-midi-clock.png" alt="Tempo screen with MIDI clock" width="260"></p>
 <p align="center"><img src="docs/img/tempo-screen.jpg" alt="Tempo screen on a real MS-60B" width="420"></p>
 
-**Getting it:** download Zoom's official MS-50G 3.10 updater, drag it onto
+**Getting it:** download [Zoom's official MS-50G 3.10 updater](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-50g/ms-50g-support/), drag it onto
 `MIDISTOMP-builder.exe` from the [releases](https://github.com/matujuice/zoom-ms-modding/releases),
 flash the updater it writes. Full steps and recovery: [user guide](docs/user-guide.md).
 
