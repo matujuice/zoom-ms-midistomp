@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PATCH = patcher.load(ROOT / "patches/midi-settings.yaml")
 OTHERS = [patcher.load(ROOT / f"patches/{n}.yaml") for n in ("midi-cc", "midi-clock")]
 BASE = 0x1181EA00
+SEC = bytes.fromhex(PATCH["section"][0]["data"])
 
 
 def _word(entry):
@@ -16,6 +17,14 @@ def _word(entry):
 
 def _at(addr):
     return next(e for e in PATCH["write"] if e["addr"] == addr)
+
+
+def _sec_word(addr):
+    return int.from_bytes(SEC[addr - BASE:addr - BASE + 4], "little")
+
+
+def _sec_str(addr):
+    return SEC[addr - BASE:].split(b"\0")[0].decode()
 
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
@@ -28,10 +37,14 @@ def test_patch_bytes_match_assembly_source():
 
 
 @pytest.mark.parametrize("site,tramp,vector", [
-    (0xC00B9CF4, 0xC00B97E8, 24),  # pack
-    (0xC00BA09C, 0xC00BDB44, 32),  # unpack
-    (0xC00AF088, 0xC00B2FAC, 40),  # CC
-    (0xC00AF0AC, 0xC00B2FAC, 40),  # PC
+    (0xC00A8360, 0xC00BEDF0, 64),   # menu keys
+    (0xC00A9400, 0xC00C2164, 72),   # menu draw
+    (0xC00B9CF4, 0xC00B97E8, 128),  # settings pack
+    (0xC00BA09C, 0xC00BDB44, 136),  # settings unpack
+    (0xC00AF088, 0xC00B2FAC, 144),  # CC
+    (0xC00AF0AC, 0xC00B2FAC, 144),  # PC
+    (0xC00B8DD4, 0xC00C4AAC, 152),  # record 51 load
+    (0xC00B86E0, 0xC00C5D88, 160),  # record 51 save
 ])
 def test_call_sites_reach_their_vector(site, tramp, vector):
     word = _word(_at(site))
@@ -46,18 +59,39 @@ def test_call_sites_reach_their_vector(site, tramp, vector):
     assert (hi << 16 | lo) == BASE + vector
 
 
-def test_switch_tables_and_tables():
-    assert _word(_at(0xC00EF300)) == BASE + 0   # screen 1 keys
-    assert _word(_at(0xC00EF330)) == BASE + 8   # screen 13 keys
-    assert _word(_at(0xC00EF2EC)) == BASE + 16  # screen 13 draw
-    sec = bytes.fromhex(PATCH["section"][0]["data"])
-    names = [int.from_bytes(sec[64 + 4 * i:68 + 4 * i], "little") for i in range(12)]
-    assert names[:7] == [0xC00E94B5, 0xC00E94C8, 0xC00E94DA, 0xC00E94EB, 0xC00E94F5, 0xC00E9502, 0xC00E9510]
-    assert names[11] == 0
-    strings = [sec[a - BASE:].split(b"\0")[0] for a in names[7:11]]
-    assert strings == [b"MIDI CLOCK", b"MIDI START/STOP", b"MIDI PROG CHANGE", b"MIDI CC"]
-    assert sec[48:56] == bytes(8)  # flags and item start at 0 = all on
-    assert "MIDI_FLAGS, 0x1181EA30" in (ROOT / "asm/midi_clock/transport.inc").read_text()
+def test_switch_tables():
+    assert _word(_at(0xC00EF300)) == BASE + 80   # screen 1 keys
+    assert _word(_at(0xC00EF2BC)) == BASE + 88   # screen 1 draw
+    assert _word(_at(0xC00EF334)) == BASE + 96   # screen 14 keys
+    assert _word(_at(0xC00EF2F0)) == BASE + 104  # screen 14 draw
+    assert _word(_at(0xC00EF330)) == BASE + 112  # screen 13 keys
+    assert _word(_at(0xC00EF2EC)) == BASE + 120  # screen 13 draw
+
+
+def test_vars_and_shared_addresses():
+    assert SEC[0:32] == bytes(32)  # MIDI word etc. start at 0 = defaults
+    assert _sec_word(BASE + 32) == 125  # V_BOOT
+    assert "MIDI_FLAGS, 0x1181EA00" in (ROOT / "asm/midi_clock/transport.inc").read_text()
+    assert "TEMPO_LOCK, 0x1181EAA8" in (ROOT / "asm/midi_clock/poll.S").read_text()
+
+
+def test_settings_table():
+    items = SEC.index((0x1181EA00 + 12).to_bytes(4, "little")) - 4  # TEMPO LOCK's word
+    first = items - 6 * 24
+    rows = []
+    for i in range(7):
+        d = SEC[first + 24 * i:first + 24 * i + 24]
+        name, word, choices = (int.from_bytes(d[k:k + 4], "little") for k in (0, 4, 8))
+        rows.append((_sec_str(name), word, tuple(d[12:18])))
+    assert rows == [
+        ("CLOCK RECEIVE", 0x1181EA00, (0, 1, 1, 2, 14, 0)),
+        ("TRANSPORT RECEIVE", 0x1181EA00, (1, 1, 1, 2, 14, 1)),
+        ("PROG CH RECEIVE", 0x1181EA00, (2, 1, 1, 2, 14, 2)),
+        ("PROG CH START NO.", 0x1181EA00, (4, 1, 1, 2, 14, 3)),
+        ("CC RECEIVE", 0x1181EA00, (3, 1, 1, 2, 14, 4)),
+        ("MIDI CHANNEL", 0x1181EA00, (5, 31, 0, 17, 14, 5)),
+        ("TEMPO LOCK", 0x1181EA0C, (0, 1, 0, 2, 1, 7)),
+    ]
 
 
 def test_no_overlap():
@@ -71,5 +105,8 @@ def test_no_overlap():
                 if a == c == 0xC00AF088:  # the CC call site, rerouted on purpose
                     continue
                 assert b <= c or d <= a, hex(c)
-    end = PATCH["section"][0]["addr"] + len(bytes.fromhex(PATCH["section"][0]["data"]))
+    for i, (a, b) in enumerate(ours):
+        for c, d in ours[i + 1:]:
+            assert b <= c or d <= a, hex(c)
+    end = PATCH["section"][0]["addr"] + len(SEC)
     assert end <= 0x1181FF00  # transport block

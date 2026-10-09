@@ -31,8 +31,8 @@
 ;     changes, and leaving a MIDI choice screen after a change), rec_load
 ;     takes it out at boot. A stock record has 0 there = all defaults.
 ;   - TEMPO LOCK is bit 5 of byte 23 of the stock settings record (50), via
-;     pack_hook/unpack_hook; changing it flips a bit of the shadow copy so
-;     the stock settings save sees a change.
+;     pack_hook/unpack_hook; leaving its choice screen after a change saves
+;     the stock settings record.
 ;
 ; MIDI word: bits 0-3 "receive off" for clock, transport, PC, CC (clock.S
 ; tests them, transport.inc), bit 4 = PROG CH START is 0, bits 5-9 channel
@@ -74,7 +74,9 @@
         .equ    STR_EXIT, 0xC00E9597
         .equ    STR_BLANK, 0xC00E959C
         .equ    OFF_ON, 0xC00ED238          ; "OFF", "ON"
-        .equ    SHADOW, 0xC009D860
+        .equ    SETTINGS_WORDS, 0xC009D8F8
+        .equ    SAVE_SETTINGS, 0xC00B9D04   ; (words), writes record 50
+        .equ    CLAMP, 0xC00A766C           ; (value, min, max)
         .equ    PACK, 0xC00D3C6C
         .equ    UNPACK, 0xC00D3B80
         .equ    REC_SAVE, 0xC00B4C94        ; (record, buffer)
@@ -177,6 +179,7 @@ vectors:
         nop     5
         b       .S2     tempo_lock          ; +168 called, poll.S
         nop     5
+        .p2align 5                          ; keep data out of code packets
 
 ; Settings: name, value word, choice names, then bytes shift, mask, xor
 ; (value = (word >> shift & mask) ^ xor), choices, parent screen and row.
@@ -605,15 +608,27 @@ ok_ret:
         ldw     .D2T1   *+b15(8), a10
         ldw     .D2T1   *+b15(12), a11
         RET16
-ok_turn:
+ok_turn:        ; value = clamp(value + turn), like the stock OFF/ON screens
+        mv      .L1     a5, a11
+        mv      .L1     a10, a4
+        FARCALL get_value
+        add     .L1     a4, a11, a4
         ITEM    a10
-        ldbu    .D1T2   *+a3(15), b4        ; choices
-        mv      .L1     a5, a4
-        nop     3
-        FARCALL LIST_SCROLL
-        FARCALL LIST_INDEX
+        ldbu    .D1T1   *+a3(15), a6        ; choices
+        mvk     .L2     0, b4
+        nop     4
+        add     .L1     -1, a6, a6
+        FARCALL CLAMP
         mv      .L1     a4, a11             ; new value
-        mv      .L2X    a4, b4
+        mvk     .L1     3, a0               ; list position for the highlight
+        cmplt   .L1     a0, a11, a2
+        mv      .L1     a11, a6             ; row
+        mvk     .L1     0, a7               ; top
+  [a2]  mvk     .L1     3, a6
+  [a2]  add     .L1     -3, a11, a7
+        stw     .D2T1   a6, *+b14(368)
+        stw     .D2T1   a7, *+b14(372)
+        mv      .L2X    a11, b4
         mv      .L1     a10, a4
         FARCALL set_value
         ; TRANSPORT RECEIVE turned off: the transport counts as stopped.
@@ -649,15 +664,10 @@ ok_exit:
         FARCALL SAVE_LAST_PATCH
         b       .S1     ok_back
         nop     5
-ok_flip:        ; TEMPO LOCK: make the stock settings save see a change
-        mvkl    .S2     SHADOW, b4
-        mvkh    .S2     SHADOW, b4
-        ldw     .D2T2   *b4, b5
-        mvk     .S2     1, b6
-        shl     .S2     b6, 31, b6
-        nop     2
-        xor     .L2     b6, b5, b5
-        stw     .D2T2   b5, *b4
+ok_flip:        ; TEMPO LOCK: save the stock settings record now
+        mvkl    .S1     SETTINGS_WORDS, a4
+        mvkh    .S1     SETTINGS_WORDS, a4
+        FARCALL SAVE_SETTINGS
 ok_back:
         ITEM    a10
         ldbu    .D1T1   *+a3(16), a4        ; parent screen
