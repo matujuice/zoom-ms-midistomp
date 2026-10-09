@@ -26,6 +26,13 @@ class Scr:
                         if bold: s.set(x + i + 1, y + r, 0 if inv else 1)
             x += 6 + (1 if bold else 0)
         return x
+    def big(s, t, x, y, inv=False):  # the 6x8 font at 2x, for the tempo box
+        for c in t:
+            col = FONT[(ord(c) & 127) * 6:(ord(c) & 127) * 6 + 6]
+            for i, b in enumerate(col):
+                for r in range(8):
+                    if b >> r & 1: s.box(x + 2 * i, y + 2 * r, x + 2 * i + 1, y + 2 * r + 1, 0 if inv else 1)
+            x += 12
     def box(s, x0, y0, x1, y1, v=1):
         for y in range(y0, y1 + 1):
             for x in range(x0, x1 + 1): s.set(x, y, v)
@@ -48,12 +55,12 @@ def title(s, t):
 def tri(s, x, y, up):
     for r in range(3):
         for i in range(-r, r + 1): s.set(x + i, y + (r if up else 2 - r))
-def softkeys(s, labels):
+def softkeys(s, labels, arrows=True):
     for k, l in enumerate(labels):
         x0 = k * 43; x1 = x0 + 41
         s.box(x0, 54, x1, 63)
         if l: s.text(l, x0 + (42 - len(l) * 6) // 2 + 1, 55, inv=True)
-    tri(s, 16, 48, True); tri(s, 24, 48, False)
+    if arrows: tri(s, 16, 48, True); tri(s, 24, 48, False)
 def lst(t, names, rows_hi, top=0, icons=None, left='ENTER'):
     s = Scr(); title(s, t)
     bar = len(names) > 4
@@ -85,4 +92,23 @@ logo = bytes.fromhex(yaml.safe_load(open('patches/boot-logo.yaml'))['bin133'][0]
 b = Scr()
 for y in range(H):
     for x in range(W): b.p[y][x] = logo[(y // 8) * W + x] >> (y % 8) & 1
+b.text('v1.0', (W - 24) // 2, 50)  # the OS prints the version here
 b.png(OUT + '/boot-screen.png')
+# banner: the boot screen on an MS-50G grey panel
+sc = 6; fg = (28, 36, 58); bgc = (196, 214, 226)
+ban = Image.new('RGB', (1200, 480), (88, 91, 96)); d = ImageDraw.Draw(ban)
+x0, y0 = (1200 - W * sc) // 2, (480 - H * sc) // 2
+d.rounded_rectangle([x0 - 20, y0 - 20, x0 + W * sc + 19, y0 + H * sc + 19], radius=16, fill=(32, 33, 36))
+d.rectangle([x0, y0, x0 + W * sc - 1, y0 + H * sc - 1], fill=bgc)
+for y in range(H):
+    for x in range(W):
+        if b.p[y][x]: d.rectangle([x0 + x * sc, y0 + y * sc, x0 + x * sc + sc - 1, y0 + y * sc + sc - 1], fill=fg)
+ban.save(OUT + '/banner.png')
+# tempo screen: the stock tempo box with our TURN OR TAP / MIDI CLOCK line
+for name, line in (('tempo-turn-tap', 'TURN OR TAP'), ('tempo-midi-clock', 'MIDI CLOCK')):
+    t = Scr()
+    t.box(4, 14, 123, 47); t.box(5, 15, 122, 46, 0)
+    t.box(8, 19, 70, 36); t.big('TEMPO', 10, 20, inv=True); t.big('122', 78, 20)
+    t.text(line, (W - 6 * len(line)) // 2, 38)
+    softkeys(t, ['TEMPO', 'EXIT', 'PAGE'], arrows=False)
+    t.png(OUT + '/' + name + '.png')

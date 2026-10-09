@@ -26,24 +26,14 @@ blit(55,127,6,17,S)             # S, bar, TOMP
 for y in (16,17):               # S bottom bar: start under the new M
     for x in range(72+S): out[y][x]=0  # only the bar; TOMP's bottom rows stay
     for x in range(15+S, (72 if y==16 else 71)+S): out[y][x]=1
-# bottom line: V 1 . 0 (0 from stock), centred
-V=[]
-for r in range(21):
-    l=round(r*8/20); row=['.']*23
-    for i in range(6): row[l+i]='#'; row[22-l-i]='#'
-    V.append(''.join(row))
-ONE=[]
-for r in range(21):
-    row=['.']*11
-    for i in range(5,11): row[i]='#'
-    if r<6:
-        for i in range(max(0,4-r),5): row[i]='#'
-    ONE.append(''.join(row))
-x=33
-draw(V,x,20); x+=23+3
-draw(ONE,x,20); x+=11+3
-draw(["######"]*5,x,36); x+=6+3
-blit(80,96,20,40,x-80)  # stock "0" is columns 80-96
+# bottom line: M O D (M and O are the stock "M" and "0" of MS-50G), centred;
+# the OS prints the version under it
+x=30
+blit(11,38,20,40,x-11); x+=28+3   # stock "M" is columns 11-38
+blit(80,96,20,40,x-80); x+=17+3   # stock "0" is columns 80-96
+for y in range(21,41):            # D: straight left stroke, right half of the "0"
+    for i in range(17):
+        if i<6 or i>=8 and src[y][80+i] or i<10 and (y<=24 or y>=37): out[y][x+i]=1
 img=Image.new('L',(W,H),20)
 for y in range(H):
     for x in range(W):

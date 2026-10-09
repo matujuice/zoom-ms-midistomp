@@ -1,4 +1,4 @@
-<p align="center"><img src="img/banner.png" alt="MIDISTOMP V1.0" width="720"></p>
+<p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.0" width="720"></p>
 
 <h1 align="center">MIDISTOMP V1.0 user guide</h1>
 
@@ -9,7 +9,8 @@
 <a href="#3-recovery-and-going-back-to-stock">Recovery</a> ·
 <a href="#4-features">Features</a> ·
 <a href="#5-midi-cc-chart">MIDI chart</a> ·
-<a href="#7-known-limits-and-faq">FAQ</a>
+<a href="#7-known-limits-and-faq">FAQ</a> ·
+<a href="../README.md#demo">Demo</a>
 </p>
 
 <sub>Screen pictures are drawn with the pedal's own font from the firmware; the photos are of a real MS-60B.</sub>
@@ -48,10 +49,10 @@ updater yourself from Zoom's official one. This needs Windows.
    <img src="img/keys.jpg" alt="The four cursor keys around the footswitch" width="480">
 
 6. Run `MIDISTOMP V1.0 Updater.exe` and let it finish. Don't unplug during the update.
-7. Unplug and power on normally. The boot screen reads **MIDISTOMP V1.0** and
+7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.0** and
    the last menu entry reads **V1.0**.
 
-   <img src="img/boot-screen.png" alt="MIDISTOMP V1.0 boot screen" width="400">
+   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.0 boot screen" width="400">
 
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's bootloader, which keeps the update mode always available.
@@ -111,7 +112,7 @@ so they stay on the beat and restart on the downbeat.
 **TEMPO LOCK** (last row of SETTINGS, default OFF): changing patch keeps the
 current tempo. Tap tempo, the tempo screen and MIDI clock still change it.
 
-<img src="img/tempo-screen.jpg" alt="Tempo screen with TURN OR TAP" width="480">
+<p><img src="img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="300"> <img src="img/tempo-midi-clock.png" alt="Tempo screen while MIDI clock arrives" width="300"></p>
 
 **Tempo screen.** Press the knob labelled **TEMPO**: the screen shows the BPM
 and **TURN OR TAP**. Turn the knob for 1 BPM steps or tap the footswitch; it
