@@ -1,5 +1,10 @@
 # zoom-ms-modding
 
+**MIDISTOMP V1.0** is the current release: MIDI program change, CC, clock and
+Start/Stop, tempo screen, HOLD FOR and button combos for the MS-50G 3.10
+firmware (also on a cross-flashed MS-60B). Players start with the
+[user guide](docs/user-guide.md).
+
 Custom firmware for the Zoom MultiStomp **MS-60B**, **MS-50G** and **MS-70CDR**
 (the original models, not the "+" versions), built by patching Zoom's OS.
 See [docs/roadmap.md](docs/roadmap.md) for the planned features and
