@@ -14,8 +14,7 @@
 ; HOLD FOR MOMENTARY (settings.S V_HOLDM): the footswitch flips the effect
 ; on press as usual; held for HOLD_MS or more, release flips it back. The
 ; footswitch hold timer does nothing, and AUTO SAVE waits while the
-; footswitch is down, so a flip-back leaves the patch as saved. With TUNER
-; or TEMPO the footswitch flips on release instead, unless the hold fired.
+; footswitch is down, so a flip-back leaves the patch as saved.
 ;
 ; Combos, in play mode (effect chain and effect screens, not menus), when a
 ; button's stock hold timer fires (1 s) with the other button also down:
@@ -163,11 +162,7 @@ tap_hook:
         nop     5
         JUMP    STOCK_TAP
 
-; Footswitch press would flip slot A4. MOMENTARY: flip now, maybe back on
-; release. TUNER/TEMPO: flip on release instead, unless the hold fired (so
-; holding for the tuner or the tempo screen never flips the effect). The
-; deferred case returns past the stock flag store (0xC00ACC30-3A), so the
-; stock hold has nothing to undo.
+; Footswitch press flips slot A4: note it for the release (MOMENTARY).
 toggle_hook:
         ENTER
         FCALL   CLOCK_GETTICKS
@@ -176,21 +171,13 @@ toggle_hook:
         ldw     .D1T2   *+a0(V_HOLDM), b1
         ldw     .D2T1   *+b15(8), a1
         stw     .D1T1   a4, *+a0(V_PRESST)
-        mvk     .L2     ARM_LATER, b2
-        nop     2
-        sub     .L2     b2, b1, b2          ; ARM_BACK for MOMENTARY
-        stw     .D1T2   b2, *+a0(V_MARM)
+        nop     3
+        stw     .D1T2   b1, *+a0(V_MARM)
         stw     .D1T1   a1, *+a0(V_MSLOT)
         LEAVE
-        mvkl    .S2     TOGGLE, b0
-        mvkh    .S2     TOGGLE, b0
-  [!b1] mvkl    .S2     TOGGLE_DONE, b0
-  [!b1] mvkh    .S2     TOGGLE_DONE, b0
-        b       .S2     b0
-        nop     5
+        JUMP    TOGGLE
 
-; Footswitch release (event 33): flip back after a long MOMENTARY press,
-; or do the deferred flip if the hold did not fire.
+; Footswitch release (event 33): after a long MOMENTARY press, flip back.
 release_hook:
         ENTER
         FCALL   CLOCK_GETTICKS
@@ -198,19 +185,13 @@ release_hook:
         mvkh    .S1     HV, a0
         ldw     .D1T1   *+a0(V_MARM), a2
         ldw     .D1T1   *+a0(V_PRESST), a1
-        ldw     .D2T2   *+b14(MODE), b0
-        ldw     .D2T2   *+b14(HOLD_FIRED), b1
         mvk     .L1     0, a3
         mvk     .S1     HOLD_MS, a5
+        nop     2
         stw     .D1T1   a3, *+a0(V_MARM)
         sub     .L1     a4, a1, a1
         cmpltu  .L1     a1, a5, a1          ; a short press stays flipped
-        or      .L2     b0, b1, b0          ; tuner open, or tempo screen
-        cmpeq   .L1     ARM_LATER, a2, a3
-  [b0]  mvk     .L1     0, a3
-        cmpeq   .L1     ARM_BACK, a2, a2
   [a1]  mvk     .L1     0, a2
-        or      .L1     a2, a3, a2
   [!a2] b       .S1     rel_stock
         ldw     .D1T1   *+a0(V_MSLOT), a4
         nop     4

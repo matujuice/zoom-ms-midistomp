@@ -437,11 +437,6 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     0.5 s, like `poll.S`). `knob_hook` turns the tempo with knob 1 in states
     2 and 5 (clamped 40-250, set like tap) and re-arms the 2 s; `tap_hook`
     skips taps while the clock is live.
-  - With HOLD FOR TUNER or TEMPO, `toggle_hook` skips the flip and returns
-    to `0xC00ACC50`, past the stock flag store, so the hold has nothing to
-    undo; `release_hook` flips on release unless the hold fired (mode no
-    longer 0, or `B14+360` set by the tempo screen). Stock flips on press
-    and flips back when the hold fires.
   - MOMENTARY (settings `V_HOLDM`, the stock word stays 0): `toggle_hook`
     flips and notes slot and time, `release_hook` flips back after 0.5 s
     or more, `hold_hook` makes event 224 do nothing, and `dirty_hook` (at the
