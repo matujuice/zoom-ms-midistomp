@@ -70,6 +70,13 @@ def test_word_patches():
     assert cst(0xC00CB3C8) == (4, 0xB13F, 0)  # mvkh 0xC00E: "TEMPO"
 
 
+def test_tempo_box_reaches_bottom_row():
+    box = bytes.fromhex(_at(0xC00EBB64)["data"])
+    x, y, w, h = (int.from_bytes(box[k:k + 2], "little") for k in range(0, 8, 2))
+    assert (x, w) == (4, 120) and y + h - 1 == 63
+    assert "TEXT_Y, 53" in (ROOT / "asm/tempo_hold/hold.inc").read_text()  # 7-px font: rows 53-59
+
+
 def test_shared_addresses():
     inc = (ROOT / "asm/tempo_hold/hold.inc").read_text()
     settings = (ROOT / "asm/midi_settings/settings.S").read_text()

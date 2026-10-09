@@ -3,7 +3,8 @@
 ;
 ; Tempo screen (overlay state 2, footswitch hold with HOLD FOR TEMPO; state
 ; 5, knob 1 press on a patch with a tempo effect): drawn by the stock box
-; (TEMPO and the BPM), then tempo_draw adds a line under it, TURN OR TAP, or
+; (TEMPO and the BPM, made taller), then tempo_draw adds a line inside it,
+; TURN OR TAP, or
 ; MIDI CLOCK while the clock sets the tempo (CLOCK RECEIVE on, a clock in
 ; the last 0.5 s). Turning knob 1 changes the tempo by 1 BPM a step (40 to
 ; 250, like tap) and keeps the screen 2 s; while the clock is live turns and
@@ -13,7 +14,8 @@
 ; HOLD FOR MOMENTARY (settings.S V_HOLDM): the footswitch flips the effect
 ; on press as usual; held for HOLD_MS or more, release flips it back. The
 ; footswitch hold timer does nothing, and AUTO SAVE waits while the
-; footswitch is down, so a flip-back leaves the patch as saved.
+; footswitch is down, so a flip-back leaves the patch as saved. With TUNER
+; or TEMPO the footswitch flips on release instead, unless the hold fired.
 ;
 ; Combos, in play mode (effect chain and effect screens, not menus), when a
 ; button's stock hold timer fires (1 s) with the other button also down:
@@ -71,14 +73,12 @@ clock_live:
         b       .S2     b3
         nop     5
 
-; Overlay states 2 and 5 (A4 = 0, B4 = tempo): stock box, then our line.
+; Overlay states 2 and 5 (A4 = 0, B4 = tempo): stock box (made taller by
+; tempo-hold.yaml), then our line inside it.
 tempo_draw:
         addk    .S2     -16, b15
         stw     .D2T2   b3, *+b15(4)
         FCALL   TEMPO_BOX
-        mvk     .L1     0, a4
-        mvk     .L2     7, b4
-        FCALL   CLEAR_PAGE
         callp   .S2     clock_live, b3
         mv      .L1     a4, a1
         mvkl    .S2     s_turn, b4
@@ -163,7 +163,11 @@ tap_hook:
         nop     5
         JUMP    STOCK_TAP
 
-; Footswitch press flips slot A4: note it for the release (MOMENTARY).
+; Footswitch press would flip slot A4. MOMENTARY: flip now, maybe back on
+; release. TUNER/TEMPO: flip on release instead, unless the hold fired (so
+; holding for the tuner or the tempo screen never flips the effect). The
+; deferred case returns past the stock flag store (0xC00ACC30-3A), so the
+; stock hold has nothing to undo.
 toggle_hook:
         ENTER
         FCALL   CLOCK_GETTICKS
@@ -172,13 +176,21 @@ toggle_hook:
         ldw     .D1T2   *+a0(V_HOLDM), b1
         ldw     .D2T1   *+b15(8), a1
         stw     .D1T1   a4, *+a0(V_PRESST)
-        nop     3
-        stw     .D1T2   b1, *+a0(V_MARM)
+        mvk     .L2     ARM_LATER, b2
+        nop     2
+        sub     .L2     b2, b1, b2          ; ARM_BACK for MOMENTARY
+        stw     .D1T2   b2, *+a0(V_MARM)
         stw     .D1T1   a1, *+a0(V_MSLOT)
         LEAVE
-        JUMP    TOGGLE
+        mvkl    .S2     TOGGLE, b0
+        mvkh    .S2     TOGGLE, b0
+  [!b1] mvkl    .S2     TOGGLE_DONE, b0
+  [!b1] mvkh    .S2     TOGGLE_DONE, b0
+        b       .S2     b0
+        nop     5
 
-; Footswitch release (event 33): after a long MOMENTARY press, flip back.
+; Footswitch release (event 33): flip back after a long MOMENTARY press,
+; or do the deferred flip if the hold did not fire.
 release_hook:
         ENTER
         FCALL   CLOCK_GETTICKS
@@ -186,13 +198,19 @@ release_hook:
         mvkh    .S1     HV, a0
         ldw     .D1T1   *+a0(V_MARM), a2
         ldw     .D1T1   *+a0(V_PRESST), a1
+        ldw     .D2T2   *+b14(MODE), b0
+        ldw     .D2T2   *+b14(HOLD_FIRED), b1
         mvk     .L1     0, a3
         mvk     .S1     HOLD_MS, a5
-        nop     2
         stw     .D1T1   a3, *+a0(V_MARM)
         sub     .L1     a4, a1, a1
         cmpltu  .L1     a1, a5, a1          ; a short press stays flipped
+        or      .L2     b0, b1, b0          ; tuner open, or tempo screen
+        cmpeq   .L1     ARM_LATER, a2, a3
+  [b0]  mvk     .L1     0, a3
+        cmpeq   .L1     ARM_BACK, a2, a2
   [a1]  mvk     .L1     0, a2
+        or      .L1     a2, a3, a2
   [!a2] b       .S1     rel_stock
         ldw     .D1T1   *+a0(V_MSLOT), a4
         nop     4

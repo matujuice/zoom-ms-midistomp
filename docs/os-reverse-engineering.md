@@ -431,13 +431,19 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     tempo screen open the footswitch always taps instead of flipping
     (`0xC00ACBD8`, `0xC00ACA40`: the HOLD FOR getter's result is replaced by
     1), so a screen opened by the combo works with any HOLD FOR.
-  - `tempo_draw` clears page 7 under the box and writes TURN OR TAP, or MIDI
+  - The tempo box rect (`0xC00EBB64`, only used by `0xC00AAC48`) is made
+    taller (y 27-63) and `tempo_draw` writes TURN OR TAP inside it, or MIDI
     CLOCK while the clock is live (CLOCK RECEIVE on and a clock in the last
     0.5 s, like `poll.S`). `knob_hook` turns the tempo with knob 1 in states
     2 and 5 (clamped 40-250, set like tap) and re-arms the 2 s; `tap_hook`
     skips taps while the clock is live.
+  - With HOLD FOR TUNER or TEMPO, `toggle_hook` skips the flip and returns
+    to `0xC00ACC50`, past the stock flag store, so the hold has nothing to
+    undo; `release_hook` flips on release unless the hold fired (mode no
+    longer 0, or `B14+360` set by the tempo screen). Stock flips on press
+    and flips back when the hold fires.
   - MOMENTARY (settings `V_HOLDM`, the stock word stays 0): `toggle_hook`
-    notes slot and time of the flip, `release_hook` flips back after 0.5 s
+    flips and notes slot and time, `release_hook` flips back after 0.5 s
     or more, `hold_hook` makes event 224 do nothing, and `dirty_hook` (at the
     `0xC00B87F4` call in `0xC00ACCE0`) reports "unchanged" while the
     footswitch is down.
@@ -445,4 +451,6 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     and RIGHT down it runs `0xC00ABE58(224)` with the HOLD FOR word set to 0
     (tuner), with BOTTOM and LEFT set to 1 (tempo screen), then puts the word
     back and clears `B14+360`. `swallow_hook` drops the two buttons' next
-    releases. BOTTOM = i 2, RIGHT = i 4, LEFT = i 5 (`hold.inc`).
+    releases. BOTTOM = i 3, RIGHT = i 4, LEFT = i 5 (`hold.inc`): the cursor
+    keys around the footswitch (i 2 is the top one; i 2 for BOTTOM did
+    nothing on the MS-60B, v0.6 r1).
