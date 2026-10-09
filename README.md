@@ -8,7 +8,14 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 <p align="center"><a href="docs/user-guide.md"><b>User guide</b></a> ·
 <a href="https://github.com/matujuice/zoom-ms-modding/releases">Download</a> ·
 <a href="docs/user-guide.md#5-midi-cc-chart">MIDI chart</a> ·
-<a href="#demo">Demo</a></p>
+<a href="#demo">Demo</a> ·
+<a href="#custom-effects">Custom effects</a> ·
+<a href="#feedback-and-bug-reports">Feedback</a></p>
+
+> **Tested on an MS-60B** running the MS-50G 3.10 firmware. The MS-50G runs the
+> same firmware it is built from, but is not tested yet. An MS-70CDR version
+> will be tested and built once I get one. Tried it on another pedal?
+> [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
 
 ## What you get
 
@@ -33,6 +40,34 @@ flash the updater it writes. Full steps and recovery: [user guide](docs/user-gui
 
 <!-- DEMO: Luca's video goes here -->
 A short video of MIDISTOMP on an MS-60B is coming soon.
+
+## Custom effects
+
+<p align="center"><a href="https://github.com/matujuice/zoom-ms-zdl-effects-pack"><img src="https://raw.githubusercontent.com/matujuice/zoom-ms-zdl-effects-pack/main/release/covers.png" alt="Effects from the Matujuice Zoom MS ZDL effects pack" width="640"></a></p>
+
+**MIDISTOMP is at its best with the free custom effects from
+[zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack).**
+
+Stock Zoom effects work fine on MIDISTOMP: MIDI clock sets their tempo and CC
+moves their knobs. But they were made long before this firmware, so they have
+limits: they don't know about MIDI Start/Stop, some delays cut out when the
+tempo changes, and nothing lines up to the bar.
+
+The effects in the pack are built around MIDISTOMP. They follow the pedal's
+tempo with no Tempo knob, lock to the clock's grid, restart on the downbeat when
+your DAW or drum machine sends Start, and keep running after Stop. Synced
+gates, pitch shifters, delays, filters, a choir and more. The pack is updated
+often and new effects keep coming, so check back.
+
+[Get the effects](https://github.com/matujuice/zoom-ms-zdl-effects-pack) · [What each knob does](https://github.com/matujuice/zoom-ms-zdl-effects-pack/blob/main/docs/EFFECTS.md)
+
+## Feedback and bug reports
+
+MIDISTOMP is made by one person with one pedal, so your reports really help.
+If something doesn't work, looks wrong, or you have an idea, please
+[open an issue](https://github.com/matujuice/zoom-ms-modding/issues): say which pedal and which MIDISTOMP version you have,
+what you did and what happened. Reports from MS-50G and MS-70CDR owners are
+especially welcome.
 
 ---
 

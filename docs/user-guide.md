@@ -10,6 +10,8 @@
 <a href="#4-features">Features</a> ·
 <a href="#5-midi-cc-chart">MIDI chart</a> ·
 <a href="#7-known-limits-and-faq">FAQ</a> ·
+<a href="#8-custom-effects">Custom effects</a> ·
+<a href="#9-feedback-and-bug-reports">Feedback</a> ·
 <a href="../README.md#demo">Demo</a>
 </p>
 
@@ -24,11 +26,14 @@ playing aids. It is not made or supported by Zoom.
 | Pedal | Status |
 |---|---|
 | MS-50G | Runs it (same firmware it was made from). |
-| MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; this is the pedal it was tested on. |
-| MS-70CDR | Untested. It should boot, but stereo may not work (inferred). |
+| MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; **the only pedal it has been tested on**. |
+| MS-70CDR | Untested. It should boot, but stereo may not work (inferred). A tested MS-70CDR version will follow once the author has one. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
 
 You get 6 effects per patch, like the MS-50G firmware.
+
+If you try it on an MS-50G or MS-70CDR, please [report how it went](https://github.com/matujuice/zoom-ms-modding/issues):
+every report helps.
 
 ## 2. Getting it onto the pedal
 
@@ -179,3 +184,24 @@ it can rewrite the firmware and remove MIDISTOMP (inferred, not tested).
   always there to recover, as in section 3.
 - *Why do I need Zoom's updater?* Zoom's firmware can't be shared here; the
   builder only changes your own copy.
+- *Found a bug or something unclear in this guide?* Please
+  [open an issue](https://github.com/matujuice/zoom-ms-modding/issues), see section 9.
+
+## 8. Custom effects
+
+Stock effects work with MIDISTOMP (clock sets their tempo, CC moves their
+knobs), but they have limits: they ignore Start/Stop, some delays cut out on
+tempo changes, and nothing locks to the bar.
+
+The free effects in [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack) are built around
+MIDISTOMP: they follow the pedal's tempo, lock to the clock's grid, restart on
+the downbeat with MIDI Start and keep going after Stop. They are the best way
+to use this firmware, and the pack is updated often with new effects. Install
+them with Effect Manager in normal mode (section 6).
+
+## 9. Feedback and bug reports
+
+Please [open an issue](https://github.com/matujuice/zoom-ms-modding/issues) for anything that doesn't work, anything
+confusing, or an idea. Say which pedal and MIDISTOMP version you have, what
+you did and what happened; a phone photo of the screen helps. Reports from
+MS-50G and MS-70CDR owners are especially welcome.
