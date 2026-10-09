@@ -69,7 +69,7 @@ when not running.
   without a clock (and 0.5 s after Start), and copies a changed patch TEMPO
   when the clock is not live.
 - Layout constants: `asm/midi_clock/transport.inc`.
-- MIDI settings page (v0.5, issue #26): with SETTINGS > MIDI START/STOP set
-  to OFF, Start, Stop and the clock count are ignored and turning it off
-  clears running (like a Stop). MIDI CLOCK set to OFF only stops the clock
+- MIDI SETTINGS (v0.5, issue #26): with TRANSPORT RECEIVE set to OFF,
+  Start, Stop and the clock count are ignored and turning it off clears
+  running (like a Stop). CLOCK RECEIVE set to OFF only stops the clock
   setting the tempo. The block's address, magic and layout do not change.
