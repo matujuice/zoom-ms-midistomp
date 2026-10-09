@@ -15,6 +15,12 @@
 ;                      have no channel)
 ; SETTINGS (screen 1) gets an eighth row, TEMPO LOCK OFF/ON: changing patch
 ; keeps the current tempo (tempo_lock below).
+; v0.6: the menu entry and title read MIDI; SETTINGS row 0 (stock HOLD FOR
+; TUNER/TAP, screen 12) opens a choice screen here instead: HOLD FOR TUNER /
+; TEMPO / MOMENTARY. The stock word keeps 0 = tuner, 1 = tempo (MOMENTARY
+; stores 0 there, so stock code treats it as TUNER) and V_HOLDM says
+; MOMENTARY (asm/tempo_hold/hold.S reads it), saved as bit 6 of byte 23 of
+; record 50.
 ;
 ; UI (docs/os-reverse-engineering.md, "Settings screen"): screens 1, 13 and
 ; 14 go through the dispatchers' switch tables, which branch (not call) to
@@ -50,6 +56,7 @@
         .equ    V_LPATCH, 24                ; patch the poll saw last
         .equ    V_PEND, 28                  ; rounds left to restore the tempo
         .equ    V_BOOT, 32                  ; rounds left before the lock acts
+        .equ    V_HOLDM, 36                 ; HOLD FOR is MOMENTARY (v0.6)
 
         .equ    SET_SCREEN, 0xC00A75E0      ; (screen, row)
         .equ    LIST_INDEX, 0xC00A7040      ; -> row + top of the list
@@ -95,6 +102,8 @@
         .equ    SCREEN_MIDI, 14
         .equ    ITEM_SIZE, 24
         .equ    ITEM_TLOCK, 6
+        .equ    ITEM_HOLD, 7
+        .equ    HOLD_WORD, 0xC009D920       ; stock HOLD FOR: 0 tuner, 1 tap
         .equ    TLOCK_WORD, BASE + V_TLOCK
         .equ    PEND_ROUNDS, 16             ; 16 ms poll rounds
         .equ    BOOT_ROUNDS, 125
@@ -148,7 +157,8 @@ vars:
         .word   0                           ; +24 V_LPATCH
         .word   0                           ; +28 V_PEND
         .word   BOOT_ROUNDS                 ; +32 V_BOOT
-        .word   0, 0, 0, 0, 0, 0, 0
+        .word   0                           ; +36 V_HOLDM
+        .word   0, 0, 0, 0, 0, 0
 ; +64: entry points at fixed offsets (the patch file names them by address)
 vectors:
         b       .S2     menu_keys           ; +64  called, menu stub
@@ -196,16 +206,19 @@ items:
         ITEMDEF s_cc, MIDI_FLAGS, OFF_ON, 3, 1, 1, 2, SCREEN_MIDI, 4
         ITEMDEF s_channel, MIDI_FLAGS, channels, 5, 31, 0, 17, SCREEN_MIDI, 5
         ITEMDEF s_tlock, TLOCK_WORD, OFF_ON, 0, 1, 0, 2, SCREEN_LIST, 7
+        ITEMDEF s_hold, HOLD_WORD, hold_names, 0, 0, 0, 3, SCREEN_LIST, 0
 
 menu_names:     ; stock entries, ours before the version entry
         .word   0xC00E9484, 0xC00E9497, 0xC00E94A4, s_midi, 0xC00E94AD
-settings_names: ; stock rows (0xC00ECD68), then ours
-        .word   0xC00E94B5, 0xC00E94C8, 0xC00E94DA, 0xC00E94EB
+settings_names: ; stock rows (0xC00ECD68) but our HOLD FOR, then ours
+        .word   s_hold, 0xC00E94C8, 0xC00E94DA, 0xC00E94EB
         .word   0xC00E94F5, 0xC00E9502, 0xC00E9510, s_tlock
 midi_names:
         .word   s_clock, s_transport, s_pc, s_pcstart, s_cc, s_channel
 zero_one:
         .word   s_0, s_1
+hold_names:     ; stock "TUNER", "TEMPO" (the tap screen title), ours
+        .word   0xC00E953F, 0xC00EB13F, s_moment
 channels:
         .word   s_omni, s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8
         .word   s_9, s_10, s_11, s_12, s_13, s_14, s_15, s_16
@@ -222,7 +235,7 @@ settings_icons:
         .byte   0x78, 0x7e, 0x79, 0x49, 0x79, 0x7e, 0x78
 midi_icon:
         .byte   0x1c, 0x22, 0x55, 0x41, 0x55, 0x22, 0x1c
-s_midi:         .string "MIDI SETTINGS"
+s_midi:         .string "MIDI"
 s_clock:        .string "CLOCK RECEIVE"
 s_transport:    .string "TRANSPORT RECEIVE"
 s_pc:           .string "PROG CH RECEIVE"
@@ -230,6 +243,8 @@ s_pcstart:      .string "PROG CH START NO."
 s_cc:           .string "CC RECEIVE"
 s_channel:      .string "MIDI CHANNEL"
 s_tlock:        .string "TEMPO LOCK"
+s_hold:         .string "HOLD FOR"
+s_moment:       .string "MOMENTARY"
 s_omni:         .string "OMNI"
 s_0:            .string "0"
 s_1:            .string "1"
@@ -489,9 +504,12 @@ sk_enter:
         FARCALL LIST_INDEX
         mvk     .L1     7, a0
         cmpeq   .L1     a4, a0, a1
-  [!a1] b       .S1     sk_stock
+        cmpeq   .L1     0, a4, a2           ; HOLD FOR: ours, not screen 12
+        or      .L1     a1, a2, a0
+  [!a0] b       .S1     sk_stock
         nop     5
         mvk     .L1     ITEM_TLOCK, a4
+  [a2]  mvk     .L1     ITEM_HOLD, a4
         FARCALL open_choice
         b       .S1     redraw16
         nop     5
@@ -548,6 +566,10 @@ open_choice:
 
 ; get_value(A4 setting) -> A4. Leaf.
 get_value:
+        mvk     .L1     ITEM_HOLD, a0
+        cmpeq   .L1     a4, a0, a1
+  [a1]  b       .S1     gv_hold
+        nop     5
         ITEM    a4
         ldw     .D1T1   *+a3(4), a0         ; value word
         ldbu    .D1T1   *+a3(12), a5        ; shift
@@ -562,8 +584,36 @@ get_value:
         b       .S2     b3
         nop     5
 
+; HOLD FOR: 2 = MOMENTARY (ours), else the stock word.
+gv_hold:
+        mvkl    .S1     BASE, a0
+        mvkh    .S1     BASE, a0
+        ldw     .D1T1   *+a0(V_HOLDM), a1
+        mvkl    .S1     HOLD_WORD, a0
+        mvkh    .S1     HOLD_WORD, a0
+        ldw     .D1T1   *a0, a4
+        nop     4
+  [a1]  mvk     .L1     2, a4
+        b       .S2     b3
+        nop     5
+
 ; set_value(A4 setting, B4 value). Leaf.
 set_value:
+        mvk     .L1     ITEM_HOLD, a0
+        cmpeq   .L1     a4, a0, a1
+  [!a1] b       .S1     sv_item
+        nop     5
+        mvkl    .S1     BASE, a0
+        mvkh    .S1     BASE, a0
+        cmpeq   .L2     2, b4, b0
+        stw     .D1T2   b0, *+a0(V_HOLDM)
+        mvkl    .S1     HOLD_WORD, a0
+        mvkh    .S1     HOLD_WORD, a0
+        cmpeq   .L2     1, b4, b0
+        stw     .D1T2   b0, *a0
+        b       .S2     b3
+        nop     5
+sv_item:
         ITEM    a4
         ldw     .D1T1   *+a3(4), a0
         ldbu    .D1T1   *+a3(12), a5
@@ -657,6 +707,9 @@ ok_exit:
         nop     5
         mvk     .L1     ITEM_TLOCK, a0
         cmpeq   .L1     a10, a0, a1
+        mvk     .L1     ITEM_HOLD, a0
+        cmpeq   .L1     a10, a0, a2
+        or      .L1     a1, a2, a1
   [a1]  b       .S1     ok_flip
         nop     5
         ldw     .D2T1   *+b14(CUR_PATCH), a4    ; MIDI: save record 51 now
@@ -664,7 +717,7 @@ ok_exit:
         FARCALL SAVE_LAST_PATCH
         b       .S1     ok_back
         nop     5
-ok_flip:        ; TEMPO LOCK: save the stock settings record now
+ok_flip:        ; TEMPO LOCK, HOLD FOR: save the stock settings record now
         mvkl    .S1     SETTINGS_WORDS, a4
         mvkh    .S1     SETTINGS_WORDS, a4
         FARCALL SAVE_SETTINGS
@@ -730,8 +783,9 @@ opt_draw:
         nop     5
 
 ; Stock pack (A4 = 24-byte record, B4 = settings words) then TEMPO LOCK into
-; bit 5 of byte 23 (bits 1-7 are free; bits 1-4 held a test build's MIDI
-; bits and are cleared). B3 = return into the stock save.
+; bit 5 and MOMENTARY into bit 6 of byte 23 (bits 1-7 are free; bits 1-4
+; held a test build's MIDI bits and are cleared). B3 = return into the stock
+; save.
 pack_hook:
         addk    .S2     -16, b15
         stw     .D2T2   b3, *+b15(4)
@@ -740,13 +794,16 @@ pack_hook:
         ldw     .D2T1   *+b15(8), a4
         mvkl    .S1     BASE, a0
         mvkh    .S1     BASE, a0
+        ldw     .D1T1   *+a0(V_HOLDM), a2
         ldw     .D1T1   *+a0(V_TLOCK), a0
         nop     3
         ldbu    .D1T1   *+a4(23), a1
+        shl     .S1     a2, 6, a2
         shl     .S1     a0, 5, a0
-        nop     3
+        nop     2
         and     .L1     1, a1, a1
         or      .L1     a0, a1, a1
+        or      .L1     a2, a1, a1
         stb     .D1T1   a1, *+a4(23)
         RET16
 
@@ -762,9 +819,12 @@ unpack_hook:
         mvkl    .S1     BASE, a0
         mvkh    .S1     BASE, a0
         nop     2
-        shru    .S2     b0, 5, b0
-        and     .L2     1, b0, b0
-        stw     .D1T2   b0, *+a0(V_TLOCK)
+        shru    .S2     b0, 5, b1
+        and     .L2     1, b1, b1
+        stw     .D1T2   b1, *+a0(V_TLOCK)
+        shru    .S2     b0, 6, b1
+        and     .L2     1, b1, b1
+        stw     .D1T2   b1, *+a0(V_HOLDM)
         RET16
 
 ; Record 51 load at boot (A4 = 51, B4 = 4-byte buffer): the MIDI word comes

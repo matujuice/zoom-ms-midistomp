@@ -79,7 +79,7 @@ def test_settings_table():
     items = SEC.index((0x1181EA00 + 12).to_bytes(4, "little")) - 4  # TEMPO LOCK's word
     first = items - 6 * 24
     rows = []
-    for i in range(7):
+    for i in range(8):
         d = SEC[first + 24 * i:first + 24 * i + 24]
         name, word, choices = (int.from_bytes(d[k:k + 4], "little") for k in (0, 4, 8))
         rows.append((_sec_str(name), word, tuple(d[12:18])))
@@ -91,7 +91,11 @@ def test_settings_table():
         ("CC RECEIVE", 0x1181EA00, (3, 1, 1, 2, 14, 4)),
         ("MIDI CHANNEL", 0x1181EA00, (5, 31, 0, 17, 14, 5)),
         ("TEMPO LOCK", 0x1181EA0C, (0, 1, 0, 2, 1, 7)),
+        ("HOLD FOR", 0xC009D920, (0, 0, 0, 3, 1, 0)),
     ]
+    hold = int.from_bytes(SEC[first + 7 * 24 + 8:first + 7 * 24 + 12], "little")
+    assert [_sec_word(hold + 4 * k) for k in range(2)] == [0xC00E953F, 0xC00EB13F]  # stock TUNER, TEMPO
+    assert _sec_str(_sec_word(hold + 8)) == "MOMENTARY"
 
 
 def test_no_overlap():
