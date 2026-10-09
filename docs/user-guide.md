@@ -51,10 +51,11 @@ updater yourself from Zoom's official one. This needs Windows.
    "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** (above and below the
    footswitch, see the photo below) while you plug in the USB cable: the pedal shows the update screen.
+
    <img src="img/keys.jpg" alt="The four cursor keys around the footswitch" width="480">
 
-6. Run `MIDISTOMP V1.0 Updater.exe` and let it finish. Don't unplug during the update.
-7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.0** and
+7. Run `MIDISTOMP V1.0 Updater.exe` and let it finish. Don't unplug during the update.
+8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.0** and
    the last menu entry reads **V1.0**.
 
    <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.0 boot screen" width="400">
