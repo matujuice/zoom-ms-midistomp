@@ -1,0 +1,7 @@
+# MIDISTOMP V1.0: the VERSION menu entry reads "V1.0".
+name: version-1.0
+description: Rename the VERSION menu entry to "V1.0"
+replace:
+  - find: "VERSION\0"
+    with: "V1.0\0\0\0\0"
+    count: 2   # the menu list and the version screen title

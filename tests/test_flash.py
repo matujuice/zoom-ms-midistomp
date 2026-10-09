@@ -12,3 +12,4 @@ def test_find_script_and_boot_steps():
     assert [(s.kind, s.addr, s.length, s.resource) for s in found] == steps
     skipped = flash.boot_steps(found)
     assert [s.addr for s in skipped] == [0, 0, 0x3FD000, 0x3FD000]
+    assert [s.addr for s in flash.boot_steps(found, keep_133=True)] == [0, 0]

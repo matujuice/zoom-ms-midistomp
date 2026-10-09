@@ -12,6 +12,10 @@ Patch kinds supported so far:
         New code or data loaded by the boot image as an extra section (into RAM
         nothing else uses). `source` names the assembly it was built from;
         tests check the bytes still match it.
+    bin133:    - model: ms50g-3.10  offset: 0  expect_sha256: "..."  data: "hex"
+        Overwrite bytes of updater part BIN/133 (the boot logo), not the OS.
+        `expect_sha256` is the hash of the stock bytes being replaced, so no
+        Zoom data needs to live in the repo.
 
 A patch may list `builds: [...]`; building it for any other OS build fails
 with a clear message instead of silently doing nothing.
@@ -19,6 +23,7 @@ with a clear message instead of silently doing nothing.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import yaml
@@ -70,8 +75,23 @@ def apply(img: ais.AisImage, patch: dict, build_id: str) -> list[str]:
         except ais.AisError as e:
             raise PatchError(f"{patch['name']}: {e}") from e
         log.append(f"section 0x{sec['addr']:08X} {len(data)} B")
-    if not log:
+    if not log and not any(b["model"] == build_id for b in patch.get("bin133", [])):
         raise PatchError(f"{patch['name']}: nothing applied for {build_id}")
+    return log
+
+
+def apply_bin133(part: bytearray, patch: dict, build_id: str) -> list[str]:
+    log = []
+    for b in patch.get("bin133", []):
+        if b["model"] != build_id:
+            continue
+        off, data = b["offset"], bytes.fromhex(b["data"])
+        if off + len(data) > len(part):
+            raise PatchError(f"{patch['name']}: BIN/133 write past the end of the part")
+        if hashlib.sha256(part[off:off + len(data)]).hexdigest() != b["expect_sha256"]:
+            raise PatchError(f"{patch['name']}: BIN/133 bytes at {off} are not the expected ones")
+        part[off:off + len(data)] = data
+        log.append(f"BIN/133 +{off} {len(data)} B")
     return log
 
 

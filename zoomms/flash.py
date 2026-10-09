@@ -20,6 +20,10 @@ rewrites the bootloader on every update, which is the one step that could
 brick a pedal beyond USB recovery if interrupted. build_updater() therefore
 turns the bootloader steps (and BIN/133) into no-ops: the loop in the updater
 skips any step whose type is not 1 or 2.
+
+BIN/133 starts with the boot logo (128x64, page format: one byte = 8 vertical
+pixels, LSB on top, 128 bytes per page). A build that changes it keeps the
+BIN/133 steps, like the stock updater; the bootloader steps stay skipped.
 """
 
 from __future__ import annotations
@@ -79,15 +83,19 @@ def boot_steps(steps: list[Step], keep_133: bool = False) -> list[Step]:
     return out
 
 
-def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = True) -> bytes:
+def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = True,
+                  new_133: bytes | None = None) -> bytes:
+    """new_133: modified BIN/133 (boot logo); its erase/write steps then stay on."""
     exe = bytearray(open(exe_path, "rb").read())
-    if new_os is not None:
-        os_part = next(p for p in parts.find_parts(exe_path) if p.resource_id == 129)
-        if len(new_os) != os_part.size:
-            raise ValueError(f"new OS is {len(new_os)} B, resource slot is {os_part.size} B")
-        exe[os_part.offset:os_part.offset + os_part.size] = new_os
+    for rid, new in ((129, new_os), (133, new_133)):
+        if new is None:
+            continue
+        part = next(p for p in parts.find_parts(exe_path) if p.resource_id == rid)
+        if len(new) != part.size:
+            raise ValueError(f"new BIN/{rid} is {len(new)} B, resource slot is {part.size} B")
+        exe[part.offset:part.offset + part.size] = new
     if skip_boot:
-        for s in boot_steps(find_script(bytes(exe))):
+        for s in boot_steps(find_script(bytes(exe)), keep_133=new_133 is not None):
             struct.pack_into("<I", exe, s.offset, SKIP)
     return _unsign(bytes(exe))
 

@@ -72,20 +72,25 @@ def cmd_ais(args) -> int:
 
 def cmd_build(args) -> int:
     stock = Path(args.updater).read_bytes()
-    os_part = next(p for p in parts.find_parts(args.updater) if p.resource_id == 129)
+    found = parts.find_parts(args.updater)
+    os_part = next(p for p in found if p.resource_id == 129)
+    p133 = next(p for p in found if p.resource_id == 133)
     original = parts.read_part(args.updater, os_part)
     img = ais.parse(original)
+    stock_133 = parts.read_part(args.updater, p133)
+    d133 = bytearray(stock_133)
     for patch_path in args.patch:
         patch = patcher.load(patch_path)
         try:
-            lines = patcher.apply(img, patch, args.build_id)
+            lines = patcher.apply(img, patch, args.build_id) + patcher.apply_bin133(d133, patch, args.build_id)
         except patcher.PatchError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
         for line in lines:
             print(f"{patch['name']}: {line}")
     new_os = ais.build_part(img, original)
-    exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps)
+    new_133 = bytes(d133) if d133 != stock_133 else None
+    exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps, new_133=new_133)
 
     # Re-read what we are about to write and check it.
     check = ais.parse(exe[os_part.offset:os_part.offset + os_part.size])
@@ -93,9 +98,11 @@ def cmd_build(args) -> int:
     assert check.entry == ais.parse(original).entry
     assert exe[os_part.offset + os_part.size - 32:os_part.offset + os_part.size] == original[-32:]
     outside = [i for i in range(min(len(stock), len(exe))) if stock[i] != exe[i]
-               and not os_part.offset <= i < os_part.offset + os_part.size]
+               and not os_part.offset <= i < os_part.offset + os_part.size
+               and not p133.offset <= i < p133.offset + p133.size]
     changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
-    print(f"OS bytes changed: {changed_os}; other bytes changed: {len(outside)} "
+    changed_133 = sum(1 for a, b in zip(stock_133, d133) if a != b)
+    print(f"OS bytes changed: {changed_os}; BIN/133 bytes changed: {changed_133}; other bytes changed: {len(outside)} "
           f"(flash script and PE header); Zoom's signature removed ({len(stock) - len(exe)} B)")
     print("flash steps: " + "; ".join(s.describe() for s in flash.find_script(exe)))
     Path(args.out).write_bytes(exe)

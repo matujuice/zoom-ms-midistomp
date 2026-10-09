@@ -38,3 +38,19 @@ def test_build_round_trip_and_new_section():
     again = ais.parse(ais.build(img))
     assert [s.addr for s in again.sections] == [0x11800000, 0x11900000]
     assert again.entry == img.entry
+
+
+def test_bin133_checks_stock_hash():
+    import hashlib
+    part = bytearray(b"\0" * 16)
+    p = {"name": "t", "bin133": [{"model": "m", "offset": 4, "expect_sha256": hashlib.sha256(b"\0\0").hexdigest(), "data": "abcd"}]}
+    assert patcher.apply(img_with(b"x"), p, "m") == []  # OS untouched, not an error
+    patcher.apply_bin133(part, p, "m")
+    assert part[4:6] == b"\xab\xcd"
+    with pytest.raises(patcher.PatchError):
+        patcher.apply_bin133(part, p, "m")
+
+
+def test_boot_logo_patch_is_one_screen():
+    p = patcher.load("patches/boot-logo.yaml")
+    assert [(b["offset"], len(bytes.fromhex(b["data"]))) for b in p["bin133"]] == [(0, 1024)]

@@ -46,7 +46,16 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
   --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
   --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/ram-test.yaml \
   --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.6-ramtest.exe   # RAM test (#19), diagnostic only
+zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
+  --patch patches/version-1.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
+  --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.0.exe   # MIDISTOMP V1.0
 ```
+
+`patches/boot-logo.yaml` changes updater part BIN/133 (boot logo) instead of
+the OS, so that build keeps the stock BIN/133 erase and write steps; the
+bootloader steps stay skipped. `ms50g-3.10-stock-keepboot.exe` skips BIN/133
+and so leaves the MIDISTOMP logo in place; Zoom's own updater restores it.
 
 The v0.3 line needs `patches/midi-clock.yaml` as tagged `v0.3`.
 
