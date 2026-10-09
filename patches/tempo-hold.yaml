@@ -1,0 +1,239 @@
+# Tempo screen, HOLD FOR MOMENTARY and button combos (issue #28, v0.6).
+# MS-50G 3.10 OS only for now. Apply after midi-settings.yaml (HOLD FOR's
+# choice screen and V_HOLDM live there).
+#   Tempo screen: knob 1 turns the tempo, TURN OR TAP / MIDI CLOCK line,
+#   closes 2 s after the last turn or tap; the TAP softkey reads TEMPO.
+#   HOLD FOR MOMENTARY; BOTTOM + RIGHT opens the tuner, BOTTOM + LEFT the
+#   tempo screen. In the tuner the middle knob (labelled EXIT) leaves it.
+# Design and addresses: docs/os-reverse-engineering.md, "Tempo screen,
+# HOLD FOR and combos". The hex below is generated from asm/tempo_hold/*.S
+# with
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
+# and tests/test_tempo_hold_patch.py checks it still matches the source.
+name: tempo-hold
+description: Tempo screen knob, HOLD FOR MOMENTARY, tuner and tempo combos
+builds: [ms50g-3.10]
+write:
+  # Footswitch press with the tempo screen open: never flips, whatever
+  # HOLD FOR says (callp HOLD FOR getter -> mvk .S1 1,a4)
+  - model: ms50g-3.10
+    addr: 0xC00ACBD8
+    expect: "12231a10"
+    data: "a8000002"
+  # Footswitch release with the tempo screen open: always taps (same)
+  - model: ms50g-3.10
+    addr: 0xC00ACA40
+    expect: "12531a10"
+    data: "a8000002"
+  # Tempo screen (state 2) timeout: set a6,0,30,a6 (forever) -> mvk .S1 2000,a6
+  - model: ms50g-3.10
+    addr: 0xC00CB96C
+    expect: "891e1803"
+    data: "29e80303"
+  # Tempo box (x, y, w, h halfwords, only the tempo screen uses it): y 29 h 26
+  # -> y 27 h 37, down to the bottom row, so our line fits inside it
+  - model: ms50g-3.10
+    addr: 0xC00EBB64
+    expect: "04001d0078001a00"
+    data: "04001b0078002500"
+  # Softkey label "TAP" (0xC00ECDC7) -> "TEMPO" (0xC00EB13F, the tempo box title)
+  - model: ms50g-3.10
+    addr: 0xC00CB3C8
+    expect: "aae36602"
+    data: "aa9f5802"
+  # Call site: the overlay draw for states 2 and 5 (stock 0xC00AAC48) -> tempo_draw trampoline
+  - model: ms50g-3.10
+    addr: 0xC00BA930
+    expect: "1365e01f"
+    data: "132a2210"
+  - model: ms50g-3.10
+    addr: 0xC00CBA70
+    expect: "00000000000000000000000000000000"
+    data: "2a407d00eac008006203000000800000"
+    source: asm/tempo_hold/tempo_draw_trampoline.S
+  # Call site: the key loop's knob turn call (stock 0xC00AC214) -> knob trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD10C
+    expect: "9322fe1f"
+    data: "13564910"
+  - model: ms50g-3.10
+    addr: 0xC00D1BB0
+    expect: "00000000000000000000000000000000"
+    data: "2a447d00eac008006203000000800000"
+    source: asm/tempo_hold/knob_trampoline.S
+  # Call site: the knob press tap (stock 0xC00B9DA8) -> tap trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AC9F0
+    expect: "12791a10"
+    data: "12ca4a10"
+  # Call site: the footswitch release tap -> tap trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACA50
+    expect: "126d1a10"
+    data: "12be4a10"
+  - model: ms50g-3.10
+    addr: 0xC00D2030
+    expect: "00000000000000000000000000000000"
+    data: "2a487d00eac008006203000000800000"
+    source: asm/tempo_hold/tap_trampoline.S
+  # Call site: the footswitch press flip (stock 0xC00ABDE4) -> toggle trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACC2C
+    expect: "9238fe1f"
+    data: "12ea4c10"
+  - model: ms50g-3.10
+    addr: 0xC00D3370
+    expect: "00000000000000000000000000000000"
+    data: "2a4c7d00eac008006203000000800000"
+    source: asm/tempo_hold/toggle_trampoline.S
+  # Call site: the key loop's footswitch release call (stock 0xC00ACA1C) -> release trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD2D8
+    expect: "93ebfe1f"
+    data: "138e4d10"
+  - model: ms50g-3.10
+    addr: 0xC00D3F30
+    expect: "00000000000000000000000000000000"
+    data: "2a507d00eac008006203000000800000"
+    source: asm/tempo_hold/release_trampoline.S
+  # Call site: the key loop's type hold call, event 228 (stock 0xC00ABB80) -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD090
+    expect: "1360fd1f"
+    data: "138a4e10"
+  # event 229 too -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD064
+    expect: "1364fd1f"
+    data: "138e4e10"
+  # Call site: the cursor hold call, events 230/231 (stock 0xC00ABA90) -> combo trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD034
+    expect: "134efd1f"
+    data: "13964e10"
+  - model: ms50g-3.10
+    addr: 0xC00D44D0
+    expect: "00000000000000000000000000000000"
+    data: "2a547d00eac008006203000000800000"
+    source: asm/tempo_hold/combo_trampoline.S
+  # Call site: the key loop's footswitch hold call, event 224 (stock 0xC00ABE58) -> hold trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD0E4
+    expect: "13affd1f"
+    data: "13ba4e10"
+  - model: ms50g-3.10
+    addr: 0xC00D46B0
+    expect: "00000000000000000000000000000000"
+    data: "2a907f00eac008006203000000800000"
+    source: asm/tempo_hold/hold_trampoline.S
+  # Call site: AUTO SAVE's patch-changed check (stock 0xC00B87F4) -> dirty trampoline
+  - model: ms50g-3.10
+    addr: 0xC00ACCE4
+    expect: "92621710"
+    data: "12e24f10"
+  - model: ms50g-3.10
+    addr: 0xC00D4BF0
+    expect: "00000000000000000000000000000000"
+    data: "2a947f00eac008006203000000800000"
+    source: asm/tempo_hold/dirty_trampoline.S
+  # Call site: the type button release calls, events 69/71 (stock 0xC00AC574) -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD1F8
+    expect: "9372fe1f"
+    data: "13325710"
+  # event 71 too -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD1A8
+    expect: "937afe1f"
+    data: "133a5710"
+  # Call site: the cursor release call, events 73/75 (stock 0xC00AC434) -> swallow trampoline
+  - model: ms50g-3.10
+    addr: 0xC00AD158
+    expect: "935efe1f"
+    data: "13465710"
+  - model: ms50g-3.10
+    addr: 0xC00D8B70
+    expect: "00000000000000000000000000000000"
+    data: "2a987f00eac008006203000000800000"
+    source: asm/tempo_hold/swallow_trampoline.S
+  # Middle knob release (event 65, stock 0xC00AC8B0) -> tuner_exit
+  - model: ms50g-3.10
+    addr: 0xC00AD290
+    expect: "13c6fe1f"
+    data: "13e25710"
+  - model: ms50g-3.10
+    addr: 0xC00D9190
+    expect: "00000000000000000000000000000000"
+    data: "2ae07300eac008006203000000800000"
+    source: asm/tempo_hold/tuner_exit_trampoline.S
+  # Tuner screen, middle knob softkey (stock 0xC009F8F0 with a blank label) -> EXIT
+  - model: ms50g-3.10
+    addr: 0xC00BA5E8
+    expect: "1362ca1f"
+    data: "133e4110"
+  - model: ms50g-3.10
+    addr: 0xC00DAFD0
+    expect: "00000000000000000000000000000000"
+    data: "aacb4a026a0760021226890f00800000"
+    source: asm/tempo_hold/tuner_label_trampoline.S
+section:
+  # Vectors and handlers, in free L2 after settings.S
+  - model: ms50g-3.10
+    addr: 0x1181FA80
+    source: asm/tempo_hold/hold.S
+    data: >-
+      9212000000800000121f00000080000092410000008000001248000000800000
+      9250000000800000126200000080000052f8ff07f622bc012ab0f902ea06e002
+      620314006281820128807300e8c008002a007500eac0080064228000e6028000
+      e622bc0100600000f880040128fa8001f8490c01580a8400f82f88005a2f8400
+      f83f8400d82d04025208800762030c000080000052f8ff07f622bc012a24d602
+      6a05e002620314006281830112f2ff1fd80f90002a667f02eac00802a80f0003
+      2a6c7f82eac008822811008358a30002aa1a00032a70fe02ea04e00262031400
+      62818101e622bc01006000005208800762030c00008000006e52000028500000
+      00400000788a800058a38020901f00900080000052f8ff07f622bc01f4423c02
+      f462bc0258a300022a08dd026a06e0026203140062818601f4823c02584a9000
+      58aa1001f82f8800101500900080000012deff1fd80f9000100e008000800000
+      28366000e804600064020002e462bc022a140002287d00030040000078801402
+      2a36bb026a05e0026203140062818401da1f100228ec71026807600258a30403
+      2a32d6026a06e002620314006281840158a30002e6823c0228e8030300600000
+      2a52dc026a06e0026203140062818401e622bc0158a304020040000052088007
+      62030c0000800000e622bc01e4423c02e462bc0200600000520880072a0a6100
+      6a056000620300000080000052f8ff07f622bc0112c6ff1fd80f9000e622bc01
+      006000005208800762030c80008000002ad44e00ea0560006203000000800000
+      52f8ff07f622bc01f4423c02f462bc022ab0f902ea06e0026203140062818801
+      28127500e8c0080066028000e442bc0074420002004000007662800074228000
+      e622bc01e4423c02e462bc0200600000520880072af25e006a05600062030000
+      0080000052f8ff07f622bc01f4423c02f462bc022ab0f902ea06e00262031400
+      6281810128127500e8c00800646200016442800058a3800128fa800200200000
+      74628001f8808400f82b940058a30081900500b064220002006000002af2de02
+      6a05e0026203140062818301e622bc01e4423c02e462bc020060000052088007
+      2a0e65006a05600062030000008000006e5200006e57800028c86f00e8046000
+      640280002804000100400000fa0f040058a30021984f0401900a00b028100001
+      984f040158a300002a40040100200000900a00a00080000028080001984f0401
+      58a304002a40010100200000900600a00080000028730000f88a80002a485d00
+      6a0560002ac05d806a05608062030000008000002812f500e8c0880064820401
+      00600000785f080158a300a262030ca00080000052f8ff07f622bc012812f500
+      e8c088002a906c00ea04600064820401e6028000f40200002870000200200000
+      f85f080174820401f642bc002a2cdf026a05e00262031400628187012a906c00
+      ea046000e642bc00e622bc015aa300017e5a000158a3040200000000f6028000
+      5208800762030c00008000005455524e204f5220544150004d49444920434c4f
+      434b000000000000000000000000000000000000000000000000000000000000
+  # Vectors and the rest of the handlers, in free L2 after the transport block
+  - model: ms50g-3.10
+    addr: 0x1181FF20
+    source: asm/tempo_hold/hold2.S
+    data: >-
+      12030000008000009208000000800000120e00000080000028127500e8c00800
+      640280000060000058a3008262030c80008000002a2c5f006a05600062030000
+      0080000028127500e8c00800646280000060000058a3008262030c8000800000
+      2afa4300ea056000620300000080000028127500e8c008006482800028200001
+      f880080158a38401e04c8c0100000000782f0c01982f8ca0748280a058a300a2
+      62030ca028240000f88a80002a1a62006a0560002aba62806a05608000000000
+      6203000000800000000000000000000000000000000000000000000000000000
+  # Middle knob leaves the tuner, in the free 64 bytes after the clock variables
+  - model: ms50g-3.10
+    addr: 0x1181E7C0
+    source: asm/tempo_hold/tuner_exit.S
+    data: >-
+      6e520000006000005a600300da2b00002a58e4026a05e002281000322a58e532
+      6a05e03262031400008000000000000000000000000000000000000000000000

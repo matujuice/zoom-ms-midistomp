@@ -387,3 +387,74 @@ patch `patches/midi-settings.yaml`.
 - **Not checked:** what `0xC00B9D44` (resets the settings to defaults and
   saves, called from `0xC00C5038`) is used for; the MIDI bits keep their
   value through it.
+
+### Tempo screen, HOLD FOR and combos (issue #28, v0.6)
+
+Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
+`0x1181FF20`: together they did not fit before the transport block). Patch
+`patches/tempo-hold.yaml`; the HOLD FOR choice screen is in `settings.S`.
+
+- **Key loop:** `Task_MainApp`'s loop at `0xC00ACED0` takes events from the
+  mailbox at `B14+828` and calls a handler per event with A4 = event, A5 =
+  its value; the handler's A4 asks for a redraw. Mode is `B14+328`: 0 = play
+  (effect chain and effect screens), 5/6 = tuner, 11 = menu. `B14+348` is a
+  pending state every stock key handler cancels first (`0xC00ABA70`).
+- **Footswitch:** event 32 (press, `0xC00ACAB0`) starts hold timer 0 and in
+  play mode flips the effect under the cursor (`0xC00ABDE4(slot)`, setting
+  the flag `0xC009D02C`), except with the tempo screen open and HOLD FOR
+  TEMPO. Event 224 (timer 0, 1 s, `0xC00ABE58`) opens the tuner (HOLD FOR
+  TUNER) or toggles the tempo screen (TEMPO), and undoes the flip if the flag
+  is set. Event 33 (release, `0xC00ACA1C`) taps if the tempo screen is open
+  with HOLD FOR TEMPO, unless the hold just fired (`B14+360`).
+- **Buttons:** `Task_SwitchNrmlSpdRead` polls 7 switches into `0xC009DF90`
+  (bit i clear = down) and posts 64 + 2i on press, 65 + 2i on release.
+  i = 0/1 are the knob 2/3 presses, 2/3 change the effect type ('+'/'-',
+  press 68/70 starts timers 4/5, release 69/71 at `0xC00AC574`), 4/5 move
+  the cursor (+1/-1, press 72/74 starts timers 6/7, release 73/75 at
+  `0xC00AC434`). Timers fire events 224 + i after 1 s: 228/229 open effect
+  select (`0xC00ABB80`), 230/231 screen 33 (`0xC00ABA90`). Knob turns are
+  events 160-162 (`0xC00AC214`), knob 1 press is 34 (`0xC00AC938`: on a patch
+  with a tempo effect it taps and opens the tempo screen for 2 s).
+- **Tempo screen:** overlay state 2 (footswitch, `0xC00CB964`, stock: until
+  closed) or 5 (knob press, `0xC00CB950`, 2 s), set by
+  `0xC00CB8A4(0, state, ms)`, read by `0xC00CBA10(0)`; both drawn by
+  `0xC00AAC48(0, tempo)` (box at y 29-55, "TEMPO", big digits), called at
+  `0xC00BA930`. Tap is `0xC00B9DA8` (40-250 BPM through the TEMPO setting).
+  The softkey "TAP" comes from `mvk` at `0xC00CB3C8`.
+- **AUTO SAVE:** after every event `0xC00ACEA4` keeps timer 8 (5 s) armed
+  while the patch differs from the saved copy (`0xC00B87F4`); event 232
+  (`0xC00ACCE0`) then saves. So a flip saves 5 s after the last event, and a
+  flip-back before that leaves the patch as saved.
+- **v0.6 changes:**
+  - State 2 times out after 2 s (`0xC00CB96C`); the stock `0xC00CB964` call
+    after every footswitch tap re-arms it. With the
+    tempo screen open the footswitch always taps instead of flipping
+    (`0xC00ACBD8`, `0xC00ACA40`: the HOLD FOR getter's result is replaced by
+    1), so a screen opened by the combo works with any HOLD FOR.
+  - The tempo box rect (`0xC00EBB64`, only used by `0xC00AAC48`) is made
+    taller (y 27-63) and `tempo_draw` writes TURN OR TAP inside it, or MIDI
+    CLOCK while the clock is live (CLOCK RECEIVE on and a clock in the last
+    0.5 s, like `poll.S`). `knob_hook` turns the tempo with knob 1 in states
+    2 and 5 (clamped 40-250, set like tap) and re-arms the 2 s; `tap_hook`
+    skips taps while the clock is live.
+  - MOMENTARY (settings `V_HOLDM`, the stock word stays 0): `toggle_hook`
+    flips and notes slot and time, `release_hook` flips back after 0.5 s
+    or more, `hold_hook` makes event 224 do nothing, and `dirty_hook` (at the
+    `0xC00B87F4` call in `0xC00ACCE0`) reports "unchanged" while the
+    footswitch is down.
+  - `combo_hook` (events 228-231, play mode, nothing pending): with BOTTOM
+    and RIGHT down it runs `0xC00ABE58(224)` with the HOLD FOR word set to 0
+    (tuner), with BOTTOM and LEFT set to 1 (tempo screen), then puts the word
+    back and clears `B14+360`. `swallow_hook` drops the two buttons' next
+    releases. BOTTOM = i 3, RIGHT = i 5, LEFT = i 4 (`hold.inc`): the cursor
+    keys around the footswitch (i 2 is the top one: with BOTTOM = i 2 the
+    r1 combos worked with the top key on the MS-60B). Both keys' timers can
+    be queued before the stock hold stops them, so `combo_go` ignores a
+    combo whose releases are still waiting to be swallowed (else the second
+    event closed the tempo screen again).
+  - Tuner: event 65 (middle knob release, `0xC00AC8B0`, nothing in modes
+    5/6) goes to `tuner_exit.S` (`0x1181E7C0`, the free 64 bytes after the
+    clock variables), which in the tuner runs the stock footswitch press
+    (`0xC00ACAB0(32)`, how stock leaves the tuner). The tuner softkeys are
+    drawn at `0xC00BA5E0`-`0xC00BA600` (blank, blank, SETTINGS); the middle
+    one's call goes through a trampoline that passes "EXIT" instead.
