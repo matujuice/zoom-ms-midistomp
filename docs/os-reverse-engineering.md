@@ -313,3 +313,77 @@ Format and reader: `docs/transport-block.md`. Block at `0x1181FF00`.
   ring. Not confirmed. fix2 no longer applies the tempo in Task_MIDI:
   `clock.S` stores it in `V_WANT`, and `poll.S` applies it from the
   footswitch task (same calls as before) on its next 16 ms round.
+
+### Settings screen and MIDI SETTINGS (issue #26, v0.5)
+
+Menu (screen 0: DELETE EFFECT UNIT, EFFECT CHAIN, SETTINGS, VERSION) >
+SETTINGS (screen 1) > one screen per setting. Source: `asm/midi_settings/`,
+patch `patches/midi-settings.yaml`.
+
+- **Screens:** the current screen id is `B14+364`, written only by
+  `set_screen(id, row)` at `0xC00A75E0` (32 call sites, all with constant
+  ids). List row and top are `B14+368` / `B14+372`; `0xC00A7040` returns
+  row + top, `0xC00A72D4(delta, rows)` scrolls.
+- **Dispatch:** key events go through a switch on the screen id at
+  `0xC00A8300` (table `0xC00EF300`, ids 1-17, then 32-34), drawing through
+  `0xC00A93B0` (table `0xC00EF2BC`). Each case is a stub that calls the
+  handler and branches to the epilogue (`0xC00A840C`, `0xC00A9468`); the
+  event pair sits at `*+B15(8)`: A4 = event (34 enter, 65 exit, 160 knob
+  turn with A5 = steps), A4 returned = redraw. Ids 11, 13, 14, 15 fall to
+  the menu and are never set.
+- **Setting screens:** 1 list, 4 LCD BACKLIGHT, 5 LCD CONTRAST, 6 BATTERY
+  TYPE, 7 AUTO SAVE, 8 POWER MANAGEMENT, 10 BYPASS/MUTE TUNER, 12 HOLD FOR
+  TUNER/TAP. AUTO SAVE (keys `0xC00A8144`, draw `0xC00A9270`) is the
+  pattern: title `0xC00A7378`, rows `0xC009FCE0(0, text, 1, 12 + 9 row)`,
+  highlight `0xC00A73A4(row, 0)`, `0xC00A7400(0)`, knob labels
+  `0xC009F8F0(knob, text, 0)`; a turn clamps (`0xC00A766C`) and stores.
+- **List draw** (`0xC00A88F8`): names from a pointer table (`0xC00ECD68`,
+  mvkl/mvkh at `0xC00A8914`), 7x7 icons, 7 bytes each, one byte per column
+  with bit 0 at the top (`0xC00EC5A8`, at `0xC00A8930`), scrollbar
+  `0xC00A88CC(top, rows)` with rows at `0xC00A89C8`.
+- **Stored settings:** 38 words at `0xC009D8F8` (getters/setters
+  `0xC00B9B20`-`0xC00B9CE4`), bit-packed LSB first into a 24-byte record,
+  flash record 50 (patches are 0-49), with the bit widths at `0xC00EB538`
+  (185 of 192 bits used, so bits 1-7 of byte 23 are free). Pack
+  `0xC00D3C6C` (via `0xC00B9CE8`, also used by a SysEx dump), unpack
+  `0xC00D3B80` (via `0xC00BA090` at boot). The save (`0xC00B9D04`) runs
+  when leaving menus if the words differ from a shadow copy at
+  `0xC009D860` (compare `0xC00BA128`).
+- **Menu (screen 0):** no switch-table entry; the dispatchers' default
+  stubs call the menu key handler `0xC00A79B4` (at `0xC00A8360`) and draw
+  `0xC00A7460` (at `0xC00A9400`). Entries from the pointer table
+  `0xC00ED020` (4, no scrolling), ENTER through the jump table `0xC00EF870`
+  (indexes 0-3), EXIT clears `B14+328`. The menu is always entered through
+  `set_screen(0, row)`, so row and top are valid. The version screen
+  (9, keys `0xC00A7628`) goes back with `set_screen(0, 3)`.
+- **Record 51** (4 bytes, "last patch"): saved by `0xC00B86D0(patch)` (callp
+  `0xC00B4C94` at `0xC00B86E0`) on every patch change, loaded at boot by
+  `0xC00B8DCC` (callp `0xC00B4D4C` at `0xC00B8DD4`), which keeps the word
+  only if it is below 50. Stock never uses bits 8-31. Record 50 is saved by
+  `0xC00B9D04(words)`, which also refreshes the shadow copy.
+- **Font:** `0xC009FCE0` reads signed chars; codes 22-31 are icons
+  (6 bytes each from `0xC00EC1B4`, 25 is a note), there is no degree sign.
+- **What v0.5 does:** the menu stubs' callps go (via the zero bytes at
+  `0xC00BEDF0` and `0xC00C2164`) to `menu_keys`/`menu_draw`: five entries,
+  MIDI SETTINGS at index 3, the version entry at 4 (its exit patched to
+  row 4 at `0xC00A7638`). Screens 13 (choice) and 14 (MIDI SETTINGS list)
+  get switch-table entries; screen 1's key and draw entries are ours too
+  (8 rows, TEMPO LOCK last). All lists are drawn by `draw_list`, which does
+  what the stock list draw does. The MIDI word (`0x1181EA00`: bits 0-3
+  receive off for clock, transport, PC, CC; bit 4 PROG CH START is 0; bits
+  5-9 channel, 0 = OMNI) rides in bits 8-17 of record 51 (`rec_save` at
+  `0xC00C5D88`, `rec_load` at `0xC00C4AAC`); leaving a MIDI choice screen
+  after a change calls `0xC00B86D0`. TEMPO LOCK is bit 5 of byte 23 of
+  record 50 (pack/unpack via `0xC00B97E8`/`0xC00BDB44`); leaving its screen
+  after a change calls `0xC00B9D04`. `midi_gate` sits in front of both
+  Task_MIDI calls of `midi_channel_msg` (CC `0xC00AF088`, PC `0xC00AF0AC`,
+  via `0xC00B2FAC`): channel filter, receive off, and with PROG CH START 1
+  PC n loads patch n (PC 0 dropped, PC 127 untouched). `poll.S` calls
+  `tempo_lock` every 16 ms: for 16 rounds after the patch number changes it
+  asks (`V_WANT`) for the tempo of two rounds before the change, if the
+  patch load changed it; quiet for 2 s after boot.
+- **L2 use from v0.5:** settings section `0x1181EA00` (4000 B, vectors at
+  +64); clock handler 1696 B (ends `0x1181E6E0`); poll 448 B.
+- **Not checked:** what `0xC00B9D44` (resets the settings to defaults and
+  saves, called from `0xC00C5038`) is used for; the MIDI bits keep their
+  value through it.

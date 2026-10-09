@@ -11,6 +11,16 @@
         .equ    B_TICKS, 16                 ; clocks since Start
         .equ    B_TEMPO, 20                 ; BPM x 100
 
+; MIDI SETTINGS (v0.5): the MIDI word, kept in the settings section
+; (asm/midi_settings/settings.S, base + 0) and saved in flash record 51.
+; Bits 0-3 are "receive off" bits (0 = on); bit 4 and bits 5-9 are PROG CH
+; START and MIDI CHANNEL (settings.S).
+        .equ    MIDI_FLAGS, 0x1181EA00
+        .equ    OFF_CLOCK, 1
+        .equ    OFF_TRANSPORT, 2
+        .equ    OFF_PC, 4
+        .equ    OFF_CC, 8
+
 ; Clock handler variables, 192 bytes zeroed at boot (clock_vars section).
         .equ    VARS, 0x1181E700
         .equ    V_COUNT, 0                  ; ticks since the last beat (0..23)

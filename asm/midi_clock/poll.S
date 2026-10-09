@@ -12,10 +12,12 @@
 ;     as BPM x 100, unless the clock is live: then clock.S owns the tempo.
 ;     A TEMPO change while the clock is live (the clock setting it) is only
 ;     noted, so after the clock stops effects keep its finer tempo until
-;     TEMPO changes again.
+;     TEMPO changes again;
+;   - lets TEMPO LOCK (settings.S) put the tempo back after a patch change.
 
         .include "transport.inc"
         .equ    STALE_MS, 500
+        .equ    TEMPO_LOCK, 0x1181EAA8      ; settings.S tempo_lock vector
 
         .text
         .nocmp
@@ -68,6 +70,7 @@ tempo:
         PUB_END
 
 out:
+        FARCALL TEMPO_LOCK                  ; may ask for the kept tempo (v0.5)
         ; A tempo from the clock: take it (interrupts off, Task_MIDI may
         ; write a newer one any time) and apply it like tap tempo.
         mvkl    .S1     VARS, a0

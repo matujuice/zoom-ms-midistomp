@@ -7,6 +7,10 @@
 ; runs the replaced load before returning. Only callee-saved A10 is live in
 ; Task_MIDI here, so B0-B2 are free on the fast path.
 ;
+; The MIDI settings page (v0.5, asm/midi_settings/settings.S) can turn off
+; MIDI CLOCK (no tempo from the clock) and START/STOP (no Start, Stop or clock
+; count in the transport block); both are on by default.
+;
 ; Every byte other than 0xF8 (timing clock), 0xFA (start) and 0xFC (stop)
 ; returns at once; continue (0xFB) is ignored. Start and stop only update the
 ; transport block (transport.inc); every clock counts in it while running.
@@ -85,6 +89,13 @@ done:
         ; Start: running, one more start, no clocks yet. Its time keeps the
         ; poll (poll.S) from calling the clock stopped before the first one.
 start:
+        mvkl    .S1     MIDI_FLAGS, a0      ; START/STOP set to OFF (v0.5)
+        mvkh    .S1     MIDI_FLAGS, a0
+        ldw     .D1T1   *a0, a0
+        nop     4
+        and     .L1     OFF_TRANSPORT, a0, a0
+  [a0]  b       .S2     done
+        nop     5
         addk    .S2     -8, b15
         stw     .D2T2   b3, *+b15(8)
         FARCALL CLOCK_GETTICKS
@@ -107,6 +118,13 @@ start:
         nop     5
 
 stop:
+        mvkl    .S1     MIDI_FLAGS, a0
+        mvkh    .S1     MIDI_FLAGS, a0
+        ldw     .D1T1   *a0, a0
+        nop     4
+        and     .L1     OFF_TRANSPORT, a0, a0
+  [a0]  b       .S2     done
+        nop     5
         PUB_BEGIN
         mvk     .L1     0, a0
         stw     .D1T1   a0, *+a5(B_RUN)
@@ -129,6 +147,13 @@ tick:
 
         FARCALL CLOCK_GETTICKS
         mv      .L1     a4, a11             ; a11 = now (ms)
+        mvkl    .S1     MIDI_FLAGS, a12     ; a12 = MIDI settings (v0.5)
+        mvkh    .S1     MIDI_FLAGS, a12
+        ldw     .D1T1   *a12, a12
+        nop     4
+        and     .L1     OFF_TRANSPORT, a12, a0
+  [a0]  b       .S1     counted             ; START/STOP off: no count
+        nop     5
         PUB_BEGIN                           ; one more clock while running
         ldw     .D1T1   *+a5(B_RUN), a1
         ldw     .D1T1   *+a5(B_TICKS), a0
@@ -136,6 +161,10 @@ tick:
   [a1]  add     .L1     1, a0, a0
         stw     .D1T1   a0, *+a5(B_TICKS)
         PUB_END
+counted:
+        and     .L1     OFF_CLOCK, a12, a0
+  [a0]  b       .S1     out                 ; MIDI CLOCK off: tempo stays
+        nop     5
         ldw     .D1T1   *+a10(V_LAST), a0
         stw     .D1T1   a11, *+a10(V_LAST)
         mvk     .S1     GAP_MS, a1
