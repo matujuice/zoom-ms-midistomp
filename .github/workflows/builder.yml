@@ -1,0 +1,35 @@
+# Builds MIDISTOMP-builder.exe (no Zoom code inside) and attaches it to a
+# published release. On pull requests it is kept as a workflow artifact.
+name: builder
+on:
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pytest pyinstaller
+      - run: python -m pytest -q
+      - run: pyinstaller --onefile --console --name MIDISTOMP-builder --add-data "patches;patches" --add-data "models;models" scripts/midistomp_builder.py
+      - name: Refuses a file that is not the stock updater
+        run: |
+          '' | .\dist\MIDISTOMP-builder.exe README.md
+          if ($LASTEXITCODE -ne 1) { exit 1 }
+          if (Test-Path "MIDISTOMP V1.0 Updater.exe") { exit 1 }
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MIDISTOMP-builder
+          path: dist/MIDISTOMP-builder.exe
+      - if: github.event_name == 'release'
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder.exe --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
