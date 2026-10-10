@@ -17,6 +17,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 > will be tested and built once I get one. Tried it on another pedal?
 > [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
 
+<p align="center"><img width="1920" height="1536" alt="zoom midistomp mod v1 0 update" src="https://github.com/user-attachments/assets/49f817ca-8fe0-4b5a-8190-f3cc83cfe124" /></p>
+
 ## What you get
 
 | | |
