@@ -63,6 +63,33 @@ updater yourself from Zoom's official one. This needs Windows.
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's bootloader, which keeps the update mode always available.
 
+### On a Mac (untested on a pedal)
+
+Zoom's Mac updater holds the same firmware files as the Windows one and runs
+the same flash steps, so a MIDISTOMP version of it can be built too. The
+build has been checked byte for byte against the Windows MIDISTOMP updater,
+but nobody has flashed a pedal with it yet.
+
+1. Download Zoom's **MS-50G v3.10** updater **for Mac** from the support page
+   and unzip it.
+2. Get this repository and Python 3, then in its folder:
+   ```sh
+   python3 -m venv .venv && .venv/bin/pip install -e .
+   .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-50G v3.10 Updater.app"
+   ```
+   It writes **MIDISTOMP V1.0 Updater.app** next to Zoom's app, and refuses
+   anything that is not Zoom's original.
+3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
+   ```sh
+   xattr -cr "/path/to/MIDISTOMP V1.0 Updater.app"
+   codesign --force --deep --sign - "/path/to/MIDISTOMP V1.0 Updater.app"
+   ```
+4. Put the pedal in update mode (step 5 above) and open the app. It is an
+   Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to
+   install it).
+
+Recovery works the same way, with Zoom's original Mac updater.
+
 ## 3. Recovery and going back to stock
 
 If the pedal doesn't boot, or you want stock firmware back:
