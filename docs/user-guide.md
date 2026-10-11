@@ -25,8 +25,8 @@ playing aids. It is not made or supported by Zoom.
 
 | Pedal | Status |
 |---|---|
-| MS-50G | Should run it (same firmware it was made from), not tested yet. |
-| MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; **the only pedal it has been tested on**. |
+| MS-50G | Runs it. Tested with the Mac updater: PC, CC, MIDI clock, MIDI menu, channel filter, combos and HOLD FOR all work. |
+| MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; tested with the Windows updater. |
 | MS-70CDR | Untested. It should boot, but stereo may not work (inferred). A tested MS-70CDR version will follow once the author has one. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
 
@@ -38,7 +38,8 @@ every report helps.
 ## 2. Getting it onto the pedal
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP
-updater yourself from Zoom's official one. This needs Windows.
+updater yourself from Zoom's official one. This needs Windows, or a Mac
+(see [On a Mac](#on-a-mac) below).
 
 1. Download [Zoom's **MS-50G System v3.10** updater for Windows](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-50g/ms-50g-support/) from zoomcorp.com
    (MS-50G support page) and unzip it.
@@ -63,12 +64,12 @@ updater yourself from Zoom's official one. This needs Windows.
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's bootloader, which keeps the update mode always available.
 
-### On a Mac (untested on a pedal)
+### On a Mac
 
 Zoom's Mac updater holds the same firmware files as the Windows one and runs
 the same flash steps, so a MIDISTOMP version of it can be built too. The
-build has been checked byte for byte against the Windows MIDISTOMP updater,
-but nobody has flashed a pedal with it yet.
+build has been checked byte for byte against the Windows MIDISTOMP updater
+and flashed to an MS-50G from an Apple Silicon Mac.
 
 1. Download Zoom's **MS-50G v3.10** updater **for Mac** from the support page
    and unzip it.
