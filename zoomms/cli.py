@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from . import ais, asm, flash, models, parts, patcher, updater, zdl
+from . import ais, asm, flash, macapp, models, parts, patcher, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -70,26 +70,35 @@ def cmd_ais(args) -> int:
     return 0
 
 
+def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], build_id: str):
+    """(new main OS, new BIN/133 or None if unchanged, parsed patched OS), or None on a patch error."""
+    img = ais.parse(original)
+    d133 = bytearray(stock_133)
+    for patch_path in patch_paths:
+        patch = patcher.load(patch_path)
+        try:
+            lines = patcher.apply(img, patch, build_id) + patcher.apply_bin133(d133, patch, build_id)
+        except patcher.PatchError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return None
+        for line in lines:
+            print(f"{patch['name']}: {line}")
+    new_os = ais.build_part(img, original)
+    return new_os, (bytes(d133) if d133 != stock_133 else None), img
+
+
 def cmd_build(args) -> int:
     stock = Path(args.updater).read_bytes()
     found = parts.find_parts(args.updater)
     os_part = next(p for p in found if p.resource_id == 129)
     p133 = next(p for p in found if p.resource_id == 133)
     original = parts.read_part(args.updater, os_part)
-    img = ais.parse(original)
     stock_133 = parts.read_part(args.updater, p133)
-    d133 = bytearray(stock_133)
-    for patch_path in args.patch:
-        patch = patcher.load(patch_path)
-        try:
-            lines = patcher.apply(img, patch, args.build_id) + patcher.apply_bin133(d133, patch, args.build_id)
-        except patcher.PatchError as e:
-            print(f"error: {e}", file=sys.stderr)
-            return 1
-        for line in lines:
-            print(f"{patch['name']}: {line}")
-    new_os = ais.build_part(img, original)
-    new_133 = bytes(d133) if d133 != stock_133 else None
+    patched = _apply_patches(original, stock_133, args.patch, args.build_id)
+    if patched is None:
+        return 1
+    new_os, new_133, img = patched
+    d133 = new_133 or stock_133
     exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps, new_133=new_133)
 
     # Re-read what we are about to write and check it.
@@ -107,6 +116,28 @@ def cmd_build(args) -> int:
     print("flash steps: " + "; ".join(s.describe() for s in flash.find_script(exe)))
     Path(args.out).write_bytes(exe)
     print(f"wrote {args.out}  sha256 {hashlib.sha256(exe).hexdigest()}")
+    return 0
+
+
+def cmd_build_mac(args) -> int:
+    res = macapp.resources(Path(args.app))
+    original = (res / "Main.bin").read_bytes()
+    stock_133 = (res / "Preset.bin").read_bytes()
+    patched = _apply_patches(original, stock_133, args.patch, args.build_id)
+    if patched is None:
+        return 1
+    new_os, new_133, img = patched
+    steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps)
+
+    out_res = macapp.resources(Path(args.out))
+    check = ais.parse((out_res / "Main.bin").read_bytes())
+    assert [s.addr for s in check.sections] == [s.addr for s in img.sections]
+    assert check.entry == ais.parse(original).entry
+    changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
+    changed_133 = sum(1 for a, b in zip(stock_133, new_133 or stock_133) if a != b)
+    print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
+    print("flash steps: " + "; ".join(s.describe() for s in steps))
+    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: codesign --force --deep --sign - \"{args.out}\"")
     return 0
 
 
@@ -177,6 +208,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader like the stock updater does (not recommended)")
     p.set_defaults(func=cmd_build)
+    p = sub.add_parser("build-mac", help="build a modified Mac updater app from Zoom's Mac one plus patch files")
+    p.add_argument("app", help="stock official updater .app")
+    p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
+    p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
+    p.add_argument("--out", required=True, help="new .app (must not exist)")
+    p.add_argument("--keep-boot-steps", action="store_true",
+                   help="also rewrite the bootloader like the stock updater does (not recommended)")
+    p.set_defaults(func=cmd_build_mac)
     p = sub.add_parser("ais", help="decode a TI AIS boot image (bootloader or main OS part)")
     p.add_argument("image")
     p.add_argument("--elf", help="also write an ELF for tic6x-elf-objdump")
