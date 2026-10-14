@@ -7,8 +7,9 @@
 ; CC map (any channel):
 ;   effect n (1-6) on/off  = CC 10n+4         value >= 64 is on
 ;   effect n, knob k (1-9) = CC 10n+4+k       0-127 scaled to the knob's range
-; So CC 14-73 are ours. Everything else (including the CCs the stock OS uses:
-; 0, 74, 75) goes on to the stock midi_channel_msg unchanged.
+; So CC 14-73 are ours. Everything else goes on to step.S (CC 80/81 change
+; patch, issue #34), which passes the rest (including the CCs the stock OS
+; uses: 0, 74, 75) to the stock midi_channel_msg unchanged.
 ;
 ; A mapped CC does what the SysEx 0x31 parameter edit does (see
 ; docs/os-reverse-engineering.md): Semaphore_pend, fx_set_param(slot, param,
@@ -19,7 +20,7 @@
 ; Lives in free L2 RAM, so calls into DDR code go through a register (callp
 ; cannot reach that far).
 
-        .equ    STOCK_CHANNEL_MSG, 0xC00AE0F8
+        .equ    STEP, 0xC00F2000            ; step.S, then the stock midi_channel_msg
         .equ    FX_PARAM_DESC, 0xC00B07AC   ; (slot, param) -> descriptor, max at +12
         .equ    FX_SET_PARAM, 0xC00BAEE0
         .equ    SEM_PEND, 0xC00C7C60
@@ -51,9 +52,9 @@ cc_handler:
         cmpgtu  .L1     a1, a0, a2          ; not 14..73 -> stock
   [!a2] b       .S1     ours
         nop     5
-        ; Tail call into the stock handler: arguments and B3 untouched.
-        mvkl    .S2     STOCK_CHANNEL_MSG, b0
-        mvkh    .S2     STOCK_CHANNEL_MSG, b0
+        ; Tail call into step.S: arguments and B3 untouched.
+        mvkl    .S2     STEP, b0
+        mvkh    .S2     STEP, b0
         b       .S2     b0
         nop     5
 

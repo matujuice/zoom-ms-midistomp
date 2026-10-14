@@ -1,13 +1,14 @@
 # MIDI CC control of effects (issue #4). MS-50G 3.10 OS only for now.
 #   effect n (1-6) on/off  = CC 10n+4  (14, 24, 34, 44, 54, 64; value >= 64 = on)
 #   effect n, knob k (1-9) = CC 10n+4+k (e.g. effect 1 knob 1 = CC 15)
+#   CC 80 / 81 (value >= 64) = previous / next patch, wrapping (issue #34)
 # Any MIDI channel. Other CCs (and Program Change, SysEx) behave as stock.
 # Design and addresses: docs/os-reverse-engineering.md, "MIDI CC patch".
 # The hex below is generated from asm/midi_cc/*.S with
 #   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_cc_patch.py checks it still matches the source.
 name: midi-cc
-description: Effect on/off and knobs from MIDI CC 14-73
+description: Effect on/off and knobs from MIDI CC 14-73, patch up/down from CC 80/81
 builds: [ms50g-3.10]
 write:
   # Task_MIDI's CC call site: callp midi_channel_msg -> callp trampoline
@@ -27,7 +28,7 @@ section:
     addr: 0x1181DEA0
     source: asm/midi_cc/handler.S
     data: >-
-      28070000f8c08000a81d0000f8290001100500b0008000002a7c70006a056000
+      28070000f8c08000a81d0000f8290001100500b0008000002a001000ea076000
       620300000080000052f0ff07f642bc01f4623c05f482bc05f4a23c06f4c2bc06
       d81f980658400505a8660000804c810500000000a069ad0528050000806c0100
       00000000f840010658e0af05d80f3001100500a00080000058a30005a0c9b406
@@ -40,3 +41,12 @@ section:
       6a05e002620314002afaef01eac08801004000006ca900022a2000022a40e302
       6a06e002620314002a0af001eac0880100400000e642bc01e4623c05e482bc05
       e4a23c06e4c2bc065210800762030c0000800000000000000000000000000000
+  # Patch up/down (issue #34), in DDR at the start of RAM test region 1
+  - model: ms50g-3.10
+    addr: 0xC00F2000
+    source: asm/midi_cc/step.S
+    data: >-
+      28280000f8c08000a8000000f8290001900a00a000800000a2c9180062030c30
+      008000006c5300037820840058e0870028190000280080020000000078c00403
+      f8ca140178c000a3f8ca0001f8c000b358a304022a7c70006a05600062030000
+      0080000000000000000000000000000000000000000000000000000000000000
