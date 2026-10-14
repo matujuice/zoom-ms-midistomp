@@ -13,7 +13,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 <a href="#feedback-and-bug-reports">Feedback</a></p>
 
 > **Tested on an MS-60B** running the MS-50G 3.10 firmware. The MS-50G runs the
-> same firmware it is built from, but is not tested yet. An MS-70CDR version
+> same firmware it is built from and is tested too: flashed from a Mac, with PC,
+> CC, MIDI clock, the MIDI menu and the button combos working. An MS-70CDR version
 > will be tested and built once I get one. Tried it on another pedal?
 > [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
 

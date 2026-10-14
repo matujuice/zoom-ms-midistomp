@@ -8,8 +8,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 build/out/
-# Zoom downloads unpacked anywhere in the repo (e.g. MS-60B_v2.10_Win_E/).
+.venv/
+# Zoom downloads unpacked anywhere in the repo (e.g. MS-60B_v2.10_Win_E/, MS-50G_v3.10_Mac_E/).
 *_Win_E/
+*_Mac_E/
 *.exe
 *.dat
 work/

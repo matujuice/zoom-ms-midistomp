@@ -98,3 +98,23 @@ Value" sends CCs).
 - CC 14/24/34/44/54/64 switch effects 1-6 on and off; the knob CCs change values.
 - Unused CCs (CC 7) change nothing.
 - Effect Manager in normal mode still connects and lists the effects.
+
+## Mac updater
+
+`zoomms build-mac` does the same for Zoom's Mac updater app
+(`MS-50G_v3.10_Mac_E`), see `zoomms/macapp.py`. Its `Resources/Main.bin`,
+`Preset.bin`, `boot.bin` and `FS.bin` are byte-identical to BIN/129, 133,
+136 and 137, and `_RomProcedure` in the executable is the same 7-step script
+with types 0 = erase, 1 = write. The build replaces `Main.bin` and
+`Preset.bin`, updates their entries in the executable's MD5 table, and sets
+the bootloader steps to type 2, which the loop skips. Built with the v1.0
+patch set, `Main.bin` and `Preset.bin` match the Windows build's BIN/129 and
+BIN/133 exactly. The app must be re-signed ad hoc on the Mac
+(`codesign --force --deep --sign -`).
+
+```sh
+zoomms build-mac "firmware/MS-50G_v3.10_Mac_E/ZOOM MS-50G v3.10 Updater.app" \
+  --patch patches/version-1.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
+  --build-id ms50g-3.10 --out "build/out/MIDISTOMP V1.0 Updater.app"
+```
