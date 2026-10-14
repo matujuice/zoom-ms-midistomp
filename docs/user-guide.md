@@ -190,6 +190,12 @@ Any channel unless MIDI CHANNEL is set. Effect n is the n-th effect of the patch
 Knob values 0-127 cover the knob's whole range. A knob the effect doesn't
 have, and any other CC, does nothing.
 
+**Patch up/down** (not in v1.0 yet): CC 80 with a value of 64-127 loads the
+previous patch, CC 81 the next one, wrapping between patch 50 and patch 1.
+Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when
+released steps once. They follow CC RECEIVE and MIDI CHANNEL, not the PROG CH
+settings.
+
 ## 6. Effect Manager
 
 Zoom's Effect Manager and Zoom Effect Manager 2 work in **normal mode**

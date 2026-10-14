@@ -48,3 +48,11 @@ def test_section_kind_adds_code():
     assert ais.parse(ais.build(img)).sections[-1].data == b"\x01\x02\x03\x04"
     with pytest.raises(patcher.PatchError):
         patcher.apply(img, {"name": "t", "section": [{"model": "m", "addr": 0x11900002, "data": "00"}]}, "m")
+
+
+def test_handler_falls_through_to_step():
+    import re
+    handler, step = PATCH["section"]
+    m = re.search(r"\.equ\s+STEP,\s*(0x[0-9A-Fa-f]+)", (ROOT / handler["source"]).read_text())
+    assert int(m.group(1), 16) == step["addr"]
+    assert step["source"] == "asm/midi_cc/step.S"

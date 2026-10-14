@@ -164,6 +164,15 @@ so building an updater does not need binutils.
   on); knob k (1-9) of effect n = CC 10n+4+k (parameter index k+1). This avoids
   the CCs the stock OS uses (0, 74, 75). Slot count per model: 6 (MS-50G OS,
   MS-70CDR), 4 (MS-60B OS).
+- **Patch up/down (issue #34, `step.S`):** the handler's tail call for CCs
+  outside 14-73 goes to `step` in DDR at `0xC00F2020` (RAM test region 1,
+  confirmed unused, after the version string at `0xC00F2000`; 128 B) instead of straight to
+  `midi_channel_msg`. CC 80 / 81 with value >= 64 read the current patch
+  (`B14+332`, 0-49), step it by -1 / +1 with wrap, and tail-call
+  `midi_channel_msg` as a Program Change (`A4` = 1, `A6` = patch), the same
+  call the PC call site makes. Every other CC reaches the stock handler
+  unchanged. Tested 2026-10-14 by Luca: next/previous, wrap at
+  patch 1/50 and quick bursts of CCs all work.
 
 ### Tempo (MS-50G 3.10)
 
