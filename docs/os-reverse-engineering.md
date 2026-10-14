@@ -171,7 +171,8 @@ so building an updater does not need binutils.
   (`B14+332`, 0-49), step it by -1 / +1 with wrap, and tail-call
   `midi_channel_msg` as a Program Change (`A4` = 1, `A6` = patch), the same
   call the PC call site makes. Every other CC reaches the stock handler
-  unchanged. Not yet tested on the pedal.
+  unchanged. Tested 2026-10-14 by Luca: next/previous, wrap at
+  patch 1/50 and quick bursts of CCs all work.
 
 ### Tempo (MS-50G 3.10)
 
