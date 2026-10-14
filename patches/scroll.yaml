@@ -1,0 +1,41 @@
+# Faster left/right between effects, with wrap (issue #37). MS-50G 3.10 OS.
+#   The effect view's slide pauses 25 ms between its 4 frames (stock 100 ms),
+#   so a step takes about 0.1 s. At the end of the chain, instead of the stock
+#   bump, it slides back across all effects to the other end (10 ms frames).
+#   Top/bottom keys, holds, combos and menus are unchanged; the move still
+#   happens on release, as stock.
+# Design and addresses: docs/os-reverse-engineering.md, "Effect scrolling".
+# The hex below is generated from asm/scroll/scroll.S with
+#   zoomms asm asm/scroll/scroll.S --addr 0xC00F2100 --section
+# and tests/test_scroll_patch.py checks it still matches the source.
+name: scroll
+description: Faster left/right slide between effects, wrap at the ends
+builds: [ms50g-3.10]
+write:
+  # Slide step 0xC00C4C64: callp sleep (0xC00CF000) between frames -> frame_sleep
+  - model: ms50g-3.10
+    addr: 0xC00C4D98
+    expect: "13501410"
+    data: "13705a10"
+  # Key handler, right/left released at the end: callp bump (0xC00C4DCC) -> wrap
+  - model: ms50g-3.10
+    addr: 0xC00AC4D8
+    expect: "93213110"
+    data: "938b8b10"
+  - model: ms50g-3.10
+    addr: 0xC00AC528
+    expect: "93153110"
+    data: "937f8b10"
+section:
+  # frame_sleep, wrap and the frame time, in DDR RAM test region 1 after midi-cc's step.S
+  - model: ms50g-3.10
+    addr: 0xC00F2100
+    source: asm/scroll/scroll.S
+    data: >-
+      28e49001e807e00164020c022a0078006a066000620300000080000052f8ff07
+      f622bc01f4423c05f462bc05d80010052803800528e49001e807e00128050000
+      74020c002832e001e804e00124028c0264220c030060000058401b03a8028003
+      d80aa800d80f1c9378aa1801580a2c00f80f0801900700a000800000d80f2802
+      2a32a6026a06e002620314006281840158e0af0590f8ff0f0080000028e49001
+      e807e001a80c000074020c00e622bc01e4423c05e462bc050060000052088007
+      62030c0000800000190000000000000000000000000000000000000000000000
