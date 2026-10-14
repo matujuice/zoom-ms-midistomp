@@ -20,7 +20,7 @@
 ; Lives in free L2 RAM, so calls into DDR code go through a register (callp
 ; cannot reach that far).
 
-        .equ    STEP, 0xC00F2000            ; step.S, then the stock midi_channel_msg
+        .equ    STEP, 0xC00F2020            ; step.S, then the stock midi_channel_msg
         .equ    FX_PARAM_DESC, 0xC00B07AC   ; (slot, param) -> descriptor, max at +12
         .equ    FX_SET_PARAM, 0xC00BAEE0
         .equ    SEM_PEND, 0xC00C7C60

@@ -13,8 +13,8 @@
 ; unchanged. Behind the MIDI menu's channel filter and CC RECEIVE (the gate
 ; in settings.S runs first), not behind PROG CH RECEIVE or START NO.
 ;
-; In DDR at 0xC00F2000, the start of the first region the RAM test (issue #19)
-; confirmed unused (midi-cc.yaml); leaf.
+; In DDR at 0xC00F2020, in the first region the RAM test (issue #19) confirmed
+; unused, after version-1.0.yaml's string at 0xC00F2000 (midi-cc.yaml); leaf.
 
         .equ    STOCK_CHANNEL_MSG, 0xC00AE0F8
         .equ    CUR_PATCH, 332              ; B14 offset, current patch 0-49
@@ -46,6 +46,7 @@ step:
         cmplt   .L1     a6, a0, a2          ; past patch 50
   [!a2] sub     .L1     a6, a0, a6
         mvk     .L1     1, a4               ; Program Change
+        mvk     .L2     0, b6               ; as the stock PC call site
 stock:
         ; Tail call, B3 untouched.
         mvkl    .S2     STOCK_CHANNEL_MSG, b0
