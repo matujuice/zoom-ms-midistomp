@@ -496,6 +496,8 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
   at most 6 steps), then the stock bump in the travel direction with
   `v_frame` = 30 (its sleep call `0xC00C4DF4` also goes to `frame_sleep`;
   only wrap calls the bump now), then `v_frame` = 8.
+  **Flash test 2026-10-15:** r5 OK (Luca): steps, wrap with 1/3/6 effects,
+  bounce.
   r1 used count - 6 for the +1 end, which only holds with 6 effects: with
   fewer, wrapping from effect 1 ran to the empty slot 6 (fixed in r2).
 
