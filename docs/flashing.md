@@ -10,10 +10,18 @@ The stock updater runs a fixed script (see `zoomms/flash.py`):
 4. (MS-60B, MS-70CDR only) erase and rewrite the effects file system
 5. erase and write the main OS
 
-Updaters built by `zoomms build` skip steps 2 and 3. The bootloader holds the
+Updaters built by `zoomms build` skip steps 2, 3 and 4. The bootloader holds the
 USB update mode, so never touching it keeps that recovery path intact even if
-an update is interrupted. Built from the MS-50G updater, the effects file
-system (step 4) is not touched either, so your installed effects stay.
+an update is interrupted. Skipping step 4 (the MS-70CDR updater has it; the
+MS-50G one never did) keeps your installed effects: an update never deletes them.
+The MIDISTOMP builder takes Zoom's MS-70CDR 2.10 updater (`--build-id ms70cdr-2.10`).
+
+Zoom's updater only flashes a pedal whose model byte (flash `0x3FFC00`, BIN/133
+offset 0x2C00) is on its list: `0x57` and `0x61` in the MS-70CDR updater, so a
+pedal on the MS-50G firmware (`0x58`, every v1.0/v1.1 install) gets "Illegal
+device connected". Built updaters accept `0x57`, `0x58`, `0x5F` and `0x61`
+(`flash.accept_models`: the list moves into 4 unused bytes after it, both loop
+bounds go from 2 to 4). The bytes the pedal is sent are unchanged.
 
 They are also unsigned: Zoom's signature is removed because it no longer
 matches. Windows SmartScreen will warn; choose "More info" then "Run anyway".
@@ -54,7 +62,12 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
   --patch patches/version-1.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
   --patch patches/scroll.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.1.exe   # MIDISTOMP V1.1
+  --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.1.exe   # MIDISTOMP V1.1 (frozen, tag v1.1)
+zoomms build "firmware/MS-70CDR_v2.10_Win_E/ZOOM MS-70CDR v2.10 Updater.exe" \
+  --patch patches/version-1.2.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
+  --patch patches/scroll.yaml \
+  --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V1.2 Updater.exe"   # MIDISTOMP V1.2, all pedals
 ```
 
 `patches/boot-logo.yaml` changes updater part BIN/133 (boot logo) instead of
@@ -105,7 +118,10 @@ Value" sends CCs).
 - Unused CCs (CC 7) change nothing.
 - Effect Manager in normal mode still connects and lists the effects.
 
-## Mac updater
+## Mac updater (v1.1 only)
+
+There is no Mac builder for v1.2 (it needs a Mac updater from Zoom for the MS-70CDR 2.10 OS).
+The command below builds v1.1 and needs tag `v1.1`.
 
 `zoomms build-mac` does the same for Zoom's Mac updater app
 (`MS-50G_v3.10_Mac_E`), see `zoomms/macapp.py`. Its `Resources/Main.bin`,

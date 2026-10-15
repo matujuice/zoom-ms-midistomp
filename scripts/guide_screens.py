@@ -79,7 +79,7 @@ def lst(t, names, rows_hi, top=0, icons=None, left='ENTER'):
         s.box(122, y0, 126, y0 + h - 1)
     softkeys(s, [left, 'EXIT', ''])
     return s
-menu = [cstr(0xC00E9484), cstr(0xC00E9497), cstr(0xC00E94A4), 'MIDI', 'V1.1']
+menu = [cstr(0xC00E9484), cstr(0xC00E9497), cstr(0xC00E94A4), 'MIDI', 'V1.2']
 lst(cstr(0xC00E958C), menu, 3).png(OUT + '/menu.png')
 midi = ['CLOCK RECEIVE', 'TRANSPORT RECEIVE', 'PROG CH RECEIVE', 'PROG CH START NO.', 'CC RECEIVE', 'MIDI CHANNEL']
 micon = [0x1c, 0x22, 0x55, 0x41, 0x55, 0x22, 0x1c]
@@ -92,7 +92,7 @@ logo = bytes.fromhex(yaml.safe_load(open('patches/boot-logo.yaml'))['bin133'][0]
 b = Scr()
 for y in range(H):
     for x in range(W): b.p[y][x] = logo[(y // 8) * W + x] >> (y % 8) & 1
-b.text('v1.1', (W - 24) // 2, 50)  # the OS prints the version here
+b.text('v1.2', (W - 24) // 2, 50)  # the OS prints the version here
 b.png(OUT + '/boot-screen.png')
 # banner: the boot screen on an MS-50G grey panel
 sc = 6; fg = (28, 36, 58); bgc = (196, 214, 226)

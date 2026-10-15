@@ -3,7 +3,7 @@
 From MIDISTOMP v2.0 the firmware gives the Looper ZDL (effects pack, fxid 497)
 a big buffer, counts footswitch and CC presses for it, and lets it drive the
 LED. Everything goes through one block in RAM; the ZDL uses plain loads and
-stores and never calls into the firmware. MS-50G 3.10 OS only.
+stores and never calls into the firmware. MS-70CDR 2.10 OS (every pedal runs it from v2.0).
 The transport block (`docs/transport-block.md`) is separate and unchanged.
 
 ## Where
@@ -37,11 +37,12 @@ Big buffer (RAM test, issue #19; nothing in the OS writes there):
 | Region | Base | Bytes |
 |---|---|---|
 | 3 | `0xC0636980` | 1,677,952 |
-| 2 | `0xC01ADAD4` | 337,196 |
+| 2 | `0xC0198000` | 425,984 |
 | 1 | `0xC0102000` | 614,400 (region 1 above the 64 KB kept for MOD code) |
 
-With the looper's own 705 KB slot block that is 3.3 MB: 24.7 s stereo or
-48.4 s mono in 12-bit block float.
+With the looper's own 705 KB slot block that is about 3.4 MB: 25.4 s stereo
+or 49.7 s mono in 12-bit block float. The regions were confirmed free on the
+70CDR OS by the RAM test (2026-10-15).
 
 ## Rules
 
@@ -64,7 +65,7 @@ With the looper's own 705 KB slot block that is 3.3 MB: 24.7 s stereo or
   which writes 1 - "lit"). While word 12 is 1 the ZDL switches it every block
   (PWM); the LED task only writes on a change, so it stays out of the way.
   When the cursor leaves the looper the poll flips the LED task's "written"
-  bit (`0xC00EF078` bit 0) so it writes the new effect's state again.
+  bit (`0xC00EEB10` bit 0) so it writes the new effect's state again.
 - **Screen:** while word 12 is 1 and no overlay or prompt is open, every
   screen draw adds a status box to the Looper's Effect View: knob pages
   x 74-127, y 0-10 (above the knob frame at y 11), cover x 68-126, y 19-32

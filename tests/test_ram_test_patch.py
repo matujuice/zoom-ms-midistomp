@@ -7,7 +7,7 @@ from zoomms import asm, patcher
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = patcher.load(ROOT / "patches/ram-test.yaml")
 CLOCK = patcher.load(ROOT / "patches/midi-clock.yaml")
-BASE = 0xC00F1960
+BASE = 0xC00F1380
 
 
 def _disp_target(site, data):
@@ -25,11 +25,11 @@ def test_section_matches_source():
 
 def test_call_sites():
     w = {e["addr"]: e for e in PATCH["write"]}
-    clock = next(e for e in CLOCK["write"] if e["addr"] == 0xC00CA630)
-    assert w[0xC00CA630]["expect"] == clock["data"]  # applied on top of midi-clock.yaml
-    assert _disp_target(0xC00CA630, w[0xC00CA630]["data"]) == BASE  # ram_poll
-    assert _disp_target(0xC00A9434, w[0xC00A9434]["expect"]) == 0xC00A8474  # stock version draw
-    assert _disp_target(0xC00A9434, w[0xC00A9434]["data"]) == BASE + 0xB0  # ram_draw
+    clock = next(e for e in CLOCK["write"] if e["addr"] == 0xC00C6998)
+    assert w[0xC00C6998]["expect"] == clock["data"]  # applied on top of midi-clock.yaml
+    assert _disp_target(0xC00C6998, w[0xC00C6998]["data"]) == BASE  # ram_poll
+    assert _disp_target(0xC00A93D0, w[0xC00A93D0]["expect"]) == 0xC00A8428  # stock version draw
+    assert _disp_target(0xC00A93D0, w[0xC00A93D0]["data"]) == BASE + 0xB0  # ram_draw
     sec = bytes.fromhex(PATCH["section"][0]["data"])
     assert sec[0xB0:0xB4] == bytes.fromhex("52e0ff07")  # addk -64, b15
 
@@ -37,11 +37,12 @@ def test_call_sites():
 def test_regions_skip_code_and_used_ram():
     sec = bytes.fromhex(PATCH["section"][0]["data"])
     words = [int.from_bytes(sec[i:i + 4], "little") for i in range(0, len(sec), 4)]
-    i = words.index(0xC80F2000)
+    i = words.index(0xC80F3100)
     regions = [(words[i + 3 * k], words[i + 3 * k + 1]) for k in range(5)]
-    assert BASE + len(sec) <= 0xC00F2000  # code below the first region
-    # the space audit's unreferenced ranges (issue #19), SDRAM through the uncached alias
-    audit = [(0xC00F1958, 0xC0198000), (0xC01ADAD2, 0xC0200000), (0xC0636980, 0xC07D0000),
+    assert 0xC00F1364 <= BASE and BASE + len(sec) <= 0xC00F2000  # after the OS image, below our other sections
+    assert regions[0][0] - 0x08000000 >= 0xC00F3080  # region 1 above our DDR sections (looper block ends here)
+    # the unreferenced ranges on the 70CDR OS (docs/ms70cdr-addresses.md, ramtest.S), SDRAM through the uncached alias
+    audit = [(0xC00F1364, 0xC0198000), (0xC0198000, 0xC0200000), (0xC0636980, 0xC07D0000),
              (0xC07F4000, 0xC0800000), (0x80000000, 0x80020000)]
     for (s, e), (a, b) in zip(regions, audit):
         if s >> 24 == 0xC8:

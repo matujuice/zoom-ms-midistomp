@@ -1,8 +1,11 @@
-# Builds MIDISTOMP-builder.exe (no Zoom code inside) and attaches it to a
-# published release. On pull requests it is kept as a workflow artifact.
+# Builds MIDISTOMP-builder.exe (no Zoom code inside). Pushing a tag vX.Y
+# publishes the release with it, notes from docs/releases/vX.Y.md; a release
+# published by hand gets it attached. On pull requests it is a workflow artifact.
 name: builder
 on:
   pull_request:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
   release:
     types: [published]
@@ -23,7 +26,7 @@ jobs:
         run: |
           '' | .\dist\MIDISTOMP-builder.exe README.md
           if ($LASTEXITCODE -ne 1) { exit 1 }
-          if (Test-Path "MIDISTOMP V1.1 Updater.exe") { exit 1 }
+          if (Test-Path "MIDISTOMP V1.2 Updater.exe") { exit 1 }
           exit 0
       - uses: actions/upload-artifact@v4
         with:
@@ -31,5 +34,10 @@ jobs:
           path: dist/MIDISTOMP-builder.exe
       - if: github.event_name == 'release'
         run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder.exe --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: github.event_name == 'push'
+        shell: bash
+        run: gh release create "$GITHUB_REF_NAME" dist/MIDISTOMP-builder.exe --title "MIDISTOMP MOD $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
         env:
           GH_TOKEN: ${{ github.token }}

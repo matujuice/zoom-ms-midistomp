@@ -122,6 +122,24 @@ Manager in normal mode left the modded OS intact (MOD 0.1 still shown).
 Button/knob handlers in `Task_UpdateUI`, the audio chain loop, display drawing
 behind `Semaphore_LCDUpdate`, and a confirmed free-RAM region.
 
+### MS-70CDR 2.10 (midi-cc, midi-clock, midi-settings)
+
+These three patches are converted in place to the MS-70CDR 2.10 OS
+(`docs/ms70cdr-base.md`, task T3); every address and B14 offset below this
+point in the MIDI sections is the MS-50G 3.10 value they were found at, and
+the 70CDR counterparts are in `docs/ms70cdr-addresses.md`. What changed beyond
+addresses: the 70CDR OS keeps variables in L2 up to `0x1181DF04`, so the MIDI
+CC handler moved from L2 `0x1181DEA0` to DDR `0xC00F2800` (T2r decision);
+every other L2 section keeps its address. Three trampoline caves differ from
+the 50G ones (CC `0xC00BB190`, record 51 save `0xC00C6968`, both only 16 B).
+
+T4 converts `tempo-hold`, `scroll`, `version-1.1` and `boot-logo` the same way
+(addresses and B14 offsets MODE 320, PENDING 340, HOLD_FIRED 348 from the
+map; the trampoline caves are the map's, each checked as zero bytes after a
+`bnop b3,5`). `boot-logo` patches the 70CDR BIN/133 (its stock logo says
+MS-70CDR), rebuilt by `scripts/midistomp_logo.py` from the 70CDR bitmap. The
+tempo-hold, scroll and version sections below still quote the MS-50G values.
+
 ### MIDI CC patch (issue #4, `patches/midi-cc.yaml`)
 
 Built for the MS-50G 3.10 OS only (the patch refuses other builds). Source in
@@ -502,6 +520,11 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
   fewer, wrapping from effect 1 ran to the empty slot 6 (fixed in r2).
 
 ### Looper services (v2.0 step 2)
+
+**MS-70CDR 2.10 (T6):** addresses in `docs/ms70cdr-addresses.md`. The draw
+hook moved to `0xC00BB0EC` (`callp 0xC00D5720`, the call after the 50G's
+setter `0xC00B5794`, which the 70CDR OS lacks); region 2 is now
+`0xC0198000`-`0xC01FFFFF`. The 50G addresses below are kept for history.
 
 Source: `asm/looper/` (`looper.S` at DDR `0xC00F2200`, the services block
 `block.S` at `0xC00F3000`). Patch `patches/looper.yaml`, after midi-cc,

@@ -1,6 +1,6 @@
-<p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.1" width="720"></p>
+<p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.2" width="720"></p>
 
-<h1 align="center">MIDISTOMP V1.1 user guide</h1>
+<h1 align="center">MIDISTOMP V1.2 user guide</h1>
 
 <p align="center"><b>MIDI control, MIDI clock and playing aids for the Zoom MultiStomp</b></p>
 
@@ -19,34 +19,52 @@
 
 ## 1. What MIDISTOMP is
 
-MIDISTOMP is a modified version of Zoom's own MS-50G firmware 3.10. It keeps
+MIDISTOMP is a modified version of Zoom's own MS-70CDR firmware 2.10. It keeps
 everything the pedal does today and adds MIDI control, MIDI clock and a few
 playing aids. It is not made or supported by Zoom.
 
+One build runs on all three pedals:
+
 | Pedal | Status |
 |---|---|
-| MS-50G | Runs it. Tested with the Mac updater: PC, CC, MIDI clock, MIDI menu, channel filter, combos and HOLD FOR all work. |
-| MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; tested with the Windows updater. |
-| MS-70CDR | Reported working by a user (flashed with the Windows builder, v1.0): it boots and runs, but the audio comes out **mono**. Not tested by the author; a proper MS-70CDR version will follow once the author has one. |
+| MS-70CDR | Runs it, with real **stereo input**. Tested. |
+| MS-60B | Runs it. Tested. It behaves like an MS-70CDR with only the L input, so the input is mono. |
+| MS-50G | Same as the MS-60B: runs it, mono input. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
 
-You get 6 effects per patch, like the MS-50G firmware.
+You get 6 effects per patch.
 
 If you try it on an MS-50G or MS-70CDR, please [report how it went](https://github.com/matujuice/zoom-ms-modding/issues):
 every report helps.
 
+### What's new in v1.2
+
+- Built on Zoom's MS-70CDR 2.10 firmware for every pedal: one builder and one
+  Zoom updater for the MS-50G, MS-60B and MS-70CDR.
+- The MS-70CDR gets real stereo input (on the MS-50G and MS-60B the input stays
+  mono, as before).
+- Your installed effects and patches are kept.
+- The updater works whatever the pedal runs now: stock MS-50G, MS-60B or
+  MS-70CDR firmware, or an older MIDISTOMP.
+- The features are the same as v1.1: MIDI CC (including CC 80/81 patch
+  up/down), MIDI clock and Start/Stop, MIDI menu, tempo screen, HOLD FOR,
+  button combos, faster scrolling, boot logo.
+- No Mac builder yet. On a Mac, stay on [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md#on-a-mac).
+- The looper is not in v1.2.
+
 ## 2. Getting it onto the pedal
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP
-updater yourself from Zoom's official one. This needs Windows, or a Mac
-(see [On a Mac](#on-a-mac) below).
+updater yourself from Zoom's official one. This needs Windows. (Mac users stay
+on [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md#on-a-mac) for now.)
 
-1. Download [Zoom's **MS-50G System v3.10** updater for Windows](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-50g/ms-50g-support/) from zoomcorp.com
-   (MS-50G support page) and unzip it.
+1. Download [Zoom's **MS-70CDR v2.10** updater for Windows](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/) from zoomcorp.com
+   (MS-70CDR support page, file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it.
+   Use this one for the MS-50G and MS-60B too.
 2. Download **MIDISTOMP-builder.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-modding/releases).
-3. Drag `ZOOM MS-50G System v3.10 Updater.exe` onto `MIDISTOMP-builder.exe`.
-   It writes **MIDISTOMP V1.1 Updater.exe** in the same folder. It refuses any
+3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder.exe`.
+   It writes **MIDISTOMP V1.2 Updater.exe** in the same folder. It refuses any
    other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose
    "More info", then "Run anyway".
@@ -55,41 +73,14 @@ updater yourself from Zoom's official one. This needs Windows, or a Mac
 
    <img src="img/keys.jpg" alt="The four cursor keys around the footswitch" width="480">
 
-7. Run `MIDISTOMP V1.1 Updater.exe` and let it finish. Don't unplug during the update.
-8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.1** and
-   the last menu entry reads **V1.1**.
+7. Run `MIDISTOMP V1.2 Updater.exe` and let it finish. Don't unplug during the update.
+8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.2** and
+   the last menu entry reads **V1.2**.
 
-   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.1 boot screen" width="400">
+   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.2 boot screen" width="400">
 
 Your patches and installed effects stay as they are. The updater never
-rewrites the pedal's bootloader, which keeps the update mode always available.
-
-### On a Mac
-
-Zoom's Mac updater holds the same firmware files as the Windows one and runs
-the same flash steps, so a MIDISTOMP version of it can be built too. The
-build has been checked byte for byte against the Windows MIDISTOMP updater
-and flashed to an MS-50G from an Apple Silicon Mac.
-
-1. Download Zoom's **MS-50G v3.10** updater **for Mac** from the support page
-   and unzip it.
-2. Get this repository and Python 3, then in its folder:
-   ```sh
-   python3 -m venv .venv && .venv/bin/pip install -e .
-   .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-50G v3.10 Updater.app"
-   ```
-   It writes **MIDISTOMP V1.1 Updater.app** next to Zoom's app, and refuses
-   anything that is not Zoom's original.
-3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
-   ```sh
-   xattr -cr "/path/to/MIDISTOMP V1.1 Updater.app"
-   codesign --force --deep --sign - "/path/to/MIDISTOMP V1.1 Updater.app"
-   ```
-4. Put the pedal in update mode (step 5 above) and open the app. It is an
-   Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to
-   install it).
-
-Recovery works the same way, with Zoom's original Mac updater.
+rewrites the pedal's effects area or its bootloader, which keeps the update mode always available.
 
 ## 3. Recovery and going back to stock
 
@@ -97,7 +88,7 @@ If the pedal doesn't boot, or you want stock firmware back:
 
 1. Enter update mode (step 5 above: hold up + down while plugging in USB).
    This works even when the firmware is broken.
-2. Run Zoom's original MS-50G 3.10 updater. It puts back the stock firmware and
+2. Run Zoom's original updater for your pedal (the MS-70CDR 2.10 one, or the MS-50G 3.10 / MS-60B one you had before). It puts back the stock firmware and
    the stock boot screen.
 
 On an MS-60B you can also run Zoom's MS-60B updater to go back to the bass
@@ -217,7 +208,6 @@ it can rewrite the firmware and remove MIDISTOMP (inferred, not tested).
   Pro) can add lag; pass the clock through unchanged if you can.
 - **Some delays cut out on tempo changes.** That is the effect itself (see
   MIDI clock above).
-- **MS-70CDR**: one user reports it runs, with mono output (#35). Not tested by the author.
 - **Going back to an older MIDISTOMP or stock** may start the pedal on patch 1
   once.
 - *Is my pedal at risk?* The bootloader is never rewritten, so update mode is

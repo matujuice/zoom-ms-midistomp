@@ -1,5 +1,5 @@
 ; MIDI SETTINGS menu, MIDI channel, PC start, tempo lock (issue #26, v0.5),
-; MS-50G 3.10 OS.
+; MS-70CDR 2.10 OS.
 ;
 ; Menu (left knob press) gets a fifth entry, MIDI SETTINGS, between SETTINGS
 ; and the version entry, and scrolls like the SETTINGS list:
@@ -63,35 +63,35 @@
         .equ    LIST_SCROLL, 0xC00A72D4     ; (delta, rows)
         .equ    STOCK_MENU_KEYS, 0xC00A79B4
         .equ    STOCK_LIST_KEYS, 0xC00A7904
-        .equ    KEY_DONE, 0xC00A840C        ; key dispatcher epilogue, A4 = redraw
-        .equ    DRAW_DONE, 0xC00A9468       ; draw dispatcher epilogue
+        .equ    KEY_DONE, 0xC00A83C0        ; key dispatcher epilogue, A4 = redraw
+        .equ    DRAW_DONE, 0xC00A9404       ; draw dispatcher epilogue
         .equ    DRAW_TITLE, 0xC00A7378      ; (string)
         .equ    DRAW_TEXT, 0xC009FCE0       ; (0, string, x, y)
         .equ    DRAW_ICON, 0xC009F9B0       ; (0, x, y, w, h, bitmap)
         .equ    DRAW_BOX, 0xC00A0144        ; (0, x, y, x2, y2, mode)
         .equ    HILITE, 0xC00A73A4          ; (row, narrow for a scrollbar)
-        .equ    SCROLLBAR, 0xC00A88CC       ; (top, rows)
+        .equ    SCROLLBAR, 0xC00A8874       ; (top, rows)
         .equ    DRAW_ARROWS, 0xC00A7400     ; (0)
         .equ    SOFTKEY, 0xC009F8F0         ; (knob, string, 0)
-        .equ    BATTERY_LEVEL, 0xC00D7820   ; -> 0..4, 5+ = no battery icon
-        .equ    BATTERY_ICONS, 0xC00EEFB8
-        .equ    STR_MENU, 0xC00E958C
-        .equ    STR_SETTINGS, 0xC00E94A4
-        .equ    STR_ENTER, 0xC00E9591
-        .equ    STR_EXIT, 0xC00E9597
-        .equ    STR_BLANK, 0xC00E959C
-        .equ    OFF_ON, 0xC00ED238          ; "OFF", "ON"
+        .equ    BATTERY_LEVEL, 0xC00D7260   ; -> 0..4, 5+ = no battery icon
+        .equ    BATTERY_ICONS, 0xC00EEA50
+        .equ    STR_MENU, 0xC00E90F1
+        .equ    STR_SETTINGS, 0xC00E9004
+        .equ    STR_ENTER, 0xC00E90F6
+        .equ    STR_EXIT, 0xC00E90FC
+        .equ    STR_BLANK, 0xC00E9101
+        .equ    OFF_ON, 0xC00ECD38          ; "OFF", "ON"
         .equ    SETTINGS_WORDS, 0xC009D8F8
-        .equ    SAVE_SETTINGS, 0xC00B9D04   ; (words), writes record 50
+        .equ    SAVE_SETTINGS, 0xC00BA3E4   ; (words), writes record 50
         .equ    CLAMP, 0xC00A766C           ; (value, min, max)
-        .equ    PACK, 0xC00D3C6C
-        .equ    UNPACK, 0xC00D3B80
-        .equ    REC_SAVE, 0xC00B4C94        ; (record, buffer)
-        .equ    REC_LOAD, 0xC00B4D4C        ; (record, buffer) -> 0 = ok
-        .equ    SAVE_LAST_PATCH, 0xC00B86D0 ; (patch), writes record 51
-        .equ    CUR_PATCH, 332              ; B14 offset
-        .equ    CC_HANDLER, 0x1181DEA0
-        .equ    STOCK_CHANNEL_MSG, 0xC00AE0F8
+        .equ    PACK, 0xC00D382C
+        .equ    UNPACK, 0xC00D3740
+        .equ    REC_SAVE, 0xC00B49F4        ; (record, buffer)
+        .equ    REC_LOAD, 0xC00B4AAC        ; (record, buffer) -> 0 = ok
+        .equ    SAVE_LAST_PATCH, 0xC00B8410 ; (patch), writes record 51
+        .equ    CUR_PATCH, 324              ; B14 offset
+        .equ    CC_HANDLER, 0xC00F2800
+        .equ    STOCK_CHANNEL_MSG, 0xC00ADF20
         .equ    EV_ENTER, 34
         .equ    EV_EXIT, 65
         .equ    EV_TURN, 160
@@ -209,21 +209,21 @@ items:
         ITEMDEF s_hold, HOLD_WORD, hold_names, 0, 0, 0, 3, SCREEN_LIST, 0
 
 menu_names:     ; stock entries, ours before the version entry
-        .word   0xC00E9484, 0xC00E9497, 0xC00E94A4, s_midi, 0xC00E94AD
-settings_names: ; stock rows (0xC00ECD68) but our HOLD FOR, then ours
-        .word   s_hold, 0xC00E94C8, 0xC00E94DA, 0xC00E94EB
-        .word   0xC00E94F5, 0xC00E9502, 0xC00E9510, s_tlock
+        .word   0xC00E8FE4, 0xC00E8FF7, 0xC00E9004, s_midi, 0xC00E900D
+settings_names: ; stock rows but our HOLD FOR, then ours
+        .word   s_hold, 0xC00E9028, 0xC00E903A, 0xC00E904B
+        .word   0xC00E9055, 0xC00E9062, 0xC00E9070, s_tlock
 midi_names:
         .word   s_clock, s_transport, s_pc, s_pcstart, s_cc, s_channel
 zero_one:
         .word   s_0, s_1
 hold_names:     ; stock "TUNER", "TEMPO" (the tap screen title), ours
-        .word   0xC00E953F, 0xC00EB13F, s_moment
+        .word   0xC00E909F, 0xC00EB0DC, s_moment
 channels:
         .word   s_omni, s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8
         .word   s_9, s_10, s_11, s_12, s_13, s_14, s_15, s_16
 ; 7x7 row icons, one byte per column, bit 0 at the top: the stock SETTINGS
-; icons (0xC00EC5A8), a padlock for TEMPO LOCK, a MIDI socket.
+; icons, a padlock for TEMPO LOCK, a MIDI socket.
 settings_icons:
         .byte   0x1c, 0x3e, 0x4f, 0x41, 0x7b, 0x36, 0x1c
         .byte   0x00, 0x00, 0x1f, 0x60, 0x1f, 0x00, 0x00
@@ -266,8 +266,8 @@ s_16:           .string "16"
         .p2align 5
 
 ; draw_list(A4 title, B4 names, A6 rows, B6 icons or 0, A8 icon stride,
-; B8 left softkey): a list screen as the stock SETTINGS draw (0xC00A88F8)
-; does it. Four rows from the top (B14+372), icons at x 1 and text at x 12,
+; B8 left softkey): a list screen as the stock SETTINGS draw (0xC00A88A4)
+; does it. Four rows from the top (B14+360), icons at x 1 and text at x 12,
 ; or text at x 1 without icons; scrollbar and narrow highlight past 4 rows.
 draw_list:
         addk    .S2     -48, b15
@@ -286,7 +286,7 @@ draw_list:
         mv      .L1     a8, a13             ; icon stride
         mv      .L1X    b8, a14             ; left softkey
         FARCALL DRAW_TITLE
-        ldw     .D2T2   *+b14(372), b11     ; top
+        ldw     .D2T2   *+b14(360), b11     ; top
         mvk     .L2     0, b10              ; screen row
         nop     4
 dl_row:
@@ -334,7 +334,7 @@ dl_rows_done:
         cmplt   .L1     a0, a11, a1         ; scrollbar if more than 4 rows
         stw     .D2T1   a1, *+b15(40)
         mv      .L2X    a1, b4
-        ldw     .D2T1   *+b14(368), a4      ; highlighted screen row
+        ldw     .D2T1   *+b14(356), a4      ; highlighted screen row
         nop     4
         FARCALL HILITE
         ldw     .D2T1   *+b15(40), a1
@@ -676,8 +676,8 @@ ok_turn:        ; value = clamp(value + turn), like the stock OFF/ON screens
         mvk     .L1     0, a7               ; top
   [a2]  mvk     .L1     3, a6
   [a2]  add     .L1     -3, a11, a7
-        stw     .D2T1   a6, *+b14(368)
-        stw     .D2T1   a7, *+b14(372)
+        stw     .D2T1   a6, *+b14(356)
+        stw     .D2T1   a7, *+b14(360)
         mv      .L2X    a11, b4
         mv      .L1     a10, a4
         FARCALL set_value
@@ -851,7 +851,7 @@ rl_ret:
         RET16
 
 ; Record 51 save (A4 = 51, B4 = buffer with the patch number, B3 = return
-; into 0xC00B86D0): add the MIDI word, then the stock save.
+; into 0xC00B8410): add the MIDI word, then the stock save.
 rec_save:
         ldw     .D2T1   *b4, a0
         mvkl    .S1     MIDI_FLAGS, a5

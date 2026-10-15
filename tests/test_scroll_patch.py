@@ -25,10 +25,10 @@ def test_section_matches_assembly_source():
 def test_call_sites_retargeted():
     sleep, right, left, bump_sleep = PATCH["write"]
     for site in (sleep, bump_sleep):
-        assert callp_target(site["addr"], site["expect"]) == 0xC00CF000  # stock sleep
+        assert callp_target(site["addr"], site["expect"]) == 0xC00CEBC0  # stock sleep
         assert callp_target(site["addr"], site["data"]) == SECTION["addr"]  # frame_sleep, first in scroll.S
     for site in (right, left):
-        assert callp_target(site["addr"], site["expect"]) == 0xC00C4DCC  # stock end bump
+        assert callp_target(site["addr"], site["expect"]) == 0xC00C4C4C  # stock end bump
         assert callp_target(site["addr"], site["data"]) == SECTION["addr"] + 0x1C  # wrap
     for site in PATCH["write"]:  # only the displacement changes
         old, new = (int.from_bytes(bytes.fromhex(site[k]), "little") for k in ("expect", "data"))

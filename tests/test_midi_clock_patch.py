@@ -43,6 +43,7 @@ def test_no_overlap_with_midi_cc_patch():
     secs = sorted(PATCH["section"], key=lambda e: e["addr"])
     for a, b in zip(secs, secs[1:]):
         assert a["addr"] + len(bytes.fromhex(a["data"])) <= b["addr"]
+    assert secs[0]["addr"] >= 0x1181DF08  # past the 70CDR OS variables (end 0x1181DF04)
     assert secs[-1]["addr"] + len(bytes.fromhex(secs[-1]["data"])) <= 0x11820000  # end of L2
 
 

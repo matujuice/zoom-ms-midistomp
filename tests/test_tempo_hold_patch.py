@@ -29,21 +29,21 @@ def test_patch_bytes_match_assembly_source():
 
 
 @pytest.mark.parametrize("site,tramp,vector", [
-    (0xC00BA930, 0xC00CBA70, H + 0),    # tempo screen draw
-    (0xC00AD10C, 0xC00D1BB0, H + 8),    # knob turn
-    (0xC00AC9F0, 0xC00D2030, H + 16),   # knob press tap
-    (0xC00ACA50, 0xC00D2030, H + 16),   # footswitch tap
-    (0xC00ACC2C, 0xC00D3370, H + 24),   # footswitch flip
-    (0xC00AD2D8, 0xC00D3F30, H + 32),   # footswitch release
-    (0xC00AD090, 0xC00D44D0, H + 40),   # type hold 228
-    (0xC00AD064, 0xC00D44D0, H + 40),   # type hold 229
-    (0xC00AD034, 0xC00D44D0, H + 40),   # cursor hold 230/231
-    (0xC00AD0E4, 0xC00D46B0, H2 + 0),   # footswitch hold
-    (0xC00ACCE4, 0xC00D4BF0, H2 + 8),   # AUTO SAVE check
-    (0xC00AD1F8, 0xC00D8B70, H2 + 16),  # type release 69
-    (0xC00AD1A8, 0xC00D8B70, H2 + 16),  # type release 71
-    (0xC00AD158, 0xC00D8B70, H2 + 16),  # cursor release 73/75
-    (0xC00AD290, 0xC00D9190, 0x1181E7C0),  # middle knob release
+    (0xC00BB050, 0xC00CB62C, H + 0),    # tempo screen draw
+    (0xC00ACFE8, 0xC00D1770, H + 8),    # knob turn
+    (0xC00AC8D0, 0xC00D1BF0, H + 16),   # knob press tap
+    (0xC00AC930, 0xC00D1BF0, H + 16),   # footswitch tap
+    (0xC00ACB0C, 0xC00D2F30, H + 24),   # footswitch flip
+    (0xC00AD1B8, 0xC00D3AF0, H + 32),   # footswitch release
+    (0xC00ACF6C, 0xC00D4090, H + 40),   # type hold 228
+    (0xC00ACF40, 0xC00D4090, H + 40),   # type hold 229
+    (0xC00ACF10, 0xC00D4090, H + 40),   # cursor hold 230/231
+    (0xC00ACFC0, 0xC00D4270, H2 + 0),   # footswitch hold
+    (0xC00ACBC4, 0xC00D47B0, H2 + 8),   # AUTO SAVE check
+    (0xC00AD0D8, 0xC00D86F0, H2 + 16),  # type release 69
+    (0xC00AD088, 0xC00D86F0, H2 + 16),  # type release 71
+    (0xC00AD038, 0xC00D86F0, H2 + 16),  # cursor release 73/75
+    (0xC00AD170, 0xC00D8D10, 0x1181E7C0),  # middle knob release
 ])
 def test_call_sites_reach_their_vector(site, tramp, vector):
     entry = _at(site)
@@ -61,18 +61,18 @@ def test_call_sites_reach_their_vector(site, tramp, vector):
 
 
 def test_tuner_label_trampoline():
-    entry = _at(0xC00BA5E8)
+    entry = _at(0xC00BAD40)
     disp = (_word(entry) >> 7) & 0x1FFFFF
     disp = disp - (1 << 21) if disp & (1 << 20) else disp
-    assert (0xC00BA5E8 & ~31) + 4 * disp == 0xC00DAFD0
-    t = bytes.fromhex(_at(0xC00DAFD0)["data"])
+    assert (0xC00BAD40 & ~31) + 4 * disp == 0xC00DAA30
+    t = bytes.fromhex(_at(0xC00DAA30)["data"])
     lo = (int.from_bytes(t[0:4], "little") >> 7) & 0xFFFF
     hi = (int.from_bytes(t[4:8], "little") >> 7) & 0xFFFF
-    assert (hi << 16 | lo) == 0xC00E9597  # stock "EXIT"
+    assert (hi << 16 | lo) == 0xC00E90FC  # stock "EXIT"
     b = int.from_bytes(t[8:12], "little")
     d = (b >> 7) & 0x1FFFFF
     d = d - (1 << 21) if d & (1 << 20) else d
-    assert b & 0xF000007F == 0x12 and 0xC00DAFC0 + 4 * d == 0xC009F8F0  # b .S2 softkey
+    assert b & 0xF000007F == 0x12 and 0xC00DAA20 + 4 * d == 0xC009F8F0  # b .S2 softkey
 
 
 def test_word_patches():
@@ -80,14 +80,14 @@ def test_word_patches():
         w = _word(_at(addr))
         assert w & 0x7C == 0x28
         return (w >> 23) & 31, (w >> 7) & 0xFFFF, w & 1
-    assert cst(0xC00ACBD8) == (4, 1, 0)       # a4 = 1: "HOLD FOR is TEMPO"
-    assert cst(0xC00ACA40) == (4, 1, 0)
-    assert cst(0xC00CB96C) == (6, 2000, 1)    # tempo screen closes after 2 s
-    assert cst(0xC00CB3C8) == (4, 0xB13F, 0)  # mvkh 0xC00E: "TEMPO"
+    assert cst(0xC00ACAB8) == (4, 1, 0)       # a4 = 1: "HOLD FOR is TEMPO"
+    assert cst(0xC00AC920) == (4, 1, 0)
+    assert cst(0xC00CCCC8) == (6, 2000, 1)    # tempo screen closes after 2 s
+    assert cst(0xC00CB2A8) == (4, 0xB0DC, 0)  # mvkh 0xC00E: "TEMPO"
 
 
 def test_tempo_box_reaches_bottom_row():
-    box = bytes.fromhex(_at(0xC00EBB64)["data"])
+    box = bytes.fromhex(_at(0xC00EB700)["data"])
     x, y, w, h = (int.from_bytes(box[k:k + 2], "little") for k in range(0, 8, 2))
     assert (x, w) == (4, 120) and y + h - 1 == 63
     assert "TEXT_Y, 53" in (ROOT / "asm/tempo_hold/hold.inc").read_text()  # 7-px font: rows 53-59

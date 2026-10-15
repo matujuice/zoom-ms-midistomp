@@ -1,7 +1,7 @@
-; Far jump from DDR to menu_draw in L2 (settings.S vector table), MS-50G 3.10.
-; Placed at 0xC00C2164: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to menu_draw in L2 (settings.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00C1FC4: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; the draw dispatcher's default (menu) stub (0xC00A9400); B3 still holds the return address. Clobbers B0 (caller-saved).
+; the draw dispatcher's default (menu) stub (0xC00A9398); B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global menu_draw_trampoline
 menu_draw_trampoline:

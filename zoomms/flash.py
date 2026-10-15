@@ -12,13 +12,15 @@ MS-50G v3.10:
     erase 0x3FD000 +0x3000      write BIN/133
     erase 0x040000 +0xB0000     write BIN/129 main OS, last
 
-MS-60B / MS-70CDR also write BIN/137 (effects file system) at 0x0F0000.
+MS-60B / MS-70CDR also write BIN/137 (effects file system, 2912256 B) at
+0x0F0000, between the BIN/133 and main OS steps.
 
 Erasing the OS trailer first and writing the OS last looks like how the
 bootloader knows an update was interrupted (inferred). The stock updater
 rewrites the bootloader on every update, which is the one step that could
 brick a pedal beyond USB recovery if interrupted. build_updater() therefore
-turns the bootloader steps (and BIN/133) into no-ops: the loop in the updater
+turns the bootloader steps (and BIN/133) into no-ops, and the BIN/137 erase and
+write too, so an update never deletes the user's installed effects: the loop in the updater
 skips any step whose type is not 1 or 2.
 
 BIN/133 starts with the boot logo (128x64, page format: one byte = 8 vertical
@@ -73,12 +75,13 @@ def find_script(exe: bytes) -> list[Step]:
 
 
 def boot_steps(steps: list[Step], keep_133: bool = False) -> list[Step]:
-    """Steps touching the bootloader area (and BIN/133 unless keep_133)."""
+    """Steps touching the bootloader area, the effects file system (0xF0000) and
+    BIN/133 (unless keep_133): all the steps an update must not run."""
     out = []
     for s in steps:
         if s.addr < 0x40000:
             out.append(s)
-        elif not keep_133 and s.addr == 0x3FD000:
+        elif s.addr == 0xF0000 or (not keep_133 and s.addr == 0x3FD000):
             out.append(s)
     return out
 
@@ -97,7 +100,38 @@ def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = 
     if skip_boot:
         for s in boot_steps(find_script(bytes(exe)), keep_133=new_133 is not None):
             struct.pack_into("<I", exe, s.offset, SKIP)
+    accept_models(exe)
     return _unsign(bytes(exe))
+
+
+# The updater's model check (Luca's go-ahead 2026-10-15): the model byte the
+# pedal reports (flash 0x3FFC00, BIN/133 offset 0x2C00) must be in a 2-entry
+# list, else "Illegal device connected". Every v1.0/v1.1 pedal reports 0x58.
+# Code at 0x40456e-0x404597 in both the MS-50G 3.10 and MS-70CDR 2.10 updaters.
+MODEL_LOOP_HEAD = bytes.fromhex("837de802731d0fb60d28cc45008b55e80fb682")  # ... movzbl list(%edx),%eax
+MODEL_LOOP_TAIL = bytes.fromhex("3bc87504eb06eb02ebd6ebd4837de8027278")
+MODELS = bytes([0x57, 0x58, 0x5F, 0x61])  # 0x57 as in both stock lists, MS-50G, MS-60B, MS-70CDR
+
+
+def accept_models(exe: bytearray) -> bool:
+    """Let the updater flash any of the three pedals: the list moves 3 bytes up,
+    into unused padding after it, and grows to 4 entries. False if not found."""
+    import pefile
+
+    at = exe.find(MODEL_LOOP_HEAD)
+    disp = at + len(MODEL_LOOP_HEAD)
+    if at < 0 or exe[disp + 4:disp + 4 + len(MODEL_LOOP_TAIL)] != MODEL_LOOP_TAIL:
+        return False
+    va = struct.unpack_from("<I", exe, disp)[0]
+    pe = pefile.PE(data=bytes(exe), fast_load=True)
+    off = pe.get_offset_from_rva(va - pe.OPTIONAL_HEADER.ImageBase)
+    if exe[off + 2:off + 8] != bytes(6):  # +2 is a "" string in use, +3..+7 unreferenced padding
+        return False
+    exe[off + 3:off + 3 + len(MODELS)] = MODELS
+    struct.pack_into("<I", exe, disp, va + 3)
+    exe[at + 3] = len(MODELS)  # both loop bounds: cmpl $2 -> $4
+    exe[disp + 4 + len(MODEL_LOOP_TAIL) - 3] = len(MODELS)
+    return True
 
 
 def _unsign(exe: bytes) -> bytes:

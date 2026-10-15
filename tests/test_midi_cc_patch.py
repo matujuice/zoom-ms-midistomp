@@ -29,7 +29,7 @@ def test_callsite_is_retargeted_to_trampoline():
         disp = (w >> 7) & 0x1FFFFF
         return packet + 4 * (disp - (1 << 21) if disp & (1 << 20) else disp)
 
-    assert target(old) == 0xC00AE0F8  # stock midi_channel_msg
+    assert target(old) == 0xC00ADF20  # stock midi_channel_msg
     assert target(word) == tramp["addr"]
     assert word & ~(0x1FFFFF << 7) == old & ~(0x1FFFFF << 7)
     assert len(bytes.fromhex(tramp["data"])) <= 24  # the free gap

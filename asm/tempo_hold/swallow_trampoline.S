@@ -1,7 +1,7 @@
-; Far jump from DDR to swallow_hook in L2 (hold2.S vector table), MS-50G 3.10.
-; Placed at 0xC00D8B70: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to swallow_hook in L2 (hold2.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00D86F0: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; 0xC00AD1F8, 0xC00AD1A8, 0xC00AD158; B3 still holds the return address. Clobbers B0 (caller-saved).
+; 0xC00AD0D8, 0xC00AD088, 0xC00AD038; B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global swallow_trampoline
 swallow_trampoline:

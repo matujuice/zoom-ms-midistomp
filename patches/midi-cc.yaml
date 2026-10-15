@@ -1,4 +1,4 @@
-# MIDI CC control of effects (issue #4). MS-50G 3.10 OS only for now.
+# MIDI CC control of effects (issue #4). MS-70CDR 2.10 OS (addresses: docs/ms70cdr-addresses.md).
 #   effect n (1-6) on/off  = CC 10n+4  (14, 24, 34, 44, 54, 64; value >= 64 = on)
 #   effect n, knob k (1-9) = CC 10n+4+k (e.g. effect 1 knob 1 = CC 15)
 #   CC 80 / 81 (value >= 64) = previous / next patch, wrapping (issue #34)
@@ -9,44 +9,44 @@
 # and tests/test_midi_cc_patch.py checks it still matches the source.
 name: midi-cc
 description: Effect on/off and knobs from MIDI CC 14-73, patch up/down from CC 80/81
-builds: [ms50g-3.10]
+builds: [ms70cdr-2.10]
 write:
   # Task_MIDI's CC call site: callp midi_channel_msg -> callp trampoline
-  - model: ms50g-3.10
-    addr: 0xC00AF088
-    expect: "130ffe1f"
-    data: "13710010"
-  # Trampoline into L2 (was 16 of the 24 zero bytes after a return)
-  - model: ms50g-3.10
-    addr: 0xC00AF408
+  - model: ms70cdr-2.10
+    addr: 0xC00AEE6C
+    expect: "1318fe1f"
+    data: "13661810"
+  # Trampoline to the handler (16 zero bytes after a return)
+  - model: ms70cdr-2.10
+    addr: 0xC00BB190
     expect: "00000000000000000000000000000000"
-    data: "2a506f00eac008006203000000800000"
+    data: "2a001400ea0760006203000000800000"
     source: asm/midi_cc/trampoline.S
 section:
-  # The handler, in L2 RAM nothing in the OS or bootloader uses
-  - model: ms50g-3.10
-    addr: 0x1181DEA0
+  # The handler, in DDR after the looper code (the 70CDR OS uses the L2 it had)
+  - model: ms70cdr-2.10
+    addr: 0xC00F2800
     source: asm/midi_cc/handler.S
     data: >-
       28070000f8c08000a81d0000f8290001100500b0008000002a101000ea076000
       620300000080000052f0ff07f642bc01f4623c05f482bc05f4a23c06f4c2bc06
       d81f980658400505a8660000804c810500000000a069ad0528050000806c0100
       00000000f840010658e0af05d80f3001100500a00080000058a30005a0c9b406
-      900a00000080000058203005d80f2c02da1f28022ad68302ea05e00262031400
-      2aa6ef01eac0880100400000646210000060000000a8810000400000d01f8000
-      a8080400680201003026000100400000d80f8c066cc400025aa37c022a30be02
-      6a06e002620314002acaef01eac0880100400000d80f2c02da1f2802d80f3403
-      5aa3000358a304042a70d702ea05e002620314002ae0ef01eac0880100400000
-      6cc400022a60b802ea06e002620314002aeeef01eac08801004000002a52e702
-      6a05e002620314002afaef01eac08801004000006ca900022a2000022a40e302
-      6a06e002620314002a0af001eac0880100400000e642bc01e4623c05e482bc05
+      900a00000080000058203005d80f2c02da1f28022ab68202ea05e00262031400
+      2a569401ea07e00100400000646210000060000000a8810000400000d01f8000
+      a8080400680201003026000100400000d80f8c066cbf00025aa37c022a70bf02
+      6a06e002620314002a7a9401ea07e00100400000d80f2c02da1f2802d80f3403
+      5aa3000358a304042a00db02ea05e002620314002a909401ea07e00100400000
+      6cbf00022a80b502ea06e002620314002a9e9401ea07e001004000002ac2e602
+      6a05e002620314002aaa9401ea07e001004000006ca400022a2000022aa0df02
+      6a06e002620314002aba9401ea07e00100400000e642bc01e4623c05e482bc05
       e4a23c06e4c2bc065210800762030c0000800000000000000000000000000000
   # Patch up/down (issue #34), in DDR RAM test region 1, after version-1.0's string
-  - model: ms50g-3.10
+  - model: ms70cdr-2.10
     addr: 0xC00F2020
     source: asm/midi_cc/step.S
     data: >-
       28280000f8c08000a8000000f8290001100b00a000800000a2c9180062030c30
-      008000006c5300037820840058e0870028190000280080020000000078c00403
-      f8ca140178c000a3f8ca0001f8c000b358a304025aa300032a7c70006a056000
+      008000006c5100037820840058e0870028190000280080020000000078c00403
+      f8ca140178c000a3f8ca0001f8c000b358a304025aa300032a906f006a056000
       6203000000800000000000000000000000000000000000000000000000000000

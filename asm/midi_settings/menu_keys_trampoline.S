@@ -1,7 +1,7 @@
-; Far jump from DDR to menu_keys in L2 (settings.S vector table), MS-50G 3.10.
-; Placed at 0xC00BEDF0: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to menu_keys in L2 (settings.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00BEC90: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; the key dispatcher's default (menu) stub (0xC00A8360); B3 still holds the return address. Clobbers B0 (caller-saved).
+; the key dispatcher's default (menu) stub (0xC00A8310); B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global menu_keys_trampoline
 menu_keys_trampoline:

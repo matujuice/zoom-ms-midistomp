@@ -5,7 +5,7 @@
         .word   0x5A4C5301                  ; S_MAGIC
         .word   3                           ; S_NREG
         .word   0xC0636980, 0x00199680      ; region 3: 1,677,952 bytes
-        .word   0xC01ADAD4, 0x0005252C      ; region 2: 337,196 bytes
+        .word   0xC0198000, 0x00068000      ; region 2: 425,984 bytes
         .word   0xC0102000, 0x00096000      ; region 1: 614,400 bytes
         .word   0, 0                        ; S_CLAIM, S_HB
         .word   -1                          ; S_SLOT

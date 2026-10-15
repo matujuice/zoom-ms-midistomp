@@ -1,4 +1,4 @@
-; Looper services (v2.0 step 2), MS-50G 3.10 OS.
+; Looper services (v2.0 step 2), MS-70CDR 2.10 OS.
 ;
 ; The Looper ZDL claims the services block (services.inc) with its params
 ; pointer and beats a heartbeat every audio block. This code, reached from
@@ -14,7 +14,7 @@
 ;   hold_pre   footswitch hold (event 224): nothing while on the looper.
 ;   cc_pre     MIDI CC: the looper slot's on/off CC (10n+4) counts a press
 ;              for values 64-127 and is dropped for 0-63.
-;   draw_pre   every screen draw, before the LCD send (call at 0xC00BA9CC):
+;   draw_pre   every screen draw, before the LCD send (call at 0xC00BB0EC):
 ;              on the looper's Effect View, the status box (knob pages: x 74-127,
 ;              y 0-10; cover: x 68-126, y 19-32): a white box with a black
 ;              border, filled black from the left with the ZDL's progress, its
@@ -31,7 +31,7 @@
         .equ    POLL_HOOK, 0x1181E800       ; poll.S (transport upkeep), returns A4 = ticks
         .equ    TOGGLE_HOOK, 0x1181FA98     ; hold.S toggle_hook (MOMENTARY), then the flip
         .equ    HOLD_HOOK, 0x1181FF20       ; hold2.S hold_hook, then the stock hold
-        .equ    CC_HANDLER, 0x1181DEA0      ; midi_cc handler.S
+        .equ    CC_HANDLER, 0xC00F2800      ; midi_cc handler.S (DDR)
 
         .macro  FCALL target
         mvkl    .S2     \target, b5
@@ -260,10 +260,11 @@ cc_ours:
         b       .S2     b3
         nop     5
 
-; Called instead of 0xC00B5794 (A4 = its argument, B3 = return) after every
+; Called instead of 0xC00D5720 (A4 = its argument, B3 = return) after every
 ; screen draw, before the LCD send. On the looper's Effect View with no overlay
-; or prompt, draws the status box; then on to 0xC00B5794. Uses A0-A9, A16-A31,
-; B0-B5, B16-B19 (caller-saved).
+; or prompt, draws the status box; then on to 0xC00D5720. (The 50G hooked
+; the setter 0xC00B5794 one call earlier; the 70CDR OS has no such setter.)
+; Uses A0-A9, A16-A31, B0-B5, B16-B19 (caller-saved).
 draw_pre:
         addk    .S2     -96, b15            ; +4 B3, +8 A4, +16 the text, a byte a column
         stw     .D2T2   b3, *+b15(4)
@@ -460,4 +461,4 @@ draw_out:
         ldw     .D2T1   *+b15(8), a4
         nop     4
         addk    .S2     96, b15
-        JUMP    LCD_MODE
+        JUMP    LCD_GATE

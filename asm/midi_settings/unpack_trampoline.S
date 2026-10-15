@@ -1,7 +1,7 @@
-; Far jump from DDR to unpack_hook in L2 (settings.S vector table), MS-50G 3.10.
-; Placed at 0xC00BDB44: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to unpack_hook in L2 (settings.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00BD9E4: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; the stock unpack call in the boot-time settings load (0xC00BA09C); B3 still holds the return address. Clobbers B0 (caller-saved).
+; the stock unpack call in the boot-time settings load (0xC00BA77C); B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global unpack_trampoline
 unpack_trampoline:
