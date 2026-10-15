@@ -4,6 +4,14 @@ Research, 2026-10-15. Read-only: no firmware code. Measured on the stock
 updaters MS-50G 3.10, MS-60B 2.10 and MS-70CDR 2.10 and on the 11 effects of
 zoom-ms-zdl-effects-pack (`dist/*.ZDL`).
 
+## Outcome (Luca, 2026-10-15)
+
+Not pursued. Custom effects are already stripped (about 100 bytes per file
+left to gain, no block saved), and stripping the stock effects would mean
+rewriting all of them. Luca deletes unused stock effects with Effect Manager
+instead, so space is not an issue now. #16 closed as not needed. The
+measurements below stay for later.
+
 ## Short answer
 
 Stock effects carry about 36 % of dead weight: debug info and the static
