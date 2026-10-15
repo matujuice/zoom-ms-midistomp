@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/img/banner.png" alt="MIDISTOMP MOD v1.1" width="720"></p>
+<p align="center"><img src="docs/img/banner.png" alt="MIDISTOMP MOD v1.2" width="720"></p>
 
 <h1 align="center">MIDISTOMP</h1>
 
@@ -12,12 +12,11 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 <a href="#custom-effects">Custom effects</a> ·
 <a href="#feedback-and-bug-reports">Feedback</a></p>
 
-> **Tested on an MS-60B** running the MS-50G 3.10 firmware. The MS-50G runs the
-> same firmware it is built from and is tested too: flashed from a Mac, with PC,
-> CC, MIDI clock, the MIDI menu and the button combos working. An MS-70CDR owner
-> reports v1.0 flashing and running fine, with mono output; I will build and test
-> a proper MS-70CDR version once I get mine. Tried it on another pedal?
-> [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
+> **v1.2 runs on the MS-50G, MS-60B and MS-70CDR** from one build, made from
+> Zoom's MS-70CDR 2.10 firmware. It is tested on an MS-60B and an MS-70CDR (the
+> MS-70CDR gets real stereo input). Your effects and patches are kept. Tried it
+> on an MS-50G? [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
+> Mac: not in v1.2 yet, use [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md).
 
 <p align="center"><img width="1920" height="1536" alt="zoom midistomp mod v1 0 update" src="https://github.com/user-attachments/assets/49f817ca-8fe0-4b5a-8190-f3cc83cfe124" /></p>
 
@@ -38,7 +37,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 <p align="center"><img src="docs/img/boot-screen.png" alt="Boot screen" width="260"> <img src="docs/img/midi-menu.png" alt="MIDI menu" width="260"> <img src="docs/img/hold-for.png" alt="HOLD FOR" width="260"></p>
 <p align="center"><img src="docs/img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="260"> <img src="docs/img/tempo-midi-clock.png" alt="Tempo screen with MIDI clock" width="260"></p>
 
-**Getting it:** download [Zoom's official MS-50G 3.10 updater](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-50g/ms-50g-support/), drag it onto
+**Getting it:** download [Zoom's official MS-70CDR 2.10 updater](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
+(for every pedal, also the MS-50G and MS-60B), drag it onto
 `MIDISTOMP-builder.exe` from the [releases](https://github.com/matujuice/zoom-ms-modding/releases),
 flash the updater it writes. Full steps and recovery: [user guide](docs/user-guide.md).
 
@@ -102,7 +102,7 @@ a build config per pedal in [`models/`](models/).
 | 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **round trip exact on all 3 stock updaters** |
 | 2 | Per-model effect sets installed via Effect Manager / SysEx | effect files only | |
 | 3 | Our own DSP effects built with TI CGT C6000 | effect files only | |
-| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **MIDISTOMP MOD v1.1** |
+| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **MIDISTOMP MOD v1.2** |
 | 5 | Core firmware research (UI, routing, chain limits) | firmware | research only |
 
 ## Usage
