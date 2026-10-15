@@ -362,7 +362,7 @@ the pin mux/McASP side, a wrong-sounding L at the stage port.
 ## Port to the MS-70CDR OS
 
 Owner decision 2026-10-15: run MIDISTOMP on the MS-70CDR's own OS (2.10), build id
-`ms70cdr-2.10`. Phase 1 (this section): `version-1.1`, `boot-logo`, `midi-cc`, `midi-clock`.
+`ms70cdr-2.10`. Phase 1: `version-1.1`, `boot-logo`, `midi-cc`, `midi-clock`; phase 2 below.
 Static work only: built, not flashed, no pedal test.
 
 **How.** Each patch keeps one YAML with `ms50g-3.10` and `ms70cdr-2.10` entries. The sources
@@ -416,13 +416,67 @@ CC callp keeps its p-bit (1, parallel with the argument moves). Each cave is 16 
 words 4-7 of a plain packet after `bnop b3,5`, with no branch target or data word pointing at
 it. In the built image, every `mvkl/mvkh` constant in the new code is a 70CDR address.
 
-**Left for phase 2 and 3.**
-- **Phase 1 alone must not be flashed.** `midi-clock` reads the MIDI flags at `0x1181EA00` and
-  calls the TEMPO LOCK vector `0x1181EAA8`, both from `midi-settings` (the same holds on the 50G).
-- Phase 2: `midi-settings` (7 caves plus the SysEx handler-table words `0xC00EF2xx`; the
-  `settings.S` `CUR_PATCH`, `CC_HANDLER`, `STOCK_CHANNEL_MSG` move to `os.inc`), `tempo-hold`
-  (11 caves), `scroll`. The 70CDR has 34 caves of the same kind; the trampolines use 3 of them.
-  Their 50G L2 addresses (`0x1181E7C0`, `0x1181EA00`-`0x1181FF00`, `0x1181FF20`) are all above
-  `0x1181DF04` and can stay. Free L2 left: `0x1181DF04`-`0x1181E040` (316 B).
-- Phase 3: `looper` retargets the CC trampoline (`0xC00E1F70` here) and has its own
-  `CC_HANDLER` in `looper.S`.
+**Phase 2 (2026-10-15): `midi-settings`, `tempo-hold`, `scroll`.** Static work as phase 1:
+built (`cdr70-p2.exe`, the seven patches), not flashed. The sources take every OS address from
+`os.inc` (the 50G file got the same names with its values; 50G bytes unchanged). Method as
+phase 1, plus: a function is matched by its first instructions with all numbers masked and
+the neighbours' shift; inside a function, instructions are aligned with difflib; each callee
+was then compared whole (only register allocation and scheduling differ). Data by content
+(string bytes, pointer tables) and by the code that loads it.
+
+| what | MS-50G 3.10 | MS-70CDR 2.10 |
+|---|---|---|
+| B14: screen id, list row, list top | 364, 368, 372 | 352, 356, 360 |
+| B14: key mode, pending, hold fired | 328, 348, 360 | 320, 340, 348 |
+| key / draw switch tables (entry = base - 4 + 4 x screen) | `0xC00EF300` / `0xC00EF2BC` | `0xC00EEFA0` / `0xC00EEBB4` |
+| default stubs (screens 0, 11, 13-15): callp menu keys / draw | `0xC00A8360` / `0xC00A9400` | `0xC00A8310` / `0xC00A9398` |
+| key / draw dispatcher epilogue | `0xC00A840C` / `0xC00A9468` | `0xC00A83C0` / `0xC00A9404` |
+| list UI: set_screen, list index/scroll, title, hilite, arrows, text, icon, box, softkey, clamp, stock menu/list keys | `0xC009F8F0`-`0xC00A79B4` | the same addresses (code identical) |
+| scrollbar, battery level, battery icons | `0xC00A88CC`, `0xC00D7820`, `0xC00EEFB8` | `0xC00A8874`, `0xC00D7260`, `0xC00EEA50` |
+| strings MENU, SETTINGS, ENTER, EXIT, blank | `0xC00E958C` ... `0xC00E959C` | `0xC00E90F1`, `0xC00E9004`, `0xC00E90F6`, `0xC00E90FC`, `0xC00E9101` |
+| menu entries; SETTINGS rows 1-6; TUNER, TEMPO; OFF/ON table | `0xC00E9484`...; `0xC00E94C8`...; `0xC00E953F`, `0xC00EB13F`; `0xC00ED238` | `0xC00E8FE4`...; `0xC00E9028`...; `0xC00E909F`, `0xC00EB0DC`; `0xC00ECD38` (same rows, same order) |
+| settings save / pack / unpack (bit widths `0xC00EB538` / `0xC00EAFD0`) | `0xC00B9D04` / `0xC00D3C6C` / `0xC00D3B80` | `0xC00BA3E4` / `0xC00D382C` / `0xC00D3740` |
+| their call sites (pack, unpack) | `0xC00B9CF4`, `0xC00BA09C` | `0xC00BA3D4`, `0xC00BA77C` |
+| record save / load / save last patch; record 51 load, save sites | `0xC00B4C94` / `0xC00B4D4C` / `0xC00B86D0`; `0xC00B8DD4`, `0xC00B86E0` | `0xC00B49F4` / `0xC00B4AAC` / `0xC00B8410`; `0xC00B8B14`, `0xC00B8420` |
+| Task_MIDI PC call site | `0xC00AF0AC` | `0xC00AEE90` |
+| settings words, HOLD FOR word, switch state, cursor | `0xC009D8F8`, `0xC009D920`, `0xC009DF90`, `0xC009C064` | the same |
+| overlay set / get; state-2 opener and its `set a6,0,30` | `0xC00CB8A4` / `0xC00CBA10`; `0xC00CB964`, `0xC00CB96C` | `0xC00CCC84` / `0xC00CCD6C`; `0xC00CCCC0`, `0xC00CCCC8` |
+| tempo box draw, its geometry, its call (states 2, 5) | `0xC00AAC48`, `0xC00EBB64`, `0xC00BA930` | `0xC00AAB10`, `0xC00EB700`, `0xC00BB050` |
+| TAP softkey `mvk` | `0xC00CB3C8` | `0xC00CB2A8` |
+| footswitch press / release / hold, flip, HOLD FOR getter sites | `0xC00ACAB0` / `0xC00ACA1C` / `0xC00ABE58`, `0xC00ABDE4`, `0xC00ACBD8` + `0xC00ACA40` | `0xC00AC990` / `0xC00AC8FC` / `0xC00ABD30`, `0xC00ABCB8`, `0xC00ACAB8` + `0xC00AC920` |
+| knob turn, tap, AUTO SAVE check, middle release | `0xC00AC214`, `0xC00B9DA8`, `0xC00B87F4`, `0xC00AC8B0` | `0xC00AC0E8`, `0xC00BA488`, `0xC00B8534`, `0xC00AC790` |
+| type / cursor hold, type / cursor release | `0xC00ABB80` / `0xC00ABA90`, `0xC00AC574` / `0xC00AC434` | `0xC00ABA58` / `0xC00AB968`, `0xC00AC450` / `0xC00AC30C` |
+| key loop (`Task_MainApp`), its call sites | `0xC00ACED0`, `0xC00AD034`-`0xC00AD2D8` | `0xC00ACDB0`, `0xC00ACF10`-`0xC00AD1B8` (event tables `0xC00EEFE4`, `0xC00EF010` map case for case) |
+| tuner softkeys, the knob-1 label call | `0xC00BA3F4`, `0xC00BA5E8` | `0xC00BAAD4`, `0xC00BAD40` |
+| slide step / bump / sleep; their sleep calls; end bumps | `0xC00C4C64` / `0xC00C4DCC` / `0xC00CF000`; `0xC00C4D98`, `0xC00C4DF4`; `0xC00AC4D8`, `0xC00AC528` | `0xC00C4AE4` / `0xC00C4C4C` / `0xC00CEBC0`; `0xC00C4C18`, `0xC00C4C74`; `0xC00AC3B0`, `0xC00AC400` |
+| caves, midi-settings (menu keys, menu draw, pack, unpack, rec load, rec save, gate) | `0xC00BEDF0` ... `0xC00B2FAC` | `0xC00BB190`, `0xC00BEC90`, `0xC00C3530`, `0xC00D1770`, `0xC00D1BF0`, `0xC00D2F30`, `0xC00D3AF0` |
+| caves, tempo-hold (draw, knob, tap, toggle, release, combo, hold, dirty, swallow, tuner exit, tuner label) | `0xC00CBA70` ... `0xC00DAFD0` | `0xC00D4090`, `0xC00D4270`, `0xC00D47B0`, `0xC00D86F0`, `0xC00D8D10`, `0xC00DAA30`, `0xC00DB590`, `0xC00DBF30`, `0xC00DFDB0`, `0xC00DF750`, `0xC00DFA50` |
+| sections | `0x1181EA00`, `0x1181FA80`, `0x1181FF20`, `0x1181E7C0`, `0xC00F2100` | the same |
+
+**Checked by hand [C].** Screens 13 and 14 are default stubs in both 70CDR tables (17
+entries, range check unchanged); the dispatchers keep the event pair at `b15+8` and the same
+epilogues. The 70CDR SETTINGS list has the 50G's seven rows (strings, icons and table
+identical); record 50 packs the same 38 bit widths into 24 bytes, so byte 23 bits 1-7 are
+free as on the 50G; record 51 is loaded and saved by the same code (patch number < 50). Each
+callp keeps its p-bit and creg; the two HOLD FOR getter calls become `mvk .S1 1,a4` alone in
+their packets; the state-2 `set .S1` becomes `mvk .S1 2000,a6` in the same .S1 slot (the
+callp is on .S2). Every `mvkl/mvkh` constant and data word in the new code is a 70CDR
+`os.inc` value, a MIDISTOMP address or section-local. Caves: as phase 1 (words 4-7 of a plain
+packet after `bnop b3,5`, no branch, `mvkl/mvkh` or data word pointing at them); one after an
+`spkernel` was skipped.
+
+**[I] Not checked on hardware.** The 70CDR overlay has states 0-5 only (the 50G 6-8 are
+missing); 2 and 5 are the tempo box as on the 50G. The switch indexes (BOTTOM 3, LEFT 4,
+RIGHT 5) assume the same button wiring as the MS-50G. The 70CDR menu, settings and tuner
+screens were compared as code, not looked at.
+
+**Phase 1 alone must not be flashed** (`midi-clock` uses the MIDI word `0x1181EA00` and the
+TEMPO LOCK vector `0x1181EAA8` from `midi-settings`); phase 1 + 2 together can.
+
+**Left for phase 3 (`looper`).** Its trampolines move: CC (70CDR `0xC00E1F70`), poll
+(`0xC00C82D0`), footswitch flip (`0xC00D86F0`), hold (`0xC00DB590`); the draw hook
+`0xC00BA9CC` needs its 70CDR site; `looper.S` (`0xC00F2200`, 1536 B) ends exactly at the 70CDR
+CC handler (`0xC00F2800`); its own `CC_HANDLER`, `MODE`, `PENDING`, `CURSOR`, `OVL_GET` move
+to `os.inc`. On both builds `midi-settings` routes the CC call site to `midi_gate`, which jumps
+to `CC_HANDLER` directly, so the midi-cc trampoline that `looper` retargets for `cc_pre` is no
+longer on the CC path (MS-50G too: check before relying on the looper's CC press).
