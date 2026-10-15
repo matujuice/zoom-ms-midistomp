@@ -1,4 +1,4 @@
-# Faster left/right between effects, with wrap (issue #37). MS-50G 3.10 OS.
+# Faster left/right between effects, with wrap (issue #37). MS-50G 3.10 and MS-70CDR 2.10 OS.
 #   The effect view's slide pauses 8 ms between its 4 frames (stock 100 ms).
 #   At the end of the chain, instead of the stock bump, it slides back across
 #   all effects to the other end with 5 ms frames, and the effect it lands on
@@ -7,11 +7,11 @@
 #   happens on release, as stock.
 # Design and addresses: docs/os-reverse-engineering.md, "Effect scrolling".
 # The hex below is generated from asm/scroll/scroll.S with
-#   zoomms asm asm/scroll/scroll.S --addr 0xC00F2100 --section
+#   zoomms asm asm/scroll/scroll.S --addr 0xC00F2100 --section --build-id <model>
 # and tests/test_scroll_patch.py checks it still matches the source.
 name: scroll
 description: Faster left/right slide between effects, wrap at the ends
-builds: [ms50g-3.10]
+builds: [ms50g-3.10, ms70cdr-2.10]
 write:
   # Slide step 0xC00C4C64: callp sleep (0xC00CF000) between frames -> frame_sleep
   - model: ms50g-3.10
@@ -32,6 +32,25 @@ write:
     addr: 0xC00C4DF4
     expect: "13441410"
     data: "13645a10"
+  # MS-70CDR 2.10: slide step 0xC00C4AE4: callp sleep (0xC00CEBC0) -> frame_sleep
+  - model: ms70cdr-2.10
+    addr: 0xC00C4C18
+    expect: "13f81310"
+    data: "13a05a10"
+  # Key handler 0xC00AC30C, right/left at the end: callp bump (0xC00C4C4C) -> wrap
+  - model: ms70cdr-2.10
+    addr: 0xC00AC3B0
+    expect: "93153110"
+    data: "93af8b10"
+  - model: ms70cdr-2.10
+    addr: 0xC00AC400
+    expect: "93093110"
+    data: "93a38b10"
+  # Stock bump 0xC00C4C4C: callp sleep(125) -> frame_sleep
+  - model: ms70cdr-2.10
+    addr: 0xC00C4C74
+    expect: "13ec1310"
+    data: "13945a10"
 section:
   # frame_sleep, wrap and the frame time, in DDR RAM test region 1 after midi-cc's step.S
   - model: ms50g-3.10
@@ -44,5 +63,18 @@ section:
       a8028003d80aa800d80f1c9378aa1801580a2c00f80f0801100800a000800000
       d80f28022a32a6026a06e002620314006281850158e0af0590f8ff0f00800000
       28f89001e807e001280f000074020c00d80f28022ae6a6026a06e00262031400
+      6281810128f89001e807e0012804000074020c00e622bc01e4423c05e462bc05
+      006000005208800762030c000080000008000000000000000000000000000000
+  # MS-70CDR 2.10: the same DDR address
+  - model: ms70cdr-2.10
+    addr: 0xC00F2100
+    source: asm/scroll/scroll.S
+    data: >-
+      28f89001e807e00164020c022ae075006a066000620300000080000052f8ff07
+      f622bc01f4423c05f462bc05d80010052803800528f89001e807e001a8020000
+      74020c002832e001e804e00124028c0264220c030060000028038003f8e01803
+      a8028003d80aa800d80f1c9378aa1801580a2c00f80f0801100800a000800000
+      d80f28022a72a5026a06e002620314006281850158e0af0590f8ff0f00800000
+      28f89001e807e001280f000074020c00d80f28022a26a6026a06e00262031400
       6281810128f89001e807e0012804000074020c00e622bc01e4423c05e462bc05
       006000005208800762030c000080000008000000000000000000000000000000

@@ -1,9 +1,12 @@
-"""MIDISTOMP on the MS-70CDR 2.10 OS (build id ms70cdr-2.10), phase 1:
-version-1.1, boot-logo, midi-cc, midi-clock. Addresses: docs/ms70cdr-port.md,
-"Port to the MS-70CDR OS". Byte-vs-source checks are in test_midi_c*_patch.py."""
+"""MIDISTOMP on the MS-70CDR 2.10 OS (build id ms70cdr-2.10): phase 1
+version-1.1, boot-logo, midi-cc, midi-clock; phase 2 midi-settings,
+tempo-hold, scroll. Addresses: docs/ms70cdr-port.md, "Port to the MS-70CDR
+OS". Byte-vs-source checks are in the test_<patch>_patch.py files."""
 
 import re
 from pathlib import Path
+
+import pytest
 
 from zoomms import patcher
 
@@ -40,7 +43,7 @@ def test_os_files_define_the_same_names():
 
 
 def test_new_sections_avoid_the_os():
-    for name in ("version-1.1", "midi-cc", "midi-clock"):
+    for name in ("version-1.1", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"):
         for s in entries(name, "section"):
             end = s["addr"] + len(bytes.fromhex("".join(s["data"].split())))
             assert OS_L2_END <= s["addr"] and end <= 0x11820000 or 0xC00F2000 <= s["addr"] and end <= 0xC00F3000
@@ -81,3 +84,112 @@ def test_boot_logo_only_replaces_the_70cdr_picture():
     g50 = patcher.load(ROOT / "patches/boot-logo.yaml")["bin133"][0]
     assert b["data"] == g50["data"] and b["expect_sha256"] != g50["expect_sha256"]
     assert b["offset"] == 0 and len(bytes.fromhex(b["data"])) == 1024  # the model byte at 0x2C00 stays
+
+
+# Phase 2 ------------------------------------------------------------------
+
+PHASE1_CAVES = {0xC00E1F70, 0xC00A1A50, 0xC00C82D0}
+SB, H, H2 = 0x1181EA00, 0x1181FA80, 0x1181FF20  # settings.S, hold.S, hold2.S: 50G addresses kept
+
+
+def at(name, addr):
+    (e,) = [e for e in entries(name, "write") if e["addr"] == addr]
+    return e
+
+
+@pytest.mark.parametrize("name, site, stock, tramp, vector", [
+    ("midi-settings", 0xC00A8310, "STOCK_MENU_KEYS", 0xC00BB190, SB + 64),
+    ("midi-settings", 0xC00A9398, 0xC00A7460, 0xC00BEC90, SB + 72),  # stock menu draw
+    ("midi-settings", 0xC00BA3D4, "PACK", 0xC00C3530, SB + 128),
+    ("midi-settings", 0xC00BA77C, "UNPACK", 0xC00D1770, SB + 136),
+    ("midi-settings", 0xC00AEE6C, 0xC00E1F70, 0xC00D3AF0, SB + 144),  # CC: midi-cc's trampoline
+    ("midi-settings", 0xC00AEE90, "MIDI_CHANNEL_MSG", 0xC00D3AF0, SB + 144),  # PC
+    ("midi-settings", 0xC00B8B14, "REC_LOAD", 0xC00D1BF0, SB + 152),
+    ("midi-settings", 0xC00B8420, "REC_SAVE", 0xC00D2F30, SB + 160),
+    ("tempo-hold", 0xC00BB050, "TEMPO_BOX", 0xC00D4090, H + 0),
+    ("tempo-hold", 0xC00ACFE8, "STOCK_KNOB", 0xC00D4270, H + 8),
+    ("tempo-hold", 0xC00AC8D0, "STOCK_TAP", 0xC00D47B0, H + 16),
+    ("tempo-hold", 0xC00AC930, "STOCK_TAP", 0xC00D47B0, H + 16),
+    ("tempo-hold", 0xC00ACB0C, "TOGGLE", 0xC00D86F0, H + 24),
+    ("tempo-hold", 0xC00AD1B8, "STOCK_RELEASE", 0xC00D8D10, H + 32),
+    ("tempo-hold", 0xC00ACF6C, "STOCK_TYPE_HOLD", 0xC00DAA30, H + 40),
+    ("tempo-hold", 0xC00ACF40, "STOCK_TYPE_HOLD", 0xC00DAA30, H + 40),
+    ("tempo-hold", 0xC00ACF10, "STOCK_CURSOR_HOLD", 0xC00DAA30, H + 40),
+    ("tempo-hold", 0xC00ACFC0, "STOCK_HOLD", 0xC00DB590, H2 + 0),
+    ("tempo-hold", 0xC00ACBC4, "IS_DIRTY", 0xC00DBF30, H2 + 8),
+    ("tempo-hold", 0xC00AD0D8, "STOCK_TYPE_REL", 0xC00DFDB0, H2 + 16),
+    ("tempo-hold", 0xC00AD088, "STOCK_TYPE_REL", 0xC00DFDB0, H2 + 16),
+    ("tempo-hold", 0xC00AD038, "STOCK_CURSOR_REL", 0xC00DFDB0, H2 + 16),
+    ("tempo-hold", 0xC00AD170, "STOCK_MIDDLE", 0xC00DF750, 0x1181E7C0),
+])
+def test_call_sites_reach_their_vectors(name, site, stock, tramp, vector):
+    e, t = at(name, site), at(name, tramp)
+    old, new = word(e["expect"]), word(e["data"])
+    assert callp_target(site, old) == (os_inc(B)[stock] if isinstance(stock, str) else stock)
+    assert callp_target(site, new) == tramp
+    assert new & ~(0x1FFFFF << 7) == old & ~(0x1FFFFF << 7)  # only the displacement changes
+    assert t["expect"] == "00" * 16 and tramp not in PHASE1_CAVES
+    assert far_target(t["data"]) == vector
+
+
+def test_caves_are_distinct():
+    caves = [e["addr"] for n in ("midi-settings", "tempo-hold") for e in entries(n, "write")
+             if e.get("expect") == "00" * 16]
+    assert len(caves) == len(set(caves)) == 18 and not set(caves) & PHASE1_CAVES
+    assert os_inc(B)["TUNER_LABEL_TRAMP"] in caves
+
+
+def test_switch_tables():
+    # keys at 0xC00EEF9C + 4 x screen, draws at 0xC00EEBB0 + 4 x screen; 13 and 14 are the default stubs
+    for addr, stub, vector in ((0xC00EEFA0, None, 80), (0xC00EEBB4, None, 88), (0xC00EEFD4, 0xC00A8310, 96),
+                               (0xC00EEBE8, 0xC00A9398, 104), (0xC00EEFD0, 0xC00A8310, 112), (0xC00EEBE4, 0xC00A9398, 120)):
+        e = at("midi-settings", addr)
+        assert word(e["data"]) == SB + vector
+        assert stub is None or word(e["expect"]) == stub
+
+
+def test_tempo_hold_word_patches():
+    def cst(addr):
+        w = word(at("tempo-hold", addr)["data"])
+        assert w & 0x7C == 0x28  # mvk
+        return (w >> 23) & 31, (w >> 7) & 0xFFFF, w & 1
+    assert cst(0xC00ACAB8) == cst(0xC00AC920) == (4, 1, 0)  # a4 = 1: "HOLD FOR is TEMPO"
+    assert cst(0xC00CCCC8) == (6, 2000, 1)  # state 2 closes after 2 s
+    assert cst(0xC00CB2A8) == (4, os_inc(B)["STR_TEMPO"] & 0xFFFF, 0)  # mvkh 0xC00E: "TEMPO"
+    assert at("tempo-hold", 0xC00EB700)["data"] == "04001b0078002500"  # same box as the 50G
+
+
+def test_tuner_label_trampoline():
+    site, t = at("tempo-hold", 0xC00BAD40), os_inc(B)["TUNER_LABEL_TRAMP"]
+    assert callp_target(0xC00BAD40, word(site["expect"])) == os_inc(B)["SOFTKEY"]
+    assert callp_target(0xC00BAD40, word(site["data"])) == t
+    data = at("tempo-hold", t)["data"]
+    assert far_target(data) == os_inc(B)["STR_EXIT"]
+    assert callp_target(t, word(data, 2)) == os_inc(B)["SOFTKEY"]  # b .S2: same displacement field
+
+
+def test_scroll_sites():
+    sleep, right, left, bump_sleep = entries("scroll", "write")
+    (sec,) = entries("scroll", "section")
+    for s in (sleep, bump_sleep):
+        assert callp_target(s["addr"], word(s["expect"])) == os_inc(B)["STOCK_SLEEP"]
+        assert callp_target(s["addr"], word(s["data"])) == sec["addr"] == 0xC00F2100
+    for s in (right, left):
+        assert callp_target(s["addr"], word(s["expect"])) == os_inc(B)["STOCK_BUMP"]
+        assert callp_target(s["addr"], word(s["data"])) == sec["addr"] + 0x1C  # wrap
+
+
+def test_phase2_l2_and_ddr_layout():
+    """The 50G L2 addresses, no overlap with each other or with phase 1."""
+    spans = []
+    for n in ("version-1.1", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"):
+        for kind in ("write", "section"):
+            for e in entries(n, kind):
+                if n == "midi-cc" and e["addr"] == 0xC00AEE6C:
+                    continue  # the CC call site, rerouted by midi-settings on purpose
+                spans.append((e["addr"], e["addr"] + len(bytes.fromhex("".join(e["data"].split()))), n))
+    spans.sort()
+    for (_, end, a), (start, _, b) in zip(spans, spans[1:]):
+        assert end <= start, f"{a} and {b} overlap at 0x{start:08X}"
+    secs = {e["addr"] for n in ("midi-settings", "tempo-hold") for e in entries(n, "section")}
+    assert secs == {SB, H, H2, 0x1181E7C0}
