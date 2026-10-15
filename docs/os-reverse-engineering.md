@@ -521,6 +521,11 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
 
 ### Looper services (v2.0 step 2)
 
+**MS-70CDR 2.10 (T6):** addresses in `docs/ms70cdr-addresses.md`. The draw
+hook moved to `0xC00BB0EC` (`callp 0xC00D5720`, the call after the 50G's
+setter `0xC00B5794`, which the 70CDR OS lacks); region 2 is now
+`0xC0198000`-`0xC01FFFFF`. The 50G addresses below are kept for history.
+
 Source: `asm/looper/` (`looper.S` at DDR `0xC00F2200`, the services block
 `block.S` at `0xC00F3000`). Patch `patches/looper.yaml`, after midi-cc,
 midi-clock, tempo-hold and scroll. Block layout and rules:

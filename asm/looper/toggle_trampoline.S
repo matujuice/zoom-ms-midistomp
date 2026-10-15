@@ -1,5 +1,5 @@
-; Far jump from DDR to looper.S's toggle_pre (v2.0 step 2), MS-50G 3.10. Replaces the
-; target of the footswitch flip trampoline at 0xC00D3370 (tempo-hold.yaml); the call site and B3 are unchanged,
+; Far jump from DDR to looper.S's toggle_pre (v2.0 step 2), MS-70CDR 2.10. Replaces the
+; target of the footswitch flip trampoline at 0xC00D2F30 (tempo-hold.yaml); the call site and B3 are unchanged,
 ; and toggle_pre goes on to the old target. Clobbers B0 (caller-saved).
         .text
         .global toggle_pre_trampoline

@@ -19,8 +19,10 @@ Every MS-50G 3.10 OS value the MIDISTOMP release/v2.0 patches and asm depend on,
    in `asm/midi_settings/settings.S` and `asm/looper/looper.S`. Every other L2
    section keeps its address (all at or above `0x1181E040`, past the OS's
    `0x1181DF04`); the transport block stays at `0x1181FF00`.
-2. **Looper draw hook (LCD_MODE not found):** not needed for T3-T5; decided in
-   T6 (looper services port).
+2. **Looper draw hook (LCD_MODE not found):** decided in T6. The 70CDR draw
+   path is the 50G's without the setter call, so draw_pre now hooks the next
+   call, `callp 0xC00D5720 || ldw *+b14(708),a4` at `0xC00BB0EC`, keeps A4 and
+   B3 as before and jumps on to `0xC00D5720`. It still runs before the LCD send.
 3. **Medium caves** (CC trampoline `0xC00BB190`, rec_save `0xC00C6968`,
    tempo_draw `0xC00CB62C`): accepted. Any zero run after a return that nothing
    branches to works; the real build's `expect:` check and the flash test

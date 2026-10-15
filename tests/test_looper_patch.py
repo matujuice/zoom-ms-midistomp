@@ -31,7 +31,7 @@ def test_trampolines_go_to_the_hook_vectors():
     assert far_target(poll["expect"]) == 0x1181E800  # poll.S
     assert far_target(toggle["expect"]) == 0x1181FA98  # hold.S toggle_hook
     assert far_target(hold["expect"]) == 0x1181FF20  # hold2.S hold_hook
-    assert far_target(cc["expect"]) == 0x1181DEA0  # midi_cc handler.S
+    assert far_target(cc["expect"]) == 0xC00F2800  # midi_cc handler.S (DDR)
     for i, site in enumerate((poll, toggle, hold, cc)):
         assert far_target(site["data"]) == HOOKS["addr"] + 8 * i
 
@@ -44,8 +44,8 @@ def callp_target(addr, data):
 
 def test_draw_callsite_goes_to_draw_pre():
     draw = PATCH["write"][4]
-    assert draw["addr"] == 0xC00BA9CC
-    assert callp_target(draw["addr"], draw["expect"]) == 0xC00B5794
+    assert draw["addr"] == 0xC00BB0EC
+    assert callp_target(draw["addr"], draw["expect"]) == 0xC00D5720
     assert callp_target(draw["addr"], draw["data"]) == HOOKS["addr"] + 32
     old, new = (int.from_bytes(bytes.fromhex(draw[k]), "little") for k in ("expect", "data"))
     assert old & ~(0x1FFFFF << 7) == new & ~(0x1FFFFF << 7)  # still callp .S2 b3, parallel bit kept
@@ -58,7 +58,7 @@ def test_block_layout():
     assert word(0) == 0x5A4C5301 and word(4) == 3
     regions = [(word(8 + 8 * k), word(12 + 8 * k)) for k in range(3)]
     assert regions == [(0xC0636980, 0xC07D0000 - 0xC0636980),   # RAM test region 3
-                       (0xC01ADAD4, 0xC0200000 - 0xC01ADAD4),   # region 2
+                       (0xC0198000, 0xC0200000 - 0xC0198000),   # region 2
                        (0xC0102000, 0xC0198000 - 0xC0102000)]   # region 1 above 64 KB of code
     assert word(40) == 0xFFFFFFFF  # no slot claimed
     hooks_end = HOOKS["addr"] + len(bytes.fromhex("".join(HOOKS["data"].split())))
