@@ -1,0 +1,75 @@
+# Looper services (v2.0 step 2), for the Looper ZDL. MS-50G 3.10 OS.
+#   Big buffer: free RAM regions 3, 2 and 1 (3.3 MB with the looper's own slot
+#   block), handed over in the services block at 0xC00F3000 (magic 0x5A4C5301).
+#   With the looper under the cursor the footswitch counts a press instead of
+#   flipping it, and a hold does nothing; its on/off CC counts a press for
+#   values 64-127. The looper drives the LED while it is under the cursor.
+# Design and addresses: docs/os-reverse-engineering.md, "Looper services";
+# block layout: docs/looper-services.md.
+# Apply after midi-cc, midi-clock and tempo-hold (it retargets their trampolines).
+# The hex below is generated from asm/looper/*.S with
+#   zoomms asm <file> --addr <addr>   (add --section for a section)
+# and tests/test_looper_patch.py checks it still matches the source.
+name: looper
+description: Looper services (big buffer, footswitch/CC presses, LED) for the Looper ZDL
+builds: [ms50g-3.10]
+write:
+  # Transport poll trampoline (midi-clock.yaml) -> poll_pre
+  - model: ms50g-3.10
+    addr: 0xC00C8050
+    expect: "2a007400eac008006203000000800000"
+    data: "2a001100ea0760006203000000800000"
+    source: asm/looper/poll_trampoline.S
+  # Footswitch flip trampoline (tempo-hold.yaml) -> toggle_pre
+  - model: ms50g-3.10
+    addr: 0xC00D3370
+    expect: "2a4c7d00eac008006203000000800000"
+    data: "2a041100ea0760006203000000800000"
+    source: asm/looper/toggle_trampoline.S
+  # Footswitch hold trampoline (tempo-hold.yaml) -> hold_pre
+  - model: ms50g-3.10
+    addr: 0xC00D46B0
+    expect: "2a907f00eac008006203000000800000"
+    data: "2a081100ea0760006203000000800000"
+    source: asm/looper/hold_trampoline.S
+  # MIDI CC trampoline (midi-cc.yaml) -> cc_pre
+  - model: ms50g-3.10
+    addr: 0xC00AF408
+    expect: "2a506f00eac008006203000000800000"
+    data: "2a0c1100ea0760006203000000800000"
+    source: asm/looper/cc_trampoline.S
+section:
+  # Hooks, in DDR RAM test region 1 after scroll.S
+  - model: ms50g-3.10
+    addr: 0xC00F2200
+    source: asm/looper/looper.S
+    data: >-
+      12040000008000009230000000800000123b0000008000009240000000800000
+      52f8ff07f622bc012a00f402eac088026203140062818601f4423c0228001800
+      e8076000640281006422010164028301642283020060000074020301784a0c03
+      da1f180058a380325820942274228302d84a9403da1f1c0058a3802074028120
+      5aa3fc002802180468f8080458a3800490070090008000006402a00100600000
+      786a0401da1fa4a0506a00045820a404d8c8240110ffffaf0080000076428100
+      2838ef01e8c0880164028c0158a384020040000040890f0140090f0274a20101
+      74c2010274e281026e5200012832e001e804e00124028c0100600000a08c0c02
+      a06c8c02788014022858f7026807e002788014026402100200600000789a0403
+      5a0a0800d81f000178cf0803da08040058a30023644283037482010374420303
+      0020000098ef9803da1f1c009005003000800000283cf8016807e00164020c02
+      00600000d82d100274020c02e4423c02e622bc01006000005208800762030c00
+      0080000028001800e80760006442810000600000782a1001100600a000800000
+      2a4c7d00eac008006203000000800000e20304035acf9b03a2039c0064628101
+      0060000058208c0174628101a203980062030c000080000028001800e8076000
+      648281000060000058a3008262030c80008000002a907f00eac0080062030000
+      0080000028001800e80760006442810000600000a06c0401a02c840178400c01
+      58c00901784a1801da18040058a30021100500a0008000002a506f00eac00800
+      6203000000800000a2c9180062030c3000800000e20304035acf9b03a2039c00
+      646281010060000058208c0174628101a203980062030c000080000000000000
+  # The services block, after the hooks (inside the 64 KB kept for MOD code)
+  - model: ms50g-3.10
+    addr: 0xC00F3000
+    source: asm/looper/block.S
+    data: >-
+      01534c5a03000000806963c080961900d4da1ac02c250500002010c000600900
+      0000000000000000ffffffff0000000000000000000000000000000000000000
+      0000000020202020202020200000000000000000000000000000000000000000
+      00000000000000000000000000000000000000000000000000000000ff534c5a
