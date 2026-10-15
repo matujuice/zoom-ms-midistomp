@@ -307,3 +307,54 @@ except one instruction at `0x11818274`: `set b0,23,23` (50G) vs `set b0,20,20` (
 - Boot order at 0xC00D47F0: audio init 0xC00E0C00, EDMA init 0xC00C5A8C, McASP init 0xC00C31A4. EDMA events are enabled inside McASP init, so retargeting the callp at 0xC00D47F8 gives one clean place for a boot init routine.
 - 70CDR RX EDMA: source 0x01D02000, ACNT 8, DSTBIDX 8, BCNT 16, PaRAM 0/66/67, via the builder 0xC00C5900.
 - Input filter coefficients: 70CDR in_combine uses 9 coefficients, 50G uses 12 (same 9 + 3 more). Calling the 50G in_combine twice is NOT equivalent to the 70CDR; port the 70CDR stage.
+
+## Stereo input patch (test build)
+
+`patches/cdr-stereo.yaml` (2026-10-15), sources `asm/cdr_stereo/`, test `tests/test_cdr_stereo_patch.py`.
+MS-70CDR only, always on, no mono fallback (R = R jack). Apply after looper. Not flashed yet:
+no listening test, no CPU measurement on the pedal.
+
+| site | change | label |
+|---|---|---|
+| `0x11818274` PINMUX10 | compact `set b0,23,23` -> `set b0,20,20` (the 70CDR halfword): pad AXR0_4 -> McASP AXR4 | C (code), I (TRM mux behaviour) |
+| `0xC00CE292` GPIO init | compact `mvk .S2 32,b0` -> `48,b0`: bank 3 DIR `0x1030`, GPIO 52 input (the 70CDR code) | C |
+| `0xC00C3210` McASP init | RFMT `0x000180F8` -> `0x000180F0` (RBUSEL 0, DMA port) | C |
+| `0xC00C323C` McASP init | `stw b1,*+a4(124)` (RINTCTL = 0) -> `set a0,3,3,a0`, so XFMT stays `0x000180F8`; RINTCTL = 0 moves to the boot routine | C; RINTCTL dropped from the init is safe because the init has one caller (`0xC00D47F8`) [C] |
+| `0xC00C32A0` / `0xC00C32AC` | PFUNC `0x0200FF8F`, PDIR `0x1600FFCF` | C |
+| `0xC00C5BB8` | `0xC00C5BA0` (called inside the McASP init) resets PaRAM 0 DST/BCNT; DST `0x11F034F8` -> new buffer A | C (it writes `*(B14+600)+12`, the PaRAM 0 DST: same function in the 70CDR at `0xC00C9148`) |
+| `0xC00D47F8` boot | `callp 0xC00C31A4` -> `callp 0xC00F2800` (boot routine, which calls the McASP init) | C |
+| `0x1181BD6C` call list | the 3 callps rx_deint/in_combine/to_float -> `mvkl/mvkh/bnop` far jump to `0xC00F2900`; it jumps back to `0x1181BD78` | C |
+| section `0xC00F2800` | `stereo.S`: boot (+0), stereo_in (+0x100), 960 B, ends before the looper services block | - |
+
+**Boot routine** (after the EDMA init, before the McASP init enables events 0/1 via EESR):
+SRCTL4 = `0x0E`, RINTCTL = 0; RX PaRAM 0, 66, 67: SRC `0x01D02000`, A_B_CNT `0x00100008`,
+BIDX `0x00080000`, DST A, A, B (OPT/LINK/CCNT as the OS set them); zeroes `0x11F03B80`-`0x11F03CA0`.
+
+**Free L1D used:** RX buffer A `0x11F03B80`, B `0x11F03C00` (0x80 each), state `0x11F03C80`
+(L: peak, env, y', z'; R the same at +16). Coefficients are immediates. The old RX buffers
+`0x11F034F8`/`0x11F03538`, arrays `0x11F035F8`/`0x11F03618` (still the output path's) and the 50G
+in_combine state `0x11F03A04`-`0x11F03A4C` are no longer touched by the input side.
+
+**stereo_in**: the 70CDR rx_deint + in_combine + to_float fused, L on the A side and R on the B
+side in one loop (448 cycles per 8-frame block in the simulator, about 0.55 % of 456 MHz at
+44.1 kHz; DDR fetch stalls not counted). Buffer select as before: process B while PaRAM 0 DST < B.
+Frame = AXR4 s0, AXR5 s0, AXR4 s1, AXR5 s1 (DMA port order) **[C from the 70CDR rx_deint]**;
+L = AXR5 pair, R = AXR4 pair. Per side (coefficients c0..c8 from `0xC00EC528`, the values the
+70CDR init `0xC00DE820` copies to `0x11F03AA4`):
+- `env = c4*env + c3*|x1|`, `peak = max(c0*peak, env)`, `g = sat(256*c2*max(0, peak - c1))`
+- `y = g*x1 + (1-g)*c8*x0` (dual-range crossfade), `z = 4*(c5*y + c6*y' + c7*z')` (DC blocker)
+- out `float(z) * 2^-31` to `0x11F03638` (L) / `0x11F03658` (R); `0x11F03758` = the side with the
+  larger peak, as the 70CDR's third array (read by `0xC00C8A38`, probably the tuner) **[I: its use]**.
+- The formulas are read from the software-pipelined 70CDR code by cycle-by-cycle tracing
+  **[I, careful but by hand]**. The 70CDR also writes the peaks to `0x11F03858`, read only by its
+  own DDR code (`0xC00DB2CC`); the port drops that.
+
+**Tests:** byte-for-byte vs the sources, hand-encoded callp/compact checks, and a cycle-level
+simulator of stereo_in (delay slots, result-collision check) against a Python model of the
+formulas above, 24 blocks with quiet, loud, L-only and R-only input.
+
+**Risks / unconfirmed:** DMA-port order and aliasing for ACNT 8 (copied from the 70CDR values,
+not the TRM); the code runs from DDR, not L2 (L1P misses on each block possible); the boot
+order assumption that EDMA events are first enabled inside the McASP init (`0xC00C33F0`, EESR |= 3).
+On the pedal: L and R should both pass dry with a bypassed patch; a silent or noisy R points at
+the pin mux/McASP side, a wrong-sounding L at the stage port.
