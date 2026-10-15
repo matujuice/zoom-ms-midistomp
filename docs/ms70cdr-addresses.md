@@ -8,6 +8,26 @@ Every MS-50G 3.10 OS value the MIDISTOMP release/v2.0 patches and asm depend on,
 
 **Global shifts:** DDR code moves from -0x5A0 to +0x720 (no single delta; use the tables); the B14 base is 0xC00EF748 (50G 0xC00EFCC0) and the B14 offsets change by -8 to -20 (table per patch, all taken from aligned loads/stores); strings in 0xC00E9xxx move -0x4A0 (-0x49B after "EXIT"); the whole L2 BSS moves +0x80; the L1D slot-state block and the L2 frame buffer (0x11816800) do not move.
 
+
+## Decisions (T2r review, 2026-10-15)
+
+1. **L2 clash:** confirmed. The 70CDR OS builds `0x1181DE8C` (3 times),
+   `0x1181DEF0` (8) and `0x1181DF00` (6), none of which the MS-50G OS uses.
+   The midi-cc handler moves to DDR at **`0xC00F2800`** (416 B, the free gap
+   between the looper code ending `0xC00F2800` and the looper services block at
+   `0xC00F3000`). Update `asm/midi_cc/trampoline.S` and the `CC_HANDLER` `.equ`
+   in `asm/midi_settings/settings.S` and `asm/looper/looper.S`. Every other L2
+   section keeps its address (all at or above `0x1181E040`, past the OS's
+   `0x1181DF04`); the transport block stays at `0x1181FF00`.
+2. **Looper draw hook (LCD_MODE not found):** not needed for T3-T5; decided in
+   T6 (looper services port).
+3. **Medium caves** (CC trampoline `0xC00BB190`, rec_save `0xC00C6968`,
+   tempo_draw `0xC00CB62C`): accepted. Any zero run after a return that nothing
+   branches to works; the real build's `expect:` check and the flash test
+   confirm them.
+4. **Free-area rows:** accepted for T3/T4 on the static scan, as the MS-50G
+   layout was before its RAM test; T5 re-measures.
+
 ## Needs review (for T2r)
 
 ### Blockers (verified, not address uncertainty)
