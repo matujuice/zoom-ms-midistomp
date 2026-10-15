@@ -2,24 +2,21 @@
 ;
 ; Reached from the transport poll trampoline instead of looper.S's poll_pre
 ; (cdr-probe.yaml), same contract; always goes on to poll_pre with B3 intact.
-; p1 found AXR4 still on the MS-70CDR too: its second ADC looks held off.
-; The MS-50G OS drives GPIO 52 and 90 low, which the 70CDR OS leaves as inputs,
-; so p2 first lets them go (inputs drive nothing), then samples AXR4:
+; p1/p2 read McASP PDIN bit 4 and saw nothing on the MS-70CDR: the MS-50G OS
+; muxes pad AXR0_4 to GPIO 52 (PINMUX10[23:20] = 8; the 70CDR OS sets 1 =
+; McASP AXR4) and drives it low. p3 reads the pad through GPIO 52 instead:
 ;   poll 64 (about 1 s after boot): GPIO 52 and 90 -> inputs
-;   poll 80 (256 ms later): AXR4 -> input, PDIN bit 4 read SAMPLES times, old
-;            PDIR back; GPIO 52/90 levels read; with no AXR4 activity GPIO 52
-;            and 90 go back to outputs (as the MS-50G OS set them)
+;   poll 80 (256 ms later): GPIO 52 read SAMPLES times; GPIO 52/90 levels
+;            read; with no activity GPIO 52 and 90 go back to outputs (as the
+;            MS-50G OS set them)
 ; Results, in the menu strings:
-;   VERSION menu entry   "T" + AXR4 transitions (5 digits)
+;   VERSION menu entry   "T" + GPIO 52 transitions (5 digits)
 ;   version screen title  GPIO 52 level, GPIO 90 level, then samples high (5 digits)
 ; docs/ms70cdr-port.md.
 ;
 ; In DDR at 0xC00F2800, after looper.S. Uses A0-A9, A16-A25, B0-B2.
 
         .equ    POLL_PRE, 0xC00F2200        ; looper.S vector +0
-        .equ    MCASP_PTR, 0x1181DE0C       ; McASP0 base pointer (McASP init 0xC00C31D8)
-        .equ    PDIR, 0x14
-        .equ    PDIN, 0x1C
         .equ    STR_MENU, 0xC00E94AD        ; "VERSION" in the menu list (8 bytes)
         .equ    STR_TITLE, 0xC00EBADC       ; "VERSION" version screen title (8 bytes)
         .equ    GPIO_PTR, 0x1181DE70        ; GPIO base pointer (GPIO init 0xC00CE234)
@@ -88,25 +85,17 @@ run:
   [!a2] b       .S2     b0                  ; not now: straight on to poll_pre
         nop     5
 
-        mvkl    .S1     MCASP_PTR, a3
-        mvkh    .S1     MCASP_PTR, a3
-        ldw     .D1T1   *a3, a3
-        nop     4
-        ldw     .D1T1   *+a3(PDIR), a4
-        nop     4
-        clr     .S1     a4, 4, 4, a5
-        stw     .D1T1   a5, *+a3(PDIR)      ; AXR4 -> input
         mvkl    .S2     SAMPLES, b1
         mvkh    .S2     SAMPLES, b1
-        ldw     .D1T1   *+a3(PDIN), a24     ; first read sets prev
+        ldw     .D1T1   *+a7(IN23), a24     ; first read sets prev
         mvk     .S1     0, a22              ; transitions
         mvk     .S1     0, a23              ; samples high
         nop     2
-        extu    .S1     a24, 27, 31, a24
+        extu    .S1     a24, 11, 31, a24
 loop:
-        ldw     .D1T1   *+a3(PDIN), a25
+        ldw     .D1T1   *+a7(IN23), a25
         nop     4
-        extu    .S1     a25, 27, 31, a25
+        extu    .S1     a25, 11, 31, a25    ; GPIO 52 = pad AXR0_4
         xor     .L1     a25, a24, a20
         add     .L1     a20, a22, a22
         add     .S1     a25, a23, a23
@@ -114,7 +103,6 @@ loop:
         sub     .L2     b1, 1, b1
   [b1]  b       .S2     loop
         nop     5
-        stw     .D1T1   a4, *+a3(PDIR)      ; old PDIR back
 
         ldw     .D1T1   *+a7(IN23), a8
         ldw     .D1T1   *+a7(IN45), a9

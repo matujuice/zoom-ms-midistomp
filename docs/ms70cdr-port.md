@@ -230,3 +230,70 @@ Effect Manager change it) and the flash JEDEC id (production variation, the same
   - Owner's MS-60B first: expect 0 transitions.
   - Then a 70CDR owner, with no cable, then L only, then L+R: expect many in every case.
   - No other pin and no audio path changes in that build.
+
+## Why AXR4 is silent
+
+Static analysis, 2026-10-15, after probes p1/p2 (`asm/cdr_probe/probe.S`) read zero AXR4 activity on a
+70CDR running the MS-50G OS. Addresses are MS-50G 3.10 unless marked 70CDR.
+
+**The chip is DA830-family (C6745/C6747), not OMAP-L138, for pin muxing [C].** The GPIO helpers
+reject n >= 128 (`0x1181A068`, 8 banks); PINMUX0 = `0x11112101` selects the EMIFB/mDDR pins and PINMUX9
+the McASP0 clocks only under the DA830 table (Linux `mach-davinci/da830.c`). Earlier sections used
+OMAP-L138 pin names: ignore those.
+
+**PINMUX is set by the OS, not the AIS [C].** The AIS of BIN/136 and BIN/129 only writes CFGCHIP3.
+The SYSCFG pointer `0x1181D854` (70CDR `0x1181D8D4`, cinit) unlocks KICK0/1 at `0x11817310`. The L2 code
+`0x11817400`-`0x11818F50` then writes PINMUX0-19 field by field. That code is identical in both OSes
+except one instruction at `0x11818274`: `set b0,23,23` (50G) vs `set b0,20,20` (70CDR).
+
+| PINMUX10[23:20] | value | pad AXR0_4 is routed to |
+|---|---|---|
+| MS-50G/60B OS | 8 | **GPIO3_4 = GPIO 52** |
+| MS-70CDR OS | 1 | **McASP0 AXR4** |
+
+**Cause 1 (confirmed from code, the board side is inferred): the MS-50G OS takes the AXR4 pad away from the McASP.**
+- On DA830 parts the pad belongs to one module only. With PINMUX = GPIO, McASP PDIN bit 4 never sees
+  the pad, whatever PFUNC/PDIR/SRCTL4 say. That explains p1/p2 exactly: 20000 samples, 0 highs,
+  0 transitions **[I: TRM mux behaviour, not checked against the TRM text]**.
+- GPIO 52 *is* that pad. The 50G GPIO init (`0xC00CE234`: DIR3 = `0x1020`, OUT3 = 0) drives it
+  low, against the second ADC's data output, for as long as the pedal is on **[I: possible stress on
+  the ADC output]**. The 70CDR OS leaves GPIO 52 as an input (DIR3 = `0x1030`), which is a second guard.
+- p2 read GPIO 52 IN only once. A single 0 says nothing about activity.
+- The probe mapping is right: IN = base+0x20+0x28*(n>>5), bit n&31 (`0x1181A068`, base pointer
+  `0x1181DE70` = `0x01E26000` from cinit). GPIO 52 = IN23 bit 20, GPIO 90 = IN45 bit 26.
+
+**Other differences, ranked lower:**
+2. **GPIO 39 = GP2[7], pad NEMA_OE (PINMUX18[23:20] = 8, a GPIO on both) [C].** In the 70CDR the flash
+   read/write/erase (`0xC00B8E64`, `0xC00B8D0C`, `0xC00B9424`) do this for addr >= 0x400000: SPI0 SCS0 is
+   switched to GPIO 84 held high (PINMUX7[31:28] = 8, `0x1181A4D8`), then GPIO 39 goes low. So
+   GPIO 39 is the **chip select of a second SPI flash** (bank at 4 MB) **[I, strong]**, not ADC power.
+   The MS-50G OS holds it low, which keeps that chip selected all the time. Every MS-50G flash command
+   then also reaches chip 1. Writes cannot run there (WEL needs a full CS cycle), but chip 1 could
+   drive SOMI during reads. The pedal works, so chip 1 is probably not fitted or stays quiet **[I]**.
+   It is unlikely to matter for audio.
+3. **GPIO 90 = GP5[10], pad AXR1_10, a GPIO [C].** 70CDR poll `0xC00C6AB4`: GPIO 90 = 0 for 15 polls
+   means GPIO 63 = 1 and stereo; 1 means GPIO 63 = 0 and mono. p2 read 0 with every cable, and with
+   the 70CDR logic that would mean "stereo" all the time. The detect line may need a pull-up that
+   is not powered **[I]**.
+4. **GPIO 63 = GP3[15], pad ACLKX1 (PINMUX11[27:24] = 8) [C].** It is driven only at run time by the
+   jack poll. It is probably the L-to-R analog switch, not the ADC enable **[I]**.
+- The same in both [C]: AIS, bootloader, PSC enables (`0x1181736C`), EMIF/PLL and all other PINMUX fields.
+  The McASP clocks are the same too: PDIR bits 29-31 = 0, so ACLKR/AHCLKR/AFSR are inputs (the
+  McASP is a receive slave) and the second ADC uses the same clocks as AXR5. PFUNC/PDIR bit 24 is
+  reserved on McASP **[I]**, so `0x0300FF9F` vs `0x0200FF8F` only changes AXR4 there.
+
+**Next experiment (debug build, MS-70CDR only):**
+- p3: after GPIO 52 -> input (as in p2), sample **GPIO IN23 bit 20** 20000 times and count the
+  transitions and highs. It needs no PINMUX change and drives nothing.
+- Expected: many transitions, which confirms cause 1. Then p3b: write the KICK keys
+  (`0x83E70B13`, `0x95A4F1E0` to `0x01C14038`/`3C`), set PINMUX10[23:20] = 1 and sample McASP PDIN
+  bit 4 (PDIR bit 4 = 0). This should match. After that the option-A patch can go ahead with
+  PINMUX10 = `0x11188880` and GPIO 52 as an input.
+- Zero again: the ADC is held off or damaged. Then try GPIO 39 high (use SET_DATA23 bit 7, `+0x40`,
+  which is atomic), then GPIO 63 high, re-sampling after each.
+  - Risk: GPIO 39 high only deselects the suspected chip 1, the 70CDR default state.
+  - Do it outside a flash access: hold the poll task off while `0xC00B8E64` runs, or just accept a
+    possible bad read in a debug build.
+  - Never on a 50G/60B: there the pad's role is unknown.
+- Fix in any case: the stereo patch must set PINMUX10[23:20] = 1 and GPIO 52 as input before
+  McASP SRCTL4 is enabled. Otherwise the GPIO keeps driving the ADC data line.
