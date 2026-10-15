@@ -518,7 +518,7 @@ midi-clock, tempo-hold and scroll. Block layout and rules:
   `0x11F03000 + 212 x slot`; the per-slot loop at `0xC00C4064` hands it to each
   effect's record +8 handler. Word 1 is the params pointer the effect sees as
   `ctx[1]`.
-- **Slot under the cursor:** the footswitch press (`0xC00ACBE8`-`0xC00AC2C`)
+- **Slot under the cursor:** the footswitch press (`0xC00ACBE8`-`0xC00ACC2C`)
   reads the cursor byte (`0xC00C09D4(view)` = signed byte at
   `0xC009C064 + 4 x view`), then the slot word at `0xC00EEEB0 + 24 x cursor +
   4 x view`; bit `slot` of `0xC009C060` set skips the flip. The play-mode draw
