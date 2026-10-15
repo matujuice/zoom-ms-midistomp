@@ -358,3 +358,71 @@ not the TRM); the code runs from DDR, not L2 (L1P misses on each block possible)
 order assumption that EDMA events are first enabled inside the McASP init (`0xC00C33F0`, EESR |= 3).
 On the pedal: L and R should both pass dry with a bypassed patch; a silent or noisy R points at
 the pin mux/McASP side, a wrong-sounding L at the stage port.
+
+## Port to the MS-70CDR OS
+
+Owner decision 2026-10-15: run MIDISTOMP on the MS-70CDR's own OS (2.10), build id
+`ms70cdr-2.10`. Phase 1 (this section): `version-1.1`, `boot-logo`, `midi-cc`, `midi-clock`.
+Static work only: built, not flashed, no pedal test.
+
+**How.** Each patch keeps one YAML with `ms50g-3.10` and `ms70cdr-2.10` entries. The sources
+`.include "os.inc"`; `zoomms asm --build-id <id>` (and `asm.assemble(build=...)`) adds
+`-I asm/os/<id>`, so one source assembles for both builds. The tests assemble every entry for
+its own `model`. The MS-50G output is byte-identical (v1.1 + looper build sha256 `f83cc02d...`).
+
+Build: `zoomms build "ZOOM MS-70CDR v2.10 Updater.exe" --build-id ms70cdr-2.10 --patch ...`.
+Flash steps: bootloader skipped; BIN/133, **BIN/137 (the stock 70CDR file system)** and the OS
+are erased and written, as the stock 70CDR updater does. So flashing resets the pedal's effect
+list to Zoom's 137 stock ZDLs (the MS-50G updater does not write BIN/137).
+
+**Memory [C].** Same memory map as the 50G (the `.cinit` table has the same targets; only the
+image-local ones move). L2 SRAM ends `0x1181FFFF` (L2CFG 3, read from `0xC00ECC78`). The OS
+uses L2 up to **`0x1181DF04`** (`.cinit` L2 data `0x1181DD60` + 420 B; highest `mvkl/mvkh`
+`0x1181DF00`), 0x80 more than the 50G (`0x1181DE84`). So the 50G CC handler address
+`0x1181DEA0` is used by this OS: the handler goes to DDR `0xC00F2800`. Everything else the
+50G patches put in L2 starts at or above `0x1181E040` and keeps its address, the transport
+block at `0x1181FF00` included. DDR: no code or data word references `0xC00F1364`
+(image end) to `0xC0200000` except the per-slot buffers the 50G has too; the 50G overlay
+table (`0xC0198000`...) has no counterpart. **[I]** The 70CDR has had no RAM canary test.
+
+**Address map (50G -> 70CDR).** Functions: the first 40 instructions match after masking
+addresses, and the call sites vote for the same target. B14 offsets: the matched code uses
+the same register for the same job.
+
+| what | MS-50G 3.10 | MS-70CDR 2.10 |
+|---|---|---|
+| `midi_channel_msg` | `0xC00AE0F8` | `0xC00ADF20` |
+| fx param descriptor / `fx_set_param` | `0xC00B07AC` / `0xC00BAEE0` | `0xC00B056C` / `0xC00BB600` |
+| Semaphore_pend / post | `0xC00C7C60` / `0xC00D70C0` | `0xC00C7EE0` / `0xC00D6B00` |
+| UI refresh / Event_post | `0xC00ACEA4` / `0xC00CC680` | `0xC00ACD84` / `0xC00CBF40` |
+| unsigned divide / Clock_getTicks / set_setting | `0xC00DCA20` / `0xC00DF360` / `0xC00CAC64` | `0xC00DC560` / `0xC00DEE20` / `0xC00CAB44` |
+| TEMPO int / TEMPO setting object | `0xC009C06C` / `0xC00EE3D8` | `0xC009C06C` / `0xC00EDEE0` (`.cinit`: ptr, 40, 250, callback `0xC00BA124`) |
+| B14: effect semaphore, UI event, current patch | 784, 676, 332 | 764, 656, 324 |
+| B14: MIDI ring read index, byte just taken | 224, 234 | 216, 226 |
+| Task_MIDI CC call site (`callp midi_channel_msg`) | `0xC00AF088` | `0xC00AEE6C` |
+| Task_MIDI byte loop end (`ldw *+b14(rd),b0`) | `0xC00AF0F8` | `0xC00AEEE0` |
+| Task_SwitchNrmlSpdRead, `callp Clock_getTicks` | `0xC00CA620`, `0xC00CA630` | `0xC00C6980`, `0xC00C6998` (this task also runs the R-jack poll) |
+| boot screen `mvk "v%s"` | `0xC00CD960` (`0xC00E4DB4`) | `0xC00CD7C0` (`0xC00E4914`) |
+| cave: CC trampoline | `0xC00AF408` | `0xC00E1F70` (the 50G cave has only 8 B here) |
+| cave: clock / poll trampoline | `0xC00A1A50` / `0xC00C8050` | `0xC00A1A50` / `0xC00C82D0` |
+| CC handler / step / version string | `0x1181DEA0` / `0xC00F2020` / `0xC00F2000` | **`0xC00F2800`** / `0xC00F2020` / `0xC00F2000` |
+| clock, its vars, poll, transport block | `0x1181E040`, `0x1181E700`, `0x1181E800`, `0x1181FF00` | the same |
+| BIN/133 | logo bytes 0-1023 | the same logo over the stock 70CDR one; byte `0x2C00` stays `0x61` |
+
+**Checked by hand [C].** The Task_MIDI loop is the same: A10 (ring base) is the only live
+register at the clock hook. The ldw there starts a non-protected packet and is followed by a
+`nop 4`; the callp keeps the ldw's p-bit (0) and word 0 of that packet is not compact. The
+CC callp keeps its p-bit (1, parallel with the argument moves). Each cave is 16 zero bytes in
+words 4-7 of a plain packet after `bnop b3,5`, with no branch target or data word pointing at
+it. In the built image, every `mvkl/mvkh` constant in the new code is a 70CDR address.
+
+**Left for phase 2 and 3.**
+- **Phase 1 alone must not be flashed.** `midi-clock` reads the MIDI flags at `0x1181EA00` and
+  calls the TEMPO LOCK vector `0x1181EAA8`, both from `midi-settings` (the same holds on the 50G).
+- Phase 2: `midi-settings` (7 caves plus the SysEx handler-table words `0xC00EF2xx`; the
+  `settings.S` `CUR_PATCH`, `CC_HANDLER`, `STOCK_CHANNEL_MSG` move to `os.inc`), `tempo-hold`
+  (11 caves), `scroll`. The 70CDR has 34 caves of the same kind; the trampolines use 3 of them.
+  Their 50G L2 addresses (`0x1181E7C0`, `0x1181EA00`-`0x1181FF00`, `0x1181FF20`) are all above
+  `0x1181DF04` and can stay. Free L2 left: `0x1181DF04`-`0x1181E040` (316 B).
+- Phase 3: `looper` retargets the CC trampoline (`0xC00E1F70` here) and has its own
+  `CC_HANDLER` in `looper.S`.
