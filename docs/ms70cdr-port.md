@@ -297,3 +297,13 @@ except one instruction at `0x11818274`: `set b0,23,23` (50G) vs `set b0,20,20` (
   - Never on a 50G/60B: there the pad's role is unknown.
 - Fix in any case: the stereo patch must set PINMUX10[23:20] = 1 and GPIO 52 as input before
   McASP SRCTL4 is enabled. Otherwise the GPIO keeps driving the ADC data line.
+
+## Stereo input patch: groundwork (static, 2026-10-15)
+
+- Caches: L2 128 KB cache, L1D 16 KB cache (L1D SRAM ends 0x11F04000), L1P 32 KB cache. DDR 0xC0xxxxxx cacheable; shared RAM 0x80000000 not.
+- Free L1D: 50G OS inits L1D up to 0x11F03B18 (70CDR 0x11F03B7C). Nothing references 0x11F03B18-0x11F04000 or 0x11F02370-0x11F03000 (no mvk/mvkh, data, cinit, nor literal in stock/pack ZDLs). Room for 2 x 0x80 RX buffers, deinterleave arrays, combine state.
+- Free L2: only 0x1181DE84-DEA0 (28 B), 0x1181E6E0-E700 (32 B), 0x1181E9C0-EA00 (64 B). New input-stage code goes in DDR 0xC00F2800-0xC00F3000.
+- McASP init diffs only: RFMT 0x180F0 (XFMT stays 0x180F8; the OS reuses the RFMT register value for XFMT, keep XFMT), PFUNC 0x0200FF8F, PDIR 0x1600FFCF, SRCTL4 = 0x0E. RMASK/RTDM/start sequence same.
+- Boot order at 0xC00D47F0: audio init 0xC00E0C00, EDMA init 0xC00C5A8C, McASP init 0xC00C31A4. EDMA events are enabled inside McASP init, so retargeting the callp at 0xC00D47F8 gives one clean place for a boot init routine.
+- 70CDR RX EDMA: source 0x01D02000, ACNT 8, DSTBIDX 8, BCNT 16, PaRAM 0/66/67, via the builder 0xC00C5900.
+- Input filter coefficients: 70CDR in_combine uses 9 coefficients, 50G uses 12 (same 9 + 3 more). Calling the 50G in_combine twice is NOT equivalent to the 70CDR; port the 70CDR stage.
