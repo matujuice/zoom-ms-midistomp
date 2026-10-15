@@ -23,9 +23,10 @@ def test_section_matches_assembly_source():
 
 
 def test_call_sites_retargeted():
-    sleep, right, left = PATCH["write"]
-    assert callp_target(sleep["addr"], sleep["expect"]) == 0xC00CF000  # stock sleep
-    assert callp_target(sleep["addr"], sleep["data"]) == SECTION["addr"]  # frame_sleep, first in scroll.S
+    sleep, right, left, bump_sleep = PATCH["write"]
+    for site in (sleep, bump_sleep):
+        assert callp_target(site["addr"], site["expect"]) == 0xC00CF000  # stock sleep
+        assert callp_target(site["addr"], site["data"]) == SECTION["addr"]  # frame_sleep, first in scroll.S
     for site in (right, left):
         assert callp_target(site["addr"], site["expect"]) == 0xC00C4DCC  # stock end bump
         assert callp_target(site["addr"], site["data"]) == SECTION["addr"] + 0x1C  # wrap
