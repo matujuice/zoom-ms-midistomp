@@ -509,7 +509,7 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
 Source: `asm/looper/` (`looper.S` at DDR `0xC00F2200`, the services block
 `block.S` at `0xC00F3000`). Patch `patches/looper.yaml`, after midi-cc,
 midi-clock, tempo-hold and scroll. Block layout and rules:
-`docs/looper-services.md`.
+`docs/looper-services.md`. MS-70CDR 2.10 addresses: `docs/ms70cdr-port.md`, phase 3.
 
 - **Hooks:** the four DDR trampolines of the transport poll (`0xC00C8050`),
   the footswitch flip (`0xC00D3370`), the footswitch hold (`0xC00D46B0`) and the

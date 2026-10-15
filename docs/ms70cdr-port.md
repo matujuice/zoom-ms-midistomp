@@ -368,7 +368,8 @@ Static work only: built, not flashed, no pedal test.
 **How.** Each patch keeps one YAML with `ms50g-3.10` and `ms70cdr-2.10` entries. The sources
 `.include "os.inc"`; `zoomms asm --build-id <id>` (and `asm.assemble(build=...)`) adds
 `-I asm/os/<id>`, so one source assembles for both builds. The tests assemble every entry for
-its own `model`. The MS-50G output is byte-identical (v1.1 + looper build sha256 `f83cc02d...`).
+its own `model`. The MS-50G output is byte-identical (v1.1 + looper build sha256 `f83cc02d...`) up to phase 2;
+phase 3 changes it once, for the CC path fix below (`7c4b4873...`).
 
 Build: `zoomms build "ZOOM MS-70CDR v2.10 Updater.exe" --build-id ms70cdr-2.10 --patch ...`.
 Flash steps: bootloader skipped; BIN/133, **BIN/137 (the stock 70CDR file system)** and the OS
@@ -473,10 +474,45 @@ screens were compared as code, not looked at.
 **Phase 1 alone must not be flashed** (`midi-clock` uses the MIDI word `0x1181EA00` and the
 TEMPO LOCK vector `0x1181EAA8` from `midi-settings`); phase 1 + 2 together can.
 
-**Left for phase 3 (`looper`).** Its trampolines move: CC (70CDR `0xC00E1F70`), poll
-(`0xC00C82D0`), footswitch flip (`0xC00D86F0`), hold (`0xC00DB590`); the draw hook
-`0xC00BA9CC` needs its 70CDR site; `looper.S` (`0xC00F2200`, 1536 B) ends exactly at the 70CDR
-CC handler (`0xC00F2800`); its own `CC_HANDLER`, `MODE`, `PENDING`, `CURSOR`, `OVL_GET` move
-to `os.inc`. On both builds `midi-settings` routes the CC call site to `midi_gate`, which jumps
-to `CC_HANDLER` directly, so the midi-cc trampoline that `looper` retargets for `cc_pre` is no
-longer on the CC path (MS-50G too: check before relying on the looper's CC press).
+**Phase 3 (2026-10-15): `looper`.** Static work as before: built (`cdr70-p3.exe`, the eight
+patches, sha256 `d155e47f...`), not flashed. `looper.S` and `services.inc` take their OS
+addresses from `os.inc`; `looper.S` keeps `0xC00F2200` (1536 B, ends exactly at the 70CDR CC
+handler `0xC00F2800`), the services block keeps `0xC00F3000` with the same 128 bytes (the Looper
+ZDL depends on them). The four trampolines keep their bytes (targets `0xC00F22xx`) at the
+70CDR caves.
+
+| what | MS-50G 3.10 | MS-70CDR 2.10 |
+|---|---|---|
+| trampolines retargeted: poll, flip, hold, CC | `0xC00C8050`, `0xC00D3370`, `0xC00D46B0`, `0xC00AF408` | `0xC00C82D0`, `0xC00D86F0`, `0xC00DB590`, `0xC00E1F70` |
+| draw hook: last call before the LCD send (`0xC00B5A80` / `0xC00B57C8`) | `0xC00BA9CC` `callp 0xC00B5794 \|\| mv a13,a4` | `0xC00BB0EC` `callp 0xC00D5720 \|\| ldw *+b14(708),a4` (`DRAW_NEXT`) |
+| slot state block (`0xC00C8BEC` / `0xC00C8E6C`) | `0x11F03000` + 212 x slot | the same (6 slots) |
+| cursor byte (`0xC00C09D4` / `0xC00C0834`), slot under it | `0xC009C064`, `0xC00EEEB0` + 24 x cursor | `0xC009C064`, **`0xC00EE748`** (footswitch press `0xC00ACAC8`, play draw `0xC00BA9D8`) |
+| LED task (`0xC00C7520` / `0xC00C7360`): wanted, written bit | `0xC00EF070`, `0xC00EF078` | `0xC00EEB08`, **`0xC00EEB10`** |
+| LED write (`0xC00CE054` / `0xC00CD3B4`) -> GPIO writer `0x11819FC4`, bank pointer | `0x1181DE70` | **`0x1181DEF0`** (L2 OS data, `.cinit`) |
+| frame buffer, dirty rows byte | `0x11816800`, `0xC00EF118` | `0x11816800`, **`0xC00EEB30`** (all 37 users) |
+| bold font (7 B a character), knob-page word | `0xC00E8C78`, `0xC009D398` | **`0xC00E87D8`** (same 896 bytes, same 3 users), `0xC009D398` |
+| B14: mode, pending, UI event; overlay get; Event_post | 328, 348, 676; `0xC00CBA10`; `0xC00CC680` | 320, 340, 656; `0xC00CCD6C`; `0xC00CBF40` (phase 1-2) |
+
+**Checked by hand [C].** The 70CDR draw has no call to the 50G `0xC00B5794` counterpart
+(`0xC00B54F4`, called elsewhere): after the effect semaphore post it goes straight to
+`0xC00D5720` (identical to the 50G `0xC00D5B60`, which the 50G calls right after `0xC00B5794`),
+then the LCD send. So `draw_pre` wraps that call: same point (after the overlay draw, before
+the LCD send), A4 saved and restored, the `ldw` in parallel lands 1 cycle before `draw_pre`'s
+first packet, callee-saved registers untouched, `0xC00D5720`'s return value goes straight back
+to the caller. The callp is word 3 of the packet `0xC00BB0E0` (not compact, no header
+expansion bits), p-bit kept. The LED path is the same code (pin 0, value 0 = CLR_DATA at bank
++ 28 = lit). The knob page and cover draws are the same code (frame at y 11). Every
+`mvkl/mvkh` constant in the 70CDR `looper.S` differs from the 50G one only where `os.inc` does.
+
+**Big buffer [C static, I on hardware].** The 70CDR `.cinit` table (`0xC00F1204`-`0xC00F1364`)
+has the same 44 records as the 50G one with the same DDR targets and sizes: `0xC0000000` +
+`0x9DFAC`, the six `0x7800` blocks from `0xC0200000`, the six `0xAC440` slot blocks
+`0xC022D000`-`0xC0636980`, `0xC87D0000` + `0x24000`. No code constant or data word points into
+regions 1-3 (`0xC0102000`-`0xC0197FFF`, `0xC01ADAD4`-`0xC01FFFFF`, `0xC0636980`-`0xC07CFFFF`).
+The 50G proved them free with the RAM canary test; the 70CDR has not had one.
+
+**CC path fix (both builds).** `midi-settings` routes the Task_MIDI CC call site to
+`midi_gate`, which jumped straight to `CC_HANDLER`, so `looper`'s `cc_pre` (on the midi-cc
+trampoline) never ran and the looper's on/off CC never counted, on the MS-50G too. `midi_gate`
+now jumps to the trampoline (`CC_TRAMP`: `0xC00AF408` / `0xC00E1F70`). MS-50G v1.1 + looper
+build sha256 `7c4b4873...` (was `f83cc02d...`; the only change is that mvkl/mvkh pair).

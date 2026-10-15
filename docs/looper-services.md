@@ -3,7 +3,8 @@
 From MIDISTOMP v2.0 the firmware gives the Looper ZDL (effects pack, fxid 497)
 a big buffer, counts footswitch and CC presses for it, and lets it drive the
 LED. Everything goes through one block in RAM; the ZDL uses plain loads and
-stores and never calls into the firmware. MS-50G 3.10 OS only.
+stores and never calls into the firmware. MS-50G 3.10 and MS-70CDR 2.10 OS: the same
+address and layout (70CDR addresses: docs/ms70cdr-port.md, phase 3).
 The transport block (`docs/transport-block.md`) is separate and unchanged.
 
 ## Where
