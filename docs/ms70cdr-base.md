@@ -69,6 +69,7 @@ files are. Each task ends with tests passing and a real build.
 | T5 | **RAM test port:** `ram-test`, then Luca runs it | Sonnet | T2r |
 | T6 | **Looper services port** with the new free regions | Opus | T5 |
 | T7 | **PEDAL INPUT** setting | Sonnet | T4 |
+| T8 | Mac builder from Zoom's MS-70CDR Mac updater, if one exists (low priority) | Sonnet | T4 |
 
 T3 and T4 each end with a flash test by Luca before the next starts.
 
