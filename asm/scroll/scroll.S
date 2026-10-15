@@ -17,8 +17,8 @@
         .equ    STOCK_STEP, 0xC00C4C64      ; step(A4 = dir +1 / -1)
         .equ    STOCK_SLEEP, 0xC00CF000     ; sleep(A4 = ms), inferred
         .equ    CURSOR, 0xC009C064          ; byte 0 = cursor (5 = effect 1), word 1 = effect count
-        .equ    FRAME_MS, 10                ; stock 100
-        .equ    WRAP_MS, 10
+        .equ    FRAME_MS, 8                 ; stock 100
+        .equ    WRAP_MS, 5
         .equ    MAX_STEPS, 6                ; never loop if a step can't move
 
         .macro  FCALL target
