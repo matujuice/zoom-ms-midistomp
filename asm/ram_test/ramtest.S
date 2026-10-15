@@ -1,4 +1,4 @@
-; RAM canary test (issue #19), MS-50G 3.10 OS. Diagnostic build only, never
+; RAM canary test (issue #19), MS-70CDR 2.10 OS. Diagnostic build only, never
 ; released.
 ;
 ; The space audit (issue #19) lists RAM with no static reference in the OS. This
@@ -7,21 +7,21 @@
 ; (renamed RAMTEST) counts how many words in each region no longer hold it.
 ; A region that stays at 0 while the pedal is used is free.
 ;
-; Loaded in DDR at 0xC00F1960, right after the OS image, so stock code
-; reaches it with a plain callp (ram-test.yaml):
-;   0xC00CA630 (Task_SwitchNrmlSpdRead, already -> poll trampoline) -> ram_poll
-;   0xC00A9434 (screen 9 draw stub, callp 0xC00A8474) -> ram_draw
+; Loaded in DDR at 0xC00F1380, right after the OS image (ends 0xC00F1364), so
+; stock code reaches it with a plain callp (ram-test.yaml):
+;   0xC00C6998 (Task_SwitchNrmlSpdRead, already -> poll trampoline) -> ram_poll
+;   0xC00A93D0 (screen 9 draw stub, callp 0xC00A8428) -> ram_draw
 ; SDRAM is filled and read through the uncached alias 0xC8xxxxxx (the OS's
 ; own DMA buffers use it), so the cache never hides a write.
 
-        .equ    POLL_TRAMP, 0xC00C8050      ; midi-clock.yaml, to poll.S
+        .equ    POLL_TRAMP, 0xC00C82D0      ; midi-clock.yaml, to poll.S
         .equ    TITLE, 0xC00A7378           ; (title)
-        .equ    TITLE_STR, 0xC00E94AD       ; "VERSION", RAMTEST in this build
-        .equ    SNPRINTF, 0xC00DE3A0        ; (buf, size, fmt on stack +4, ...)
+        .equ    TITLE_STR, 0xC00E900D       ; "VERSION", RAMTEST in this build
+        .equ    SNPRINTF, 0xC00DDEE0        ; (buf, size, fmt on stack +4, ...)
         .equ    TEXT, 0xC00A0040            ; (0, text, x, y)
         .equ    SOFTKEY, 0xC009F8F0         ; (knob, text, 0)
-        .equ    S_EMPTY, 0xC00E959C
-        .equ    S_EXIT, 0xC00E9597
+        .equ    S_EMPTY, 0xC00E9101
+        .equ    S_EXIT, 0xC00E90FC
         .equ    KEY, 0x5AA5C33C
         .equ    UNCACHED, 0x08000000
         .equ    NREG, 5
@@ -164,11 +164,20 @@ line:
         nop     5
 
         .align  4
-; Regions (issue #19): start, end, count. The first starts after
-; this code.
+; Regions (issue #19): start, end, count. Derived on the 70CDR OS like the
+; 50G's: outside the image (ends 0xC00F1364), the six per-slot delay arenas
+; (zero-init 0xC0200000-0xC0636980: 6 x 0x7800 + 6 x 0xAC440), the DMA buffers
+; (0xC87D0000 + 0x24000) and 0xC0000000-0xC009DFAC; no image or cinit-data
+; word points into the rest (the cinit data was decoded).
+; 1 starts above our DDR sections (0xC00F2000-0xC00F307F in use).
+; 1-2: the 50G OS had an overlay table at 0xC0198000-0xC01ADAD4 (so 1 ended
+;   0xC0198000 and 2 began 0xC01ADAD4); the 70CDR has none, so 2 starts at
+;   0xC0198000. The split stays so the counts compare with the 50G's.
+; 3-5 are the 50G's: same arenas, DMA and shared RAM (0x80000000 only appears
+;   in float constants, never as an address).
 regions:
-        .word   0xC00F2000 | UNCACHED, 0xC0198000 | UNCACHED, 0
-        .word   0xC01ADAD4 | UNCACHED, 0xC0200000 | UNCACHED, 0
+        .word   0xC00F3100 | UNCACHED, 0xC0198000 | UNCACHED, 0
+        .word   0xC0198000 | UNCACHED, 0xC0200000 | UNCACHED, 0
         .word   0xC0636980 | UNCACHED, 0xC07D0000 | UNCACHED, 0
         .word   0xC07F4000 | UNCACHED, 0xC0800000 | UNCACHED, 0
         .word   0x80000000, 0x80020000, 0   ; shared RAM, if the chip has it

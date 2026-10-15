@@ -47,7 +47,7 @@ Every MS-50G 3.10 OS value the MIDISTOMP release/v2.0 patches and asm depend on,
 | LCD_MODE | looper.yaml | not found | Blocker 2 above. |
 | LED path (comment) | looper.yaml | medium | Only mentioned in a comment of looper.S; two aligned call sites, body similarity 0.77. |
 | block.S regions | looper.yaml | medium | Region boundaries come from the 50G RAM test; the 70CDR layout is unmeasured (T5). |
-| test regions | ram-test.yaml | medium | Same: the free-RAM boundaries are not built by any OS constant, so they cannot be derived statically (T5). |
+| test regions | DDR/shared RAM regions the test fills (OS unused RAM) | 1: 0xC00F2000-0xC0197FFF, 2: 0xC01ADAD4-0xC01FFFFF, 3: 0xC0636980-0xC07CFFFF, 4: 0xC07F4000-0xC07FFFFF, 5: 0x80000000-0x8001FFFF | 1: 0xC00F3100-0xC0197FFF, 2: 0xC0198000-0xC01FFFFF, 3-5 as the 50G | T5, derived statically (cinit data decoded): image ends 0xC00F1364; zero-init = 0xC0000000+0x9DFAC, the 12 arena blocks 0xC0200000-0xC0636980, DMA 0xC87D0000+0x24000; no decoded .data word points into the rest. The 50G overlay table (0xC0198000-0xC01ADAD4) does not exist on the 70CDR, so 2 starts at 0xC0198000. 1 starts above our DDR sections (0xC00F2000-0xC00F307F). Code at 0xC00F1380. Luca's run confirms | medium |
 | 15 free-area rows (L2 after the first section, DDR areas, L2 end) | free areas table | medium | Only a static scan (mvk/mvkh constants, image words). The 70CDR .bss/.far is not in the image, so the RAM test (T5) must confirm. |
 
 ### Not checked (not addresses)
@@ -337,7 +337,7 @@ Key loop (Task key handler) callp sequence, one to one in both OSes: this is how
 | S_EMPTY | empty string | `0xC00E959C` | `0xC00E9101` | see midi-settings STR_BLANK | high |
 | S_EXIT | "EXIT" string "EXIT" | `0xC00E9597` | `0xC00E90FC` | string match in both images, same neighbouring strings | high |
 | POLL_TRAMP | midi-clock poll trampoline (jump target) | `0xC00C8050` | `0xC00C82D0` | see midi-clock (cave) | high |
-| test regions | DDR/shared RAM regions the test fills (OS unused RAM) | 1: 0xC00F2000-0xC0197FFF, 2: 0xC01ADAD4-0xC01FFFFF, 3: 0xC0636980-0xC07CFFFF, 4: 0xC07F4000-0xC07FFFFF, 5: 0x80000000-0x8001FFFF | not re-measured | These are the free RAM found on the 50G OS. Static check on the 70CDR: the OS image ends at 0xC00F1364 (50G 0xC00F1958); the only OS constants in 0xC00F1364-0xC0800000 are the same six arena bases (0xC022D000, 0xC02D9440, 0xC0385880, 0xC0431CC0, 0xC04DE100, 0xC058A540) and 0xC87D0000/0xC87D4000/0xC87D4004 + 0x80000000 as before. Region boundaries are not built by any constant, so they must be measured again (T5) | medium |
+| test regions | DDR/shared RAM regions the test fills (OS unused RAM) | 1: 0xC00F2000-0xC0197FFF, 2: 0xC01ADAD4-0xC01FFFFF, 3: 0xC0636980-0xC07CFFFF, 4: 0xC07F4000-0xC07FFFFF, 5: 0x80000000-0x8001FFFF | 1: 0xC00F3100-0xC0197FFF, 2: 0xC0198000-0xC01FFFFF, 3-5 as the 50G | T5, derived statically (cinit data decoded): image ends 0xC00F1364; zero-init = 0xC0000000+0x9DFAC, the 12 arena blocks 0xC0200000-0xC0636980, DMA 0xC87D0000+0x24000; no decoded .data word points into the rest. The 50G overlay table (0xC0198000-0xC01ADAD4) does not exist on the 70CDR, so 2 starts at 0xC0198000. 1 starts above our DDR sections (0xC00F2000-0xC00F307F). Code at 0xC00F1380. Luca's run confirms | medium |
 | UNCACHED alias | 0xC8xxxxxx alias used by the OS for DMA buffers | `0xC87D0000`, `0xC87D4000`, `0xC87D4004` | same three constants | const scan of both OSes | high |
 
 ## Our code areas (not OS addresses): are they still free?
