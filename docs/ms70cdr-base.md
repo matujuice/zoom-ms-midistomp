@@ -34,8 +34,9 @@ updater is different: its script also erases and rewrites the effects file
 system (BIN/137, 2.9 MB at `0xF0000`, see `zoomms/flash.py`), which would put
 the stock 70CDR set (137 effects, 17 free blocks) on every pedal. So the
 MIDISTOMP builder sets those two steps to SKIP, like the bootloader steps.
-Check on the MS-60B that its bass effects list and load on the 70CDR OS (it
-has no OD/DIST category).
+Checked 2026-10-15 (Luca, MS-60B switched to the 70CDR OS with Zoom Effect
+Manager, which also keeps the effects area): its bass effects list and load,
+so a build that skips the effects write gives the same result.
 
 ## How
 
