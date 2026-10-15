@@ -1,0 +1,36 @@
+# DEBUG BUILD ONLY, never released: MS-70CDR detection probe.
+#   About 1 s after boot, McASP pin AXR4 is read as an input 20000 times. The
+#   VERSION menu entry then shows "T" + the transitions counted and the version
+#   screen title "H" + the samples read high. MS-50G/60B: expect T00000; MS-70CDR:
+#   expect many (AXR4 = second ADC data). Design: docs/ms70cdr-port.md.
+# Apply last, after looper (it retargets looper's poll trampoline; probe.S then
+# jumps on to looper.S poll_pre). Hex from
+#   zoomms asm asm/cdr_probe/<file> --addr <addr>   (add --section for the section)
+name: cdr-probe
+description: DEBUG MS-70CDR detection probe (AXR4 activity count on the VERSION menu entry)
+builds: [ms50g-3.10]
+write:
+  # Transport poll trampoline (looper.yaml) -> probe
+  - model: ms50g-3.10
+    addr: 0xC00C8050
+    expect: "2a001100ea0760006203000000800000"
+    data: "2a001400ea0760006203000000800000"
+    source: asm/cdr_probe/trampoline.S
+section:
+  # In DDR RAM test region 1 after looper.S (which ends at 0xC00F2800)
+  - model: ms50g-3.10
+    addr: 0xC00F2800
+    source: asm/cdr_probe/probe.S
+    data: >-
+      28b21400e8076000640280002a001100ea076000002000005820840074028000
+      2820000378ca0401620300b0008000002806ef01e8c0880164028c0100600000
+      64a20c0200600000c884900274a28c022a10a7006a00800064e20c0c2800000b
+      2800800b00200000087f630c64e28c0c00600000087fe70cf82d630a78805a0b
+      e021df0bd80f640c5ae0870092fdff4f0080000074a20c02a856ca0a6807e00a
+      282a00083436540828a89408e807e008aa020001643644092818800900400000
+      f8caca00f8c04a9ba021cc9912000090008000003436d4095ae00b0192feff6f
+      00800000280080093402d409286edd0a6807e00a282400083436540828a89408
+      e807e008aa020001643644092818800900400000f8eaca00f8e0ca9ba021cc99
+      92feff9f008000003436d4095ae00b0112fdff6f00800000280080093402d409
+      2a001100ea076000620300000080000010270000e8030000640000000a000000
+      0100000000000000000000000000000000000000000000000000000000000000
