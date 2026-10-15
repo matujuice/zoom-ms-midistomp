@@ -6,7 +6,14 @@ import pytest
 from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
-PATCH = patcher.load(ROOT / "patches/scroll.yaml")
+def _view(p, build="ms50g-3.10"):
+    """The patch as one build sees it (the tests below check the MS-50G entries;
+    test_ms70cdr_port.py the MS-70CDR ones)."""
+    return {k: [e for e in v if e["model"] == build] if k in ("write", "section") else v for k, v in p.items()}
+
+
+ALL = patcher.load(ROOT / "patches/scroll.yaml")
+PATCH = _view(ALL)
 SECTION = PATCH["section"][0]
 
 
@@ -18,8 +25,9 @@ def callp_target(addr, data):
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_section_matches_assembly_source():
-    code = asm.assemble(ROOT / SECTION["source"], SECTION["addr"], whole_packets=True)
-    assert code == bytes.fromhex("".join(SECTION["data"].split()))
+    for sec in ALL["section"]:
+        code = asm.assemble(ROOT / sec["source"], sec["addr"], whole_packets=True, build=sec["model"])
+        assert code == bytes.fromhex("".join(sec["data"].split()))
 
 
 def test_call_sites_retargeted():

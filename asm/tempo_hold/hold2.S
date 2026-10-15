@@ -1,5 +1,5 @@
-; Second part of hold.S (it did not fit in one free L2 block), MS-50G 3.10
-; OS: footswitch hold timer, AUTO SAVE check and button releases.
+; Second part of hold.S (it did not fit in one free L2 block): footswitch
+; hold timer, AUTO SAVE check and button releases. OS addresses: os.inc.
 
         .include "hold.inc"
 

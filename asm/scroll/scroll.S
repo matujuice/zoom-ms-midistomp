@@ -1,4 +1,5 @@
-; Faster effect scrolling with wrap (issue #37), MS-50G 3.10 OS.
+; Faster effect scrolling with wrap (issue #37). OS addresses: os.inc
+; (MS-50G addresses below; MS-70CDR 2.10 in asm/os/ms70cdr-2.10/os.inc).
 ;
 ; Left/right in the effect view (released, events 73/75) call the stock
 ; slide step(dir) at 0xC00C4C64: 4 frames of 32 px with sleep(100) between
@@ -16,10 +17,7 @@
 ; In DDR at 0xC00F2100, RAM test region 1 (issue #19), after midi-cc's
 ; step.S at 0xC00F2020 (scroll.yaml).
 
-        .equ    STOCK_STEP, 0xC00C4C64      ; step(A4 = dir +1 / -1)
-        .equ    STOCK_SLEEP, 0xC00CF000     ; sleep(A4 = ms), inferred
-        .equ    STOCK_BUMP, 0xC00C4DCC      ; bump(A4 = dir): 2 px out, sleep, back
-        .equ    CURSOR, 0xC009C064          ; byte 0 = cursor (5 = effect 1), word 1 = effect count
+        .include "os.inc"                   ; STOCK_STEP, STOCK_SLEEP, STOCK_BUMP, CURSOR
         .equ    FRAME_MS, 8                 ; stock 100
         .equ    WRAP_MS, 5
         .equ    BOUNCE_MS, 30               ; stock 125

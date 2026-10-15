@@ -5,8 +5,15 @@ import pytest
 from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
-PATCH = patcher.load(ROOT / "patches/midi-settings.yaml")
-OTHERS = [patcher.load(ROOT / f"patches/{n}.yaml") for n in ("midi-cc", "midi-clock")]
+ALL = patcher.load(ROOT / "patches/midi-settings.yaml")
+def _view(p, build="ms50g-3.10"):
+    """The patch as one build sees it (the tests below check the MS-50G entries;
+    test_ms70cdr_port.py the MS-70CDR ones)."""
+    return {k: [e for e in v if e["model"] == build] if k in ("write", "section") else v for k, v in p.items()}
+
+
+PATCH = _view(ALL)
+OTHERS = [_view(patcher.load(ROOT / f"patches/{n}.yaml")) for n in ("midi-cc", "midi-clock")]
 BASE = 0x1181EA00
 SEC = bytes.fromhex(PATCH["section"][0]["data"])
 
@@ -30,9 +37,10 @@ def _sec_str(addr):
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_patch_bytes_match_assembly_source():
     for kind in ("write", "section"):
-        for entry in PATCH[kind]:
+        for entry in ALL[kind]:
             if "source" in entry:
-                code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section")
+                code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section",
+                                    build=entry["model"])
                 assert code == bytes.fromhex(entry["data"]), entry["source"]
 
 

@@ -1,15 +1,13 @@
-; Middle knob press in the tuner leaves it (v0.6), MS-50G 3.10 OS.
+; Middle knob press in the tuner leaves it (v0.6). OS addresses: os.inc.
 ;
-; The key loop's call for event 65 (middle knob release, stock 0xC00AC8B0:
+; The key loop's call for event 65 (middle knob release, stock STOCK_MIDDLE:
 ; opens the patch list in play mode, nothing in the tuner) comes here via
 ; tuner_exit_trampoline.S. In the tuner (mode 5 or 6) it runs the stock
-; footswitch press (0xC00ACAB0, event 32) instead, which is how stock leaves
+; footswitch press (FOOT_PRESS, event 32) instead, which is how stock leaves
 ; the tuner. Everything else goes to the stock handler. Loaded in the free
 ; 64 bytes between the clock variables and poll.S.
 
-        .equ    MODE, 328                   ; B14 offset
-        .equ    STOCK_MIDDLE, 0xC00AC8B0
-        .equ    FOOT_PRESS, 0xC00ACAB0
+        .include "os.inc"                   ; MODE, STOCK_MIDDLE, FOOT_PRESS
 
         .text
         .nocmp
