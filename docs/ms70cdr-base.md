@@ -26,14 +26,16 @@ little differently (bigger input buffers, B14 data at `0xC00EF748` instead of
 `0xC00EFCC0`), so the free regions from the RAM test (issue #19) must be
 measured again on the 70CDR OS before the looper relies on them.
 
-**Effects flash:** Zoom's MS-70CDR updater erases and rewrites the effects file
-system (BIN/137, 2.9 MB at `0xF0000`); the MS-50G updater never touches it.
-Stock 70CDR: 137 effects, 17 free blocks (about 3 custom effects). Stock
-MS-50G: 101 effects, 300 free blocks. **Decision needed (Luca):** should the
-MIDISTOMP builder skip the effects write (keeps each pedal's installed effects,
-including the MS-50G drives/amps and MS-60B bass effects) or write the 70CDR
-set? Skipping is the safer default. Either way, check that a pedal keeping its
-own effects lists and loads them on the 70CDR OS (it has no OD/DIST category).
+**Effects flash:** installed effects and patches must survive the update, as
+they always have for Luca: Zoom Effect Manager's firmware switch (MS-60B to
+the 70CDR OS) and every MIDISTOMP build so far (made from the MS-50G updater,
+whose script never writes the effects area) kept them. Zoom's own MS-70CDR
+updater is different: its script also erases and rewrites the effects file
+system (BIN/137, 2.9 MB at `0xF0000`, see `zoomms/flash.py`), which would put
+the stock 70CDR set (137 effects, 17 free blocks) on every pedal. So the
+MIDISTOMP builder sets those two steps to SKIP, like the bootloader steps.
+Check on the MS-60B that its bass effects list and load on the 70CDR OS (it
+has no OD/DIST category).
 
 ## How
 
@@ -52,7 +54,8 @@ port changes those lines and the patch bytes, not the logic.
   review. Every port is checked by the existing tests (bytes match source,
   sections don't overlap) and by a flash test.
 - **Builder:** `scripts/midistomp_builder.py` takes Zoom's MS-70CDR updater
-  (sha256 in `models/ms70cdr.yaml`) and builds for `ms70cdr-2.10`.
+  (sha256 in `models/ms70cdr.yaml`), builds for `ms70cdr-2.10`, and skips the
+  bootloader and effects file system steps (a test checks the flash script).
 
 ## Steps (one flash test each)
 
