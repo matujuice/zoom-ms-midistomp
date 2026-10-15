@@ -501,6 +501,56 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
   r1 used count - 6 for the +1 end, which only holds with 6 effects: with
   fewer, wrapping from effect 1 ran to the empty slot 6 (fixed in r2).
 
+### Looper services (v2.0 step 2)
+
+Source: `asm/looper/` (`looper.S` at DDR `0xC00F2200`, the services block
+`block.S` at `0xC00F3000`). Patch `patches/looper.yaml`, after midi-cc,
+midi-clock, tempo-hold and scroll. Block layout and rules:
+`docs/looper-services.md`.
+
+- **Hooks:** the four DDR trampolines of the transport poll (`0xC00C8050`),
+  the footswitch flip (`0xC00D3370`), the footswitch hold (`0xC00D46B0`) and the
+  MIDI CC call (`0xC00AF408`) now jump to `looper.S`'s vectors, which go on to
+  their old L2 targets (poll.S, hold.S toggle_hook, hold2.S hold_hook,
+  handler.S) unless the looper takes the event. L2 is full, so nothing in L2
+  changed.
+- **Slot of an effect:** `0xC00C8BEC(slot)` returns the slot state block
+  `0x11F03000 + 212 x slot`; the per-slot loop at `0xC00C4064` hands it to each
+  effect's record +8 handler. Word 1 is the params pointer the effect sees as
+  `ctx[1]`.
+- **Slot under the cursor:** the footswitch press (`0xC00ACBE8`-`0xC00ACC2C`)
+  reads the cursor byte (`0xC00C09D4(view)` = signed byte at
+  `0xC009C064 + 4 x view`), then the slot word at `0xC00EEEB0 + 24 x cursor +
+  4 x view`; bit `slot` of `0xC009C060` set skips the flip. The play-mode draw
+  (`0xC00BA2F8`) uses the same lookup.
+- **LED:** `Task_UpdateLED` (`0xC00C760C`) runs `0xC00C7520` every 16 ms. Bit 0
+  of `0xC00EF070` is what the LED should show (the play-mode draw at
+  `0xC00BA21C` sets it from the cursor effect's on/off word; the tempo blink
+  sets and clears it), bit 0 of `0xC00EF078` what was written last; on a
+  difference it calls `0xC00CE054(0, 1 - bit)`, which writes GPIO pin 0 through
+  `0x11819FC4(pin, value)` (value 0: CLR_DATA at bank base + 28, else SET_DATA
+  at + 24; the bank base pointer is at `0x1181DE70`). So the LED is lit with the
+  pin low (inferred). There is no fast timer in the LED path (16 ms), so the
+  Looper ZDL does the PWM from its audio block.
+- **Status box (r2, r3):** every screen draw ends at `0xC00BA9CC` (`callp
+  0xC00B5794 || mv a13, a4`, after the overlay draw, before the LCD send
+  `0xC00B5A80`); that callp now goes to `draw_pre`. Overlay state from
+  `0xC00CBA10(0)` (-1 = none), prompt flag `B14+348`. The OS font is 6 column
+  bytes a character at `0xC00E9188 + 6 x code` (rows 0-6); the Effect View's
+  bold font (knob names and values) is 7 column bytes at `0xC00E8C78 + 7 x
+  code` (drawn through `0xC009FEF8`). The word at `0xC009D398` is 1 on the knob
+  pages (`0xC00CB0C0`), 0 on the cover (`0xC00AA478`). The knob page's
+  frame is drawn at y 11 (`0xC00AB2E8(0, 0, 11, 128, 53)` in `0xC00CB0C0`), so
+  the box uses y 0-9. Stock draws mark the 8-pixel rows to send in the byte
+  at `0xC00EF118` (bit = row). The UI event (`B14+676`) bit 0x40 redraws.
+- **Effect View draw:** play mode
+  (`B14+328` = 0) draws through `0xC00BA2F8`, which picks the slot under the
+  cursor and calls `0xC00AA478(0, slot)` (the effect's cover image and its knob
+  boxes, from the slot's screen record `0xC00B07F0(slot)`) or `0xC00CB0C0(0,
+  slot)` when the word at `0xC009D398` is set. The frame buffer is 1 bit per
+  pixel, column bytes (bit 0 on top), 128 bytes per 8-pixel row, at
+  `0x11816800`.
+
 ### RAM canary test (issue #19, diagnostic build)
 
 Source `asm/ram_test/ramtest.S`, patch `patches/ram-test.yaml` (applied
