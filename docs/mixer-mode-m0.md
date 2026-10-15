@@ -176,6 +176,9 @@ call sites above) retargeted to DDR wrappers that also handle the spare bits, an
 
 ## Open questions: hardware probes
 
+Built as one test firmware (P1-P5 on screen, P3 by a buffer check instead of a probe ZDL):
+see "Probe build: how to read it" at the end.
+
 - **P1 CPU meter (debug build, no audio change).** At `0x1181BE00` jump to a DDR stub that
   reads TSCL, runs the stock loop, reads TSCL again and keeps the maximum (and the time from
   block start). Show it on the version screen, as the RAM test does. Run it with an empty
@@ -329,3 +332,69 @@ Plus a save hook that writes record 52 whenever the patch is saved, and a load h
   above confirms it.
 
 Route B only if P4 finds non-zero bytes 14/15 in stored patches.
+
+## Probe build: how to read it
+
+One test firmware answers P1-P5 (the editor round trip was dropped). It is MIDISTOMP V1.2
+(MIDI, tempo, combos, scrolling all work as usual) plus probe screens. It **never writes flash**
+and runs your effects exactly as stock, in the same order. Not for release.
+
+- **Build** (maintainers): the release set plus `patches/m0-probe.yaml`, last:
+  `zoomms build <MS-70CDR 2.10 updater> --build-id ms70cdr-2.10 --patch patches/version-1.2.yaml
+  --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml
+  --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/scroll.yaml
+  --patch patches/m0-probe.yaml --out "build/out/MIDISTOMP M0 probe.exe"`.
+  Source `asm/m0_probe/`, tests `tests/test_m0_probe_patch.py`.
+- **Flash** it like any MIDISTOMP updater. To go back, flash the normal V1.2 updater. If the
+  pedal has no sound or freezes after boot: update mode (hold Up + Down while plugging in USB,
+  user guide section 3) and flash V1.2.
+- **Open:** press the left knob in the effect chain view (menu), pick the last entry,
+  **M0PROBE**. **Turn any knob** to change page (8 pages, it wraps). The **middle knob** leaves,
+  as before (its EXIT label is not drawn: the pages use that row). Pages P1-P3 refresh by
+  themselves about twice a second; if a number never changes, turn a knob one step and back.
+- The pedal keeps playing while a probe page is open, so play a sound into it (the bus checks
+  need signal).
+
+### The pages
+
+Numbers are DSP clock cycles. One audio block is 8 samples, about 82 700 cycles at 456 MHz.
+"Window" = the last 4096 blocks (0.74 s). The number after `#` in the P1 title counts windows:
+if it goes up, the probe is running.
+
+| page | row | meaning | hope |
+|---|---|---|---|
+| **P1 CPU** | `PER a MAX b` | time between two blocks: average, longest | a about 82 700; b close to a (a much bigger b = a block came late: audio dropout) |
+| | `BLK min avg max` | time the whole audio block takes (without the probe's own checks) | max well under PER |
+| | `FX min avg max` | the part spent inside the 6 effects | |
+| | `LOAD a% MAX b%` | BLK avg and BLK max as % of PER | this is the real CPU load. 100 - MAX = headroom for Mixer Mode |
+| | `PEAK n p%` | longest block since you opened P1 (turning back to P1 resets it) | stays under 100 % even while you switch patches |
+| | `FXPK n PRB m` | longest effect time since then; m = what the probe itself cost in the last block | m small (a few thousand at most) |
+| **P2 CUR c SLOT s** | 6 rows `k NAME cost` | the chain runner's slot k (0 runs first): effect name and its DSP cost from the ZDL (the number the "DSP Full" check adds up, limit 225). `-` empty, `MUTE` while loading, `?` unknown | tells which screen position is slot 0. Title: cursor position c (the effect under the cursor when you opened the menu) sits on slot s |
+| **P3 CYCLES** | `k AVG a MAX b` | cycles of slot k's effect per block | with P2's cost: cycles per cost unit |
+| **P3 BUS F/A/D** | `k Fn An Dn` | in how many of the window's 4096 blocks slot k's effect changed F (the chain signal, ctx[5]), Acc (the direct-to-output buffer, ctx[6]) and Dry (the pedal input, ctx[4]) | F about 4096 for every effect that is on (with signal); A 0 except LineSel-like effects; **D always 0** (an effect writing Dry would break buses) |
+| **P4 RECORDS** | `OR 14:xx 15:xx 17:xx` | all stored patches 0-49 ORed together: bytes 14, 15 and 17 of every slot block | **00 00 00** (then Route A of M0b is safe) |
+| | `110:xx OK n NZ r` | byte 110 & E0 (same OR); n patches read; r = first patch with a non-zero byte, -1 = none | `110:00`, OK = number of stored patches (50 if all were ever saved), NZ -1 |
+| | `S s ONo ID xxxxxxxx` | current patch, the slot under the cursor: on/off and effect id | |
+| | `P1 ... P4`, `P5 ... P7`, `P8 a  P9 b` | that slot's 9 knob words as saved | with LOFIDLY (9 knobs), knob 8 at its maximum: **P8 = that maximum** (confirms w9 = P8) |
+| **P5 STORE** | `BANK IN USE b`, `HDR`, `DATA`, `GAP` | record store: live bank (0/1), header and data write pointers (flash addresses), free bytes between them | HDR inside the live bank, DATA above it, GAP positive |
+| **P5 BANK 0 / BANK 1** | 4 rows `oo xx..` | first 36 bytes of each bank (offset, 9 bytes in hex) | the live bank starts with the store's magic words; the other holds older data or FF (we just want to see it) |
+
+**Limits.** P3 only sees writes: reading Dry (the gates and reverbs that use the pedal input)
+cannot be seen this way, that needs a listening test in M1. An effect that adds exact zeros (no
+signal) counts as "not written", so play something. The XOR check can in theory miss a change
+(two changes cancelling), which is negligible over 4096 blocks. CPU figures include other
+interrupts that hit during the block. Slot cost `?` means the descriptor did not match the
+running function (it should not happen).
+
+### What to send back
+
+1. Photos of every page (P1, P2, P3 CYCLES, P3 BUS, P4, P5, BANK 0, BANK 1) with an **empty
+   patch** (no effects).
+2. P1, P2, P3 CYCLES and P3 BUS with **two normal patches** (name them), and with **one heavy
+   patch** just under DSP Full (6 effects, e.g. reverbs and delays). Play while you take the
+   photos. For the heavy one, also switch to it and back while on P1 and photograph `PEAK`.
+3. P2 with the cursor on the **leftmost** effect, then on the **rightmost** (leave the menu,
+   move the cursor, come back).
+4. P4 with LOFIDLY in a slot, its knob 8 turned to the maximum, the cursor on it (the patch
+   does not need to be saved for P8, but save it once so P4's OR includes it).
+5. Anything odd: clicks, dropouts, a frozen screen, a number that never moves.
