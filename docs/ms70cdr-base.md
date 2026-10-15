@@ -40,35 +40,37 @@ so a build that skips the effects write gives the same result.
 
 ## How
 
-The patches stay as they are, with a second set of addresses: every `write:`
-and `section:` entry is tagged `model: ms50g-3.10`; the ported ones are tagged
-`ms70cdr-2.10`. The asm sources take the addresses from `.equ` lines, so a
-port changes those lines and the patch bytes, not the logic.
+v1.1 is tagged (`v1.1`), so the MS-50G build can always be rebuilt from that
+tag. On `main` the patches and asm sources are converted **in place** to the
+MS-70CDR 2.10 OS (`model: ms70cdr-2.10`, `builds: [ms70cdr-2.10]`): one set of
+addresses, no per-model machinery.
 
 - **Finding addresses:** 47 of the 70 patch sites match uniquely by their
-  normalized code context in the 70CDR OS; 23 need a person (SysEx handler
+  normalized code context in the 70CDR OS; 23 need care (SysEx handler
   tables, padding caves, call sites in changed functions). `asm/` uses 161
   OS addresses plus B14 offsets, which shift too (the model byte is at B14+220
   on the MS-50G, B14+212 on the 70CDR).
-- **Who:** the matching and byte regeneration is mechanical (a cheaper model is
-  fine); the 23 hard sites and anything in the audio path get a careful
-  review. Every port is checked by the existing tests (bytes match source,
-  sections don't overlap) and by a flash test.
-- **Builder:** `scripts/midistomp_builder.py` takes Zoom's MS-70CDR updater
-  (sha256 in `models/ms70cdr.yaml`), builds for `ms70cdr-2.10`, and skips the
-  bootloader and effects file system steps (a test checks the flash script).
+- **Checks:** the existing tests (bytes match the asm source, release sections
+  don't overlap), a real build from Zoom's updater (every `expect:` must match
+  the 70CDR OS), then Luca's flash test.
 
-## Steps (one flash test each)
+## Tasks
 
-1. **MIDI port:** MIDI CC (with CC 80/81 patch up/down), clock and
-   transport, the MIDI menu. As one build, like v0.2-v0.5 were tested.
-2. **UI port:** tempo screen, HOLD FOR, button combos, scrolling, version and
-   boot logo.
-3. **RAM test** (issue #19 build) on the 70CDR OS: free regions for the
-   looper's big buffer.
-4. **Looper services** (`docs/looper-services.md`) on the new addresses, then
-   Mixer Mode and Perform mode as in `docs/v2.0-brief.md`.
-5. **PEDAL INPUT setting** (MONO / STEREO) for the input modes in Mixer Mode
-   (the OS can't tell the pedals apart).
+Agents need Zoom's updaters, which are never committed; they run where those
+files are. Each task ends with tests passing and a real build.
 
-Release: one builder and one updater for all three pedals.
+| # | Task | Model | Needs |
+|---|---|---|---|
+| T1 | **Builder for the 70CDR:** `models/ms70cdr.yaml`, `zoomms/flash.py`, `scripts/midistomp_builder.py` take Zoom's MS-70CDR updater; the bootloader and effects (BIN/137) steps are set to SKIP; a test checks the resulting flash script | Sonnet | - |
+| T2 | **Address map:** every OS address and B14 offset used by `asm/` and `patches/` (release set, looper, ram-test) with its 70CDR counterpart, how it was found and a confidence, in `docs/ms70cdr-addresses.md`; uncertain ones flagged | Sonnet | - |
+| T2r | Review the flagged addresses | Opus | T2 |
+| T3 | **MIDI port:** `midi-cc` (with CC 80/81), `midi-clock`, `midi-settings` | Sonnet | T1, T2r |
+| T4 | **UI port:** `tempo-hold`, `scroll`, `version-1.1`, `boot-logo` | Sonnet | T3 |
+| T5 | **RAM test port:** `ram-test`, then Luca runs it | Sonnet | T2r |
+| T6 | **Looper services port** with the new free regions | Opus | T5 |
+| T7 | **PEDAL INPUT** setting | Sonnet | T4 |
+
+T3 and T4 each end with a flash test by Luca before the next starts.
+
+Release: one builder and one updater for all three pedals; then Mixer Mode and
+Perform mode as in `docs/v2.0-brief.md`.
