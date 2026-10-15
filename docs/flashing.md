@@ -16,6 +16,13 @@ an update is interrupted. Skipping step 4 (the MS-70CDR updater has it; the
 MS-50G one never did) keeps your installed effects: an update never deletes them.
 The MIDISTOMP builder takes Zoom's MS-70CDR 2.10 updater (`--build-id ms70cdr-2.10`).
 
+Zoom's updater only flashes a pedal whose model byte (flash `0x3FFC00`, BIN/133
+offset 0x2C00) is on its list: `0x57` and `0x61` in the MS-70CDR updater, so a
+pedal on the MS-50G firmware (`0x58`, every v1.0/v1.1 install) gets "Illegal
+device connected". Built updaters accept `0x57`, `0x58`, `0x5F` and `0x61`
+(`flash.accept_models`: the list moves into 4 unused bytes after it, both loop
+bounds go from 2 to 4). The bytes the pedal is sent are unchanged.
+
 They are also unsigned: Zoom's signature is removed because it no longer
 matches. Windows SmartScreen will warn; choose "More info" then "Run anyway".
 

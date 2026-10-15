@@ -44,6 +44,8 @@ every report helps.
 - The MS-70CDR gets real stereo input (on the MS-50G and MS-60B the input stays
   mono, as before).
 - Your installed effects and patches are kept.
+- The updater works whatever the pedal runs now: stock MS-50G, MS-60B or
+  MS-70CDR firmware, or an older MIDISTOMP.
 - The features are the same as v1.1: MIDI CC (including CC 80/81 patch
   up/down), MIDI clock and Start/Stop, MIDI menu, tempo screen, HOLD FOR,
   button combos, faster scrolling, boot logo.

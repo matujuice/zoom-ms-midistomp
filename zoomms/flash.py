@@ -100,7 +100,38 @@ def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = 
     if skip_boot:
         for s in boot_steps(find_script(bytes(exe)), keep_133=new_133 is not None):
             struct.pack_into("<I", exe, s.offset, SKIP)
+    accept_models(exe)
     return _unsign(bytes(exe))
+
+
+# The updater's model check (Luca's go-ahead 2026-10-15): the model byte the
+# pedal reports (flash 0x3FFC00, BIN/133 offset 0x2C00) must be in a 2-entry
+# list, else "Illegal device connected". Every v1.0/v1.1 pedal reports 0x58.
+# Code at 0x40456e-0x404597 in both the MS-50G 3.10 and MS-70CDR 2.10 updaters.
+MODEL_LOOP_HEAD = bytes.fromhex("837de802731d0fb60d28cc45008b55e80fb682")  # ... movzbl list(%edx),%eax
+MODEL_LOOP_TAIL = bytes.fromhex("3bc87504eb06eb02ebd6ebd4837de8027278")
+MODELS = bytes([0x57, 0x58, 0x5F, 0x61])  # 0x57 as in both stock lists, MS-50G, MS-60B, MS-70CDR
+
+
+def accept_models(exe: bytearray) -> bool:
+    """Let the updater flash any of the three pedals: the list moves 3 bytes up,
+    into unused padding after it, and grows to 4 entries. False if not found."""
+    import pefile
+
+    at = exe.find(MODEL_LOOP_HEAD)
+    disp = at + len(MODEL_LOOP_HEAD)
+    if at < 0 or exe[disp + 4:disp + 4 + len(MODEL_LOOP_TAIL)] != MODEL_LOOP_TAIL:
+        return False
+    va = struct.unpack_from("<I", exe, disp)[0]
+    pe = pefile.PE(data=bytes(exe), fast_load=True)
+    off = pe.get_offset_from_rva(va - pe.OPTIONAL_HEADER.ImageBase)
+    if exe[off + 2:off + 8] != bytes(6):  # +2 is a "" string in use, +3..+7 unreferenced padding
+        return False
+    exe[off + 3:off + 3 + len(MODELS)] = MODELS
+    struct.pack_into("<I", exe, disp, va + 3)
+    exe[at + 3] = len(MODELS)  # both loop bounds: cmpl $2 -> $4
+    exe[disp + 4 + len(MODEL_LOOP_TAIL) - 3] = len(MODELS)
+    return True
 
 
 def _unsign(exe: bytes) -> bytes:
