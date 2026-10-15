@@ -26,20 +26,17 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 |---|---|---|---|
 | M0 | **Research, no build:** find the chain runner, the per-slot buffers, the DSP budget and spare bytes in the patch format on the 70CDR OS. Ends with a go / no-go and the hook points | nothing (a report) | Opus, Sonnet for the address work |
 | M1 | **Engine with fixed test layouts:** the firmware runs Pre → Bus A + Bus B → sum → Post from a layout picked by a test build (e.g. slots 1-2 Pre, 3 on A, 4 on B, 5-6 Post), 50/50 sum, the safety limiter on the output | parallel effects really in parallel; no clicks; what happens at DSP Full | Opus |
-| M2 | **The nodes:** `[ROUTE]` and `[MIX]` with their knob pages in Effect View (Send, Crossfade with the Smooth / DJ / Cut curves, levels, Mode, Output Mode), saved per patch, MIDI CCs. Bus picked per effect from its own page (a temporary control) | playing Send and Crossfade by knob and CC, patches remember them | Opus engine, Sonnet UI |
+| M2 | **The nodes:** `[ROUTE]` and `[MIX]` with their knob pages in Effect View (Send, Crossfade with the Smooth / DJ / Cut curves, levels, Mode, Output Mode), saved per patch, MIDI CCs. Tested with a **routing probe** ZDL (a sound source, a filter and a delay in one effect, with a BUS: PRE / A / B / POST knob, Luca 2026-10-15); stock effects keep their bus from M3 on | playing Send and Crossfade by knob and CC, patches remember them | Opus engine, Sonnet UI |
 | M3 | **Effect Chain screen** rebuilt (two rows, nodes, signal lines, A/B tags in Effect View), **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and draws one IN), old patches load as Serial | the full design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
 flash test by Luca before the next one starts, as in the 70CDR port.
 
-## Questions for Luca
+## Decided (Luca, 2026-10-15)
 
-1. **Bus picking before the new screen (M2):** a temporary "BUS: PRE / A / B /
-   POST" control on each effect's page is the cheapest way to try routing
-   before M3. Alternative: skip it and go straight to the new Effect Chain
-   screen (M2 and M3 together, a longer wait before you can play it).
-2. **First modes:** Parallel and Serial in M2, Split input / Split output with
-   the PEDAL INPUT setting in M3?
-3. **Old patches:** load as Serial with every effect in Pre (the brief), so
-   nothing changes until you open `[ROUTE]`. Still right?
+- M2 is tried with a routing probe ZDL (sound source, filter, delay, BUS knob),
+  several in one patch, before the new Effect Chain screen.
+- Parallel and Serial in M2; Split input, Split output and PEDAL INPUT in M3.
+- Old patches load as Serial with every effect in Pre.
+- M0 starts now.
