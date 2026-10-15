@@ -490,10 +490,10 @@ Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
   sites, BIOS-like body). The slide pends/posts the semaphore at `B14+772`
   itself.
 - **v1.1:** the slide's sleep call (`0xC00C4D98`) goes to `frame_sleep`,
-  which sleeps `v_frame` ms (8; stock 100). The two bump calls
+  which sleeps `v_frame` ms (10; stock 100). The two bump calls
   (`0xC00AC4D8`, `0xC00AC528`) go to `wrap(dir)`: `v_frame` = 10, then the
   stock slide with -dir until the other end (the handler's own end tests,
-  at most 6 steps), then `v_frame` = 8.
+  at most 6 steps), then `v_frame` = 10.
   r1 used count - 6 for the +1 end, which only holds with 6 effects: with
   fewer, wrapping from effect 1 ran to the empty slot 6 (fixed in r2).
 
