@@ -1,12 +1,12 @@
 """MIDISTOMP-builder: drop Zoom's official MS-50G 3.10 updater on this program
-and it writes the MIDISTOMP V1.0 updater next to it.
+and it writes the MIDISTOMP V1.1 updater next to it.
 
-Same output as `zoomms build` with the v1.0 patch set (docs/flashing.md).
+Same output as `zoomms build` with the v1.1 patch set (docs/flashing.md).
 Refuses any file that is not the stock updater (sha256 in models/ms50g.yaml).
 Frozen into MIDISTOMP-builder.exe by .github/workflows/builder.yml.
 
 Also takes Zoom's Mac updater (ZOOM MS-50G v3.10 Updater.app) and then writes
-MIDISTOMP V1.0 Updater.app, same as `zoomms build-mac`.
+MIDISTOMP V1.1 Updater.app, same as `zoomms build-mac`.
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V1.0"
-PATCHES = ["version-1.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold"]
-OUT_NAME = "MIDISTOMP V1.0 Updater.exe"
-OUT_NAME_MAC = "MIDISTOMP V1.0 Updater.app"
+NAME = "MIDISTOMP V1.1"
+PATCHES = ["version-1.1", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
+OUT_NAME = "MIDISTOMP V1.1 Updater.exe"
+OUT_NAME_MAC = "MIDISTOMP V1.1 Updater.app"
 
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:

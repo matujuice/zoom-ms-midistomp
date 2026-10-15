@@ -1,6 +1,6 @@
 <p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.0" width="720"></p>
 
-<h1 align="center">MIDISTOMP V1.0 user guide</h1>
+<h1 align="center">MIDISTOMP V1.1 user guide</h1>
 
 <p align="center"><b>MIDI control, MIDI clock and playing aids for the Zoom MultiStomp</b></p>
 
@@ -46,7 +46,7 @@ updater yourself from Zoom's official one. This needs Windows, or a Mac
 2. Download **MIDISTOMP-builder.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-modding/releases).
 3. Drag `ZOOM MS-50G System v3.10 Updater.exe` onto `MIDISTOMP-builder.exe`.
-   It writes **MIDISTOMP V1.0 Updater.exe** in the same folder. It refuses any
+   It writes **MIDISTOMP V1.1 Updater.exe** in the same folder. It refuses any
    other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose
    "More info", then "Run anyway".
@@ -55,9 +55,9 @@ updater yourself from Zoom's official one. This needs Windows, or a Mac
 
    <img src="img/keys.jpg" alt="The four cursor keys around the footswitch" width="480">
 
-7. Run `MIDISTOMP V1.0 Updater.exe` and let it finish. Don't unplug during the update.
-8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.0** and
-   the last menu entry reads **V1.0**.
+7. Run `MIDISTOMP V1.1 Updater.exe` and let it finish. Don't unplug during the update.
+8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.1** and
+   the last menu entry reads **V1.1**.
 
    <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.0 boot screen" width="400">
 
@@ -78,12 +78,12 @@ and flashed to an MS-50G from an Apple Silicon Mac.
    python3 -m venv .venv && .venv/bin/pip install -e .
    .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-50G v3.10 Updater.app"
    ```
-   It writes **MIDISTOMP V1.0 Updater.app** next to Zoom's app, and refuses
+   It writes **MIDISTOMP V1.1 Updater.app** next to Zoom's app, and refuses
    anything that is not Zoom's original.
 3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
    ```sh
-   xattr -cr "/path/to/MIDISTOMP V1.0 Updater.app"
-   codesign --force --deep --sign - "/path/to/MIDISTOMP V1.0 Updater.app"
+   xattr -cr "/path/to/MIDISTOMP V1.1 Updater.app"
+   codesign --force --deep --sign - "/path/to/MIDISTOMP V1.1 Updater.app"
    ```
 4. Put the pedal in update mode (step 5 above) and open the app. It is an
    Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to
@@ -170,6 +170,11 @@ tuning fork under down + right (photo in section 2).
 
 In the tuner, pressing the middle knob (**EXIT**) goes back to the effects.
 
+**Faster scrolling** (from v1.1): left and right move between the effects of
+a patch several times faster than stock. At the last effect, one more
+press slides quickly back across the chain to the first one, and the other
+way round. Like stock, the move happens when you let go of the key.
+
 ## 5. MIDI CC chart
 
 Any channel unless MIDI CHANNEL is set. Effect n is the n-th effect of the patch.
@@ -190,7 +195,7 @@ Any channel unless MIDI CHANNEL is set. Effect n is the n-th effect of the patch
 Knob values 0-127 cover the knob's whole range. A knob the effect doesn't
 have, and any other CC, does nothing.
 
-**Patch up/down** (not in v1.0 yet): CC 80 with a value of 64-127 loads the
+**Patch up/down** (from v1.1): CC 80 with a value of 64-127 loads the
 previous patch, CC 81 the next one, wrapping between patch 50 and patch 1.
 Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when
 released steps once. They follow CC RECEIVE and MIDI CHANNEL, not the PROG CH

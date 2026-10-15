@@ -27,6 +27,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 | **Program Change** | loads patches from a DAW, an app or a drum machine |
 | **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#5-midi-cc-chart) |
 | **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
+| **Faster scrolling** | left/right move between effects several times faster and wrap around at the ends |
+| **Patch up/down by CC** | CC 80 / 81 load the previous / next patch |
 | **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
 | **Tempo screen** | turn the knob or tap, TEMPO LOCK across patches |
 | **HOLD FOR** | footswitch hold opens tuner, tempo, or works as a momentary switch |
@@ -99,7 +101,7 @@ a build config per pedal in [`models/`](models/).
 | 1 | Read-only tools: identify pedal, parse updaters and ZDLs, round-trip check | no | **round trip exact on all 3 stock updaters** |
 | 2 | Per-model effect sets installed via Effect Manager / SysEx | effect files only | |
 | 3 | Our own DSP effects built with TI CGT C6000 | effect files only | |
-| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **MIDISTOMP MOD v1.0** |
+| 4 | Patched OS images (`zoomms build`, see docs/flashing.md) | firmware | **MIDISTOMP MOD v1.1** |
 | 5 | Core firmware research (UI, routing, chain limits) | firmware | research only |
 
 ## Usage

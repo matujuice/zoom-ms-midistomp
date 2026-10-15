@@ -468,6 +468,39 @@ Source: `asm/tempo_hold/` (`hold.S` at `0x1181FA80`, `hold2.S` at
     drawn at `0xC00BA5E0`-`0xC00BA600` (blank, blank, SETTINGS); the middle
     one's call goes through a trampoline that passes "EXIT" instead.
 
+### Effect scrolling (issue #37, v1.1)
+
+Source: `asm/scroll/scroll.S` (DDR `0xC00F2100`, RAM test region 1, after
+`step.S`). Patch `patches/scroll.yaml`.
+
+- **Keys:** left/right press (events 72/74, `0xC00AC54C`) only starts the
+  1 s hold timer; the move happens on release (73/75, `0xC00AC434`), so a tap
+  and a hold can be told apart. In play mode the handler reads the cursor
+  (`0xC00C09D4(0)` = signed byte at `0xC009C064`) and calls the slide
+  `0xC00C4C64(dir)` (73: +1, 75: -1), or at the end of the chain the bump
+  `0xC00C4DCC(dir)` (2 px out, sleep 125, back). Ends: +1 when the cursor
+  equals 6 - the effect count (word `0xC009C068`; `0xC00C09B8` reads it, effect
+  add/delete change it), -1 when it equals 5 (effect k sits at cursor 6 - k). Then `0xC00D1940`,
+  `0xC00AB660`, `0xC00CB978` as for any move. Nothing else calls the slide
+  or the bump.
+- **Slide:** `0xC00C0914(-dir)` moves the cursor (clamped 0-5, also
+  shifts the table after it), then 4 frames of 32 px, each drawn and sent to
+  the LCD (`0xC00A13C0`, `0xC00B5A80`) with `0xC00CF000(100)` after it.
+  `0xC00CF000` is inferred to be a sleep in ms (args 16-1000 at its 48 call
+  sites, BIOS-like body). The slide pends/posts the semaphore at `B14+772`
+  itself.
+- **v1.1:** the slide's sleep call (`0xC00C4D98`) goes to `frame_sleep`,
+  which sleeps `v_frame` ms (8; stock 100). The two bump calls
+  (`0xC00AC4D8`, `0xC00AC528`) go to `wrap(dir)`: `v_frame` = 5, then the
+  stock slide with -dir until the other end (the handler's own end tests,
+  at most 6 steps), then the stock bump in the travel direction with
+  `v_frame` = 30 (its sleep call `0xC00C4DF4` also goes to `frame_sleep`;
+  only wrap calls the bump now), then `v_frame` = 8.
+  **Flash test 2026-10-15:** r5 OK (Luca): steps, wrap with 1/3/6 effects,
+  bounce.
+  r1 used count - 6 for the +1 end, which only holds with 6 effects: with
+  fewer, wrapping from effect 1 ran to the empty slot 6 (fixed in r2).
+
 ### RAM canary test (issue #19, diagnostic build)
 
 Source `asm/ram_test/ramtest.S`, patch `patches/ram-test.yaml` (applied
