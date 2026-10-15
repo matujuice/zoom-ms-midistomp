@@ -1,4 +1,4 @@
-; MIDI CC -> previous / next patch (issue #34), MS-50G 3.10 OS.
+; MIDI CC -> previous / next patch (issue #34), MS-70CDR 2.10 OS.
 ;
 ;   CC 80, value >= 64: previous patch (patch 1 wraps to 50)
 ;   CC 81, value >= 64: next patch (patch 50 wraps to 1)
@@ -16,8 +16,8 @@
 ; In DDR at 0xC00F2020, in the first region the RAM test (issue #19) confirmed
 ; unused, after version-1.0.yaml's string at 0xC00F2000 (midi-cc.yaml); leaf.
 
-        .equ    STOCK_CHANNEL_MSG, 0xC00AE0F8
-        .equ    CUR_PATCH, 332              ; B14 offset, current patch 0-49
+        .equ    STOCK_CHANNEL_MSG, 0xC00ADF20
+        .equ    CUR_PATCH, 324              ; B14 offset, current patch 0-49
         .equ    PATCHES, 50
         .equ    CC_PREV, 80                 ; CC_NEXT = CC_PREV + 1
 

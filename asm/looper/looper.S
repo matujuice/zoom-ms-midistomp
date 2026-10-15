@@ -31,7 +31,7 @@
         .equ    POLL_HOOK, 0x1181E800       ; poll.S (transport upkeep), returns A4 = ticks
         .equ    TOGGLE_HOOK, 0x1181FA98     ; hold.S toggle_hook (MOMENTARY), then the flip
         .equ    HOLD_HOOK, 0x1181FF20       ; hold2.S hold_hook, then the stock hold
-        .equ    CC_HANDLER, 0x1181DEA0      ; midi_cc handler.S
+        .equ    CC_HANDLER, 0xC00F2800      ; midi_cc handler.S (DDR)
 
         .macro  FCALL target
         mvkl    .S2     \target, b5

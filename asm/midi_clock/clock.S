@@ -1,9 +1,9 @@
-; MIDI clock -> patch tempo (issue #5), MS-50G 3.10 OS.
+; MIDI clock -> patch tempo (issue #5), MS-70CDR 2.10 OS.
 ;
 ; Hook: Task_MIDI's byte loop ends every byte, realtime bytes included, at
-; 0xC00AF0F8 ("ldw *+b14(224),b0", read index of the receive ring). That word
+; 0xC00AEEE0 ("ldw *+b14(216),b0", read index of the receive ring). That word
 ; becomes "callp clock_trampoline" (trampoline.S), so this code runs once per
-; received byte with the byte at B14+234 and B3 = return into Task_MIDI. It
+; received byte with the byte at B14+226 and B3 = return into Task_MIDI. It
 ; runs the replaced load before returning. Only callee-saved A10 is live in
 ; Task_MIDI here, so B0-B2 are free on the fast path.
 ;
@@ -32,7 +32,7 @@
 ;     clock jitter flipped the tempo between 140 and 141 on the pedal;
 ;   - tempos are kept as 10 x BPM and clamped to 40..250 BPM like tap tempo.
 ; Applying hands the tempo to poll.S (V_WANT), which does what tap tempo does
-; (0xC00B9DA8) from the footswitch task: set_setting(TEMPO, bpm), whose change
+; from the footswitch task: set_setting(TEMPO, bpm), whose change
 ; callback takes the effect semaphore and retunes the effects, then
 ; Event_post(UI, 0x40) so the UI task redraws.
 ;
@@ -43,7 +43,7 @@
 ; stack, so that is the context the effects are used to.
 
         .include "transport.inc"
-        .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
+        .equ    DIVU, 0xC00DC560            ; a4 = a4 / b4 (unsigned), RTS
         .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
         .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
@@ -68,7 +68,7 @@
         .nocmp
         .global clock_hook
 clock_hook:
-        ldbu    .D2T2   *+b14(234), b0      ; the byte just taken
+        ldbu    .D2T2   *+b14(226), b0      ; the byte just taken
         mvk     .S2     0xF8, b1
         nop     3
         cmpeq   .L2     b0, b1, b2
@@ -82,7 +82,7 @@ clock_hook:
   [b1]  b       .S2     stop
         nop     5
 done:
-        ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
+        ldw     .D2T2   *+b14(216), b0      ; the replaced instruction
         b       .S2     b3
         nop     5
 
@@ -427,6 +427,6 @@ out:
         ldw     .D2T1   *+b15(24), a13
         ldw     .D2T2   *+b15(28), b10
         addk    .S2     32, b15
-        ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
+        ldw     .D2T2   *+b14(216), b0      ; the replaced instruction
         b       .S2     b3
         nop     5

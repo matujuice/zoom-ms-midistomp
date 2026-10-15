@@ -1,4 +1,4 @@
-; MIDI CC -> effect on/off and knobs (issue #4), MS-50G 3.10 OS.
+; MIDI CC -> effect on/off and knobs (issue #4), MS-70CDR 2.10 OS.
 ;
 ; Entered from the CC call site in Task_MIDI (via trampoline.S) with the
 ; arguments of the stock midi_channel_msg(type, channel, number, value):
@@ -17,18 +17,18 @@
 ; fx_set_param itself ignores parameters the effect does not have and clamps
 ; the value to the parameter's maximum.
 ;
-; Lives in free L2 RAM, so calls into DDR code go through a register (callp
-; cannot reach that far).
+; Lives in DDR at 0xC00F2800 (the 70CDR OS uses the L2 this was in); calls go
+; through a register.
 
         .equ    STEP, 0xC00F2020            ; step.S, then the stock midi_channel_msg
-        .equ    FX_PARAM_DESC, 0xC00B07AC   ; (slot, param) -> descriptor, max at +12
-        .equ    FX_SET_PARAM, 0xC00BAEE0
-        .equ    SEM_PEND, 0xC00C7C60
-        .equ    SEM_POST, 0xC00D70C0
-        .equ    UI_REFRESH, 0xC00ACEA4
-        .equ    EVENT_POST, 0xC00CC680
-        .equ    SEM_HANDLE_OFS, 784          ; B14 offsets
-        .equ    UI_EVENT_OFS, 676
+        .equ    FX_PARAM_DESC, 0xC00B056C   ; (slot, param) -> descriptor, max at +12
+        .equ    FX_SET_PARAM, 0xC00BB600
+        .equ    SEM_PEND, 0xC00C7EE0
+        .equ    SEM_POST, 0xC00D6B00
+        .equ    UI_REFRESH, 0xC00ACD84
+        .equ    EVENT_POST, 0xC00CBF40
+        .equ    SEM_HANDLE_OFS, 764          ; B14 offsets
+        .equ    UI_EVENT_OFS, 656
         .equ    RECIP_127, 33818641     ; ceil(2^32 / 127)
 
 ; Far call: B5 = target, B3 = return label. Arguments must be set before.

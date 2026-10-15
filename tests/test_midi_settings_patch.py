@@ -37,14 +37,14 @@ def test_patch_bytes_match_assembly_source():
 
 
 @pytest.mark.parametrize("site,tramp,vector", [
-    (0xC00A8360, 0xC00BEDF0, 64),   # menu keys
-    (0xC00A9400, 0xC00C2164, 72),   # menu draw
-    (0xC00B9CF4, 0xC00B97E8, 128),  # settings pack
-    (0xC00BA09C, 0xC00BDB44, 136),  # settings unpack
-    (0xC00AF088, 0xC00B2FAC, 144),  # CC
-    (0xC00AF0AC, 0xC00B2FAC, 144),  # PC
-    (0xC00B8DD4, 0xC00C4AAC, 152),  # record 51 load
-    (0xC00B86E0, 0xC00C5D88, 160),  # record 51 save
+    (0xC00A8310, 0xC00BEC90, 64),   # menu keys
+    (0xC00A9398, 0xC00C1FC4, 72),   # menu draw
+    (0xC00BA3D4, 0xC00B9EC8, 128),  # settings pack
+    (0xC00BA77C, 0xC00BD9E4, 136),  # settings unpack
+    (0xC00AEE6C, 0xC00B2D0C, 144),  # CC
+    (0xC00AEE90, 0xC00B2D0C, 144),  # PC
+    (0xC00B8B14, 0xC00C492C, 152),  # record 51 load
+    (0xC00B8420, 0xC00C6968, 160),  # record 51 save
 ])
 def test_call_sites_reach_their_vector(site, tramp, vector):
     word = _word(_at(site))
@@ -60,12 +60,12 @@ def test_call_sites_reach_their_vector(site, tramp, vector):
 
 
 def test_switch_tables():
-    assert _word(_at(0xC00EF300)) == BASE + 80   # screen 1 keys
-    assert _word(_at(0xC00EF2BC)) == BASE + 88   # screen 1 draw
-    assert _word(_at(0xC00EF334)) == BASE + 96   # screen 14 keys
-    assert _word(_at(0xC00EF2F0)) == BASE + 104  # screen 14 draw
-    assert _word(_at(0xC00EF330)) == BASE + 112  # screen 13 keys
-    assert _word(_at(0xC00EF2EC)) == BASE + 120  # screen 13 draw
+    assert _word(_at(0xC00EEFA0)) == BASE + 80   # screen 1 keys
+    assert _word(_at(0xC00EEBB4)) == BASE + 88   # screen 1 draw
+    assert _word(_at(0xC00EEFD4)) == BASE + 96   # screen 14 keys
+    assert _word(_at(0xC00EEBE8)) == BASE + 104  # screen 14 draw
+    assert _word(_at(0xC00EEFD0)) == BASE + 112  # screen 13 keys
+    assert _word(_at(0xC00EEBE4)) == BASE + 120  # screen 13 draw
 
 
 def test_vars_and_shared_addresses():
@@ -94,7 +94,7 @@ def test_settings_table():
         ("HOLD FOR", 0xC009D920, (0, 0, 0, 3, 1, 0)),
     ]
     hold = int.from_bytes(SEC[first + 7 * 24 + 8:first + 7 * 24 + 12], "little")
-    assert [_sec_word(hold + 4 * k) for k in range(2)] == [0xC00E953F, 0xC00EB13F]  # stock TUNER, TEMPO
+    assert [_sec_word(hold + 4 * k) for k in range(2)] == [0xC00E909F, 0xC00EB0DC]  # stock TUNER, TEMPO
     assert _sec_str(_sec_word(hold + 8)) == "MOMENTARY"
 
 
@@ -106,7 +106,7 @@ def test_no_overlap():
     for o in OTHERS:
         for a, b in spans(o):
             for c, d in ours:
-                if a == c == 0xC00AF088:  # the CC call site, rerouted on purpose
+                if a == c == 0xC00AEE6C:  # the CC call site, rerouted on purpose
                     continue
                 assert b <= c or d <= a, hex(c)
     for i, (a, b) in enumerate(ours):

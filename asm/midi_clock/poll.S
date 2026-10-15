@@ -1,7 +1,7 @@
-; Transport block upkeep (issue #24), MS-50G 3.10 OS.
+; Transport block upkeep (issue #24), MS-70CDR 2.10 OS.
 ;
 ; Task_SwitchNrmlSpdRead polls the footswitches every 16 ms and starts each
-; round with Clock_getTicks (callp at 0xC00CA630). That call is retargeted to
+; round with Clock_getTicks (callp at 0xC00C6998). That call is retargeted to
 ; poll_trampoline.S, which jumps here. This does the same job (returns the
 ; time in A4, keeps every callee-saved register) and on the way:
 ;   - clears "running" when no clock came for STALE_MS, neither since the

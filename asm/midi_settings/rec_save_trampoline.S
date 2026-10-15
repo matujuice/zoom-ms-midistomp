@@ -1,7 +1,7 @@
-; Far jump from DDR to rec_save in L2 (settings.S vector table), MS-50G 3.10.
-; Placed at 0xC00C5D88: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to rec_save in L2 (settings.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00C6968: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; the record 51 save (0xC00B86E0); B3 still holds the return address. Clobbers B0 (caller-saved).
+; the record 51 save (0xC00B8420); B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global rec_save_trampoline
 rec_save_trampoline:
