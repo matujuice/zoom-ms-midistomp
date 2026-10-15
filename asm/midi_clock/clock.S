@@ -1,4 +1,4 @@
-; MIDI clock -> patch tempo (issue #5), MS-50G 3.10 OS.
+; MIDI clock -> patch tempo (issue #5). OS addresses: os.inc (via transport.inc).
 ;
 ; Hook: Task_MIDI's byte loop ends every byte, realtime bytes included, at
 ; 0xC00AF0F8 ("ldw *+b14(224),b0", read index of the receive ring). That word
@@ -43,7 +43,6 @@
 ; stack, so that is the context the effects are used to.
 
         .include "transport.inc"
-        .equ    DIVU, 0xC00DCA20            ; a4 = a4 / b4 (unsigned), RTS
         .equ    HYST10, 8                   ; average: apply 0.8 BPM or more away
         .equ    JUMP10, 40                  ; 2 beats: jump 4 BPM or more away
         .equ    AGREE10, 20                 ; ... and within 2 BPM of last beat's
@@ -68,7 +67,7 @@
         .nocmp
         .global clock_hook
 clock_hook:
-        ldbu    .D2T2   *+b14(234), b0      ; the byte just taken
+        ldbu    .D2T2   *+b14(MIDI_BYTE_OFS), b0 ; the byte just taken
         mvk     .S2     0xF8, b1
         nop     3
         cmpeq   .L2     b0, b1, b2
@@ -82,7 +81,7 @@ clock_hook:
   [b1]  b       .S2     stop
         nop     5
 done:
-        ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
+        ldw     .D2T2   *+b14(MIDI_RD_OFS), b0 ; the replaced instruction
         b       .S2     b3
         nop     5
 
@@ -427,6 +426,6 @@ out:
         ldw     .D2T1   *+b15(24), a13
         ldw     .D2T2   *+b15(28), b10
         addk    .S2     32, b15
-        ldw     .D2T2   *+b14(224), b0      ; the replaced instruction
+        ldw     .D2T2   *+b14(MIDI_RD_OFS), b0 ; the replaced instruction
         b       .S2     b3
         nop     5

@@ -1,4 +1,4 @@
-; Transport block upkeep (issue #24), MS-50G 3.10 OS.
+; Transport block upkeep (issue #24). OS addresses: os.inc (via transport.inc).
 ;
 ; Task_SwitchNrmlSpdRead polls the footswitches every 16 ms and starts each
 ; round with Clock_getTicks (callp at 0xC00CA630). That call is retargeted to

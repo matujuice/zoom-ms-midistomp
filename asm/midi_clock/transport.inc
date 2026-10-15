@@ -1,4 +1,4 @@
-; Shared by clock.S and poll.S (MS-50G 3.10).
+; Shared by clock.S and poll.S. OS addresses: os.inc.
 ;
 ; Transport block for custom effects (issue #24): 8 words at a fixed L2
 ; address, read by effects with plain loads. Loaded at boot with the magic
@@ -42,12 +42,7 @@
         .equ    V_WANT, 92                  ; tempo for poll.S to apply, 0 = none
         .equ    V_TR, 96                    ; times of the last 24 ticks
 
-        .equ    CLOCK_GETTICKS, 0xC00DF360  ; SYS/BIOS Clock_getTicks, 1 ms
-        .equ    TEMPO_VALUE, 0xC009C06C     ; patch TEMPO, int BPM
-        .equ    SET_SETTING, 0xC00CAC64     ; (setting, value, notify)
-        .equ    TEMPO_SETTING, 0xC00EE3D8   ; value ptr, min 40, max 250
-        .equ    EVENT_POST, 0xC00CC680
-        .equ    UI_EVENT_OFS, 676
+        .include "os.inc"   ; CLOCK_GETTICKS, TEMPO_VALUE, SET_SETTING, TEMPO_SETTING, EVENT_POST, UI_EVENT_OFS
 
 ; Update the block atomically: interrupts off (nothing can read it half
 ; written on this single core), sequence odd while writing.
