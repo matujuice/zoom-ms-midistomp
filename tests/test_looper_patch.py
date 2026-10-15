@@ -5,18 +5,20 @@ import pytest
 from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
-PATCH = patcher.load(ROOT / "patches/looper.yaml")
+ALL = patcher.load(ROOT / "patches/looper.yaml")
+# The tests below check the MS-50G entries; test_ms70cdr_port.py the MS-70CDR ones.
+PATCH = {k: [e for e in v if e["model"] == "ms50g-3.10"] if k in ("write", "section") else v for k, v in ALL.items()}
 HOOKS, BLOCK = PATCH["section"]
 
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_bytes_match_assembly_sources():
-    for site in PATCH["write"]:
+    for site in ALL["write"]:
         if "source" not in site:
             continue
-        assert asm.assemble(ROOT / site["source"], site["addr"]).hex() == site["data"]
-    for sec in PATCH["section"]:
-        code = asm.assemble(ROOT / sec["source"], sec["addr"], whole_packets=True)
+        assert asm.assemble(ROOT / site["source"], site["addr"], build=site["model"]).hex() == site["data"]
+    for sec in ALL["section"]:
+        code = asm.assemble(ROOT / sec["source"], sec["addr"], whole_packets=True, build=sec["model"])
         assert code == bytes.fromhex("".join(sec["data"].split()))
 
 

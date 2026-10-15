@@ -1,6 +1,6 @@
 """MIDISTOMP on the MS-70CDR 2.10 OS (build id ms70cdr-2.10): phase 1
 version-1.1, boot-logo, midi-cc, midi-clock; phase 2 midi-settings,
-tempo-hold, scroll. Addresses: docs/ms70cdr-port.md, "Port to the MS-70CDR
+tempo-hold, scroll; phase 3 looper. Addresses: docs/ms70cdr-port.md, "Port to the MS-70CDR
 OS". Byte-vs-source checks are in the test_<patch>_patch.py files."""
 
 import re
@@ -193,3 +193,51 @@ def test_phase2_l2_and_ddr_layout():
         assert end <= start, f"{a} and {b} overlap at 0x{start:08X}"
     secs = {e["addr"] for n in ("midi-settings", "tempo-hold") for e in entries(n, "section")}
     assert secs == {SB, H, H2, 0x1181E7C0}
+
+
+# Phase 3 ------------------------------------------------------------------
+
+LOOPER_HOOKS, SERVICES = 0xC00F2200, 0xC00F3000  # the 50G DDR addresses, kept
+
+
+def test_looper_trampolines_retarget_the_phase_1_2_ones():
+    poll, toggle, hold, cc, draw = entries("looper", "write")
+    for i, (e, owner) in enumerate(((poll, "midi-clock"), (toggle, "tempo-hold"), (hold, "tempo-hold"), (cc, "midi-cc"))):
+        assert e["expect"] == at(owner, e["addr"])["data"]  # what the earlier patch put there
+        assert far_target(e["data"]) == LOOPER_HOOKS + 8 * i
+    assert far_target(poll["expect"]) == 0x1181E800 and far_target(toggle["expect"]) == H + 24
+    assert far_target(hold["expect"]) == H2 and far_target(cc["expect"]) == os_inc(B)["CC_HANDLER"]
+    # midi_gate passes CCs on through that trampoline, so cc_pre is on the CC path
+    assert os_inc(B)["CC_TRAMP"] == cc["addr"] == 0xC00E1F70
+
+
+def test_looper_draw_site():
+    *_, draw = entries("looper", "write")
+    old, new = word(draw["expect"]), word(draw["data"])
+    assert draw["addr"] == 0xC00BB0EC
+    assert callp_target(draw["addr"], old) == os_inc(B)["DRAW_NEXT"] == 0xC00D5720
+    assert callp_target(draw["addr"], new) == LOOPER_HOOKS + 32  # draw_pre
+    assert new & ~(0x1FFFFF << 7) == old & ~(0x1FFFFF << 7)  # callp .S2, parallel bit kept
+
+
+def test_looper_sections():
+    hooks, block = entries("looper", "section")
+    g50 = [e for e in patcher.load(ROOT / "patches/looper.yaml")["section"] if e["model"] == "ms50g-3.10"]
+    size = len(bytes.fromhex("".join(hooks["data"].split())))
+    assert hooks["addr"] == LOOPER_HOOKS and hooks["addr"] + size == os_inc(B)["CC_HANDLER"]  # ends where the handler starts
+    assert block["addr"] == SERVICES and block["data"] == g50[1]["data"]  # the Looper ZDL's layout, unchanged
+    spans = sorted((e["addr"], e["addr"] + len(bytes.fromhex("".join(e["data"].split()))))
+                   for n in ("version-1.1", "midi-cc", "midi-clock", "scroll", "looper") for e in entries(n, "section")
+                   if e["addr"] >> 24 == 0xC0)
+    for (_, end), (start, _) in zip(spans, spans[1:]):
+        assert end <= start
+    assert spans[-1][1] <= 0xC0102000  # the 64 KB kept for MOD code, below big-buffer region 1
+
+
+def test_looper_os_addresses():
+    o, g = os_inc(B), os_inc("ms50g-3.10")
+    same = ("SLOT_STATE", "SLOT_STRIDE", "CURSOR", "FB", "VIEW_KNOBS", "EV_REDRAW")
+    assert all(o[k] == g[k] for k in same)  # the same in both OS images (docs/ms70cdr-port.md)
+    assert (o["GPIO_BANK01"], o["LED_APPLIED"], o["CURSOR_SLOT"]) == (0x1181DEF0, 0xC00EEB10, 0xC00EE748)
+    assert (o["FB_DIRTY"], o["FONT7"], o["UI_EVENT_OFS"]) == (0xC00EEB30, 0xC00E87D8, 656)
+    assert o["GPIO_BANK01"] < OS_L2_END  # OS data, initialised from .cinit

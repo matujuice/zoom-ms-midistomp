@@ -1,5 +1,5 @@
-; Far jump from DDR to looper.S's poll_pre (v2.0 step 2), MS-50G 3.10. Replaces the
-; target of the transport poll trampoline at 0xC00C8050 (midi-clock.yaml); the call site and B3 are unchanged,
+; Far jump from DDR to looper.S's poll_pre (v2.0 step 2). Replaces the
+; target of the transport poll trampoline at 0xC00C8050 (70CDR 0xC00C82D0; midi-clock.yaml); the call site and B3 are unchanged,
 ; and poll_pre goes on to the old target. Clobbers B0 (caller-saved).
         .text
         .global poll_pre_trampoline
