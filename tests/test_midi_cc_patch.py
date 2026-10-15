@@ -15,12 +15,18 @@ def test_patch_bytes_match_assembly_source():
         for entry in PATCH[kind]:
             if "source" not in entry:
                 continue
-            code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section")
+            code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section",
+                                build=entry["model"])
             assert code == bytes.fromhex(entry["data"]), entry["source"]
 
 
-def test_callsite_is_retargeted_to_trampoline():
-    site, tramp = PATCH["write"]
+def of(build, kind):
+    return [e for e in PATCH[kind] if e["model"] == build]
+
+
+@pytest.mark.parametrize("build, stock", [("ms50g-3.10", 0xC00AE0F8), ("ms70cdr-2.10", 0xC00ADF20)])
+def test_callsite_is_retargeted_to_trampoline(build, stock):
+    site, tramp = of(build, "write")
     word = int.from_bytes(bytes.fromhex(site["data"]), "little")
     old = int.from_bytes(bytes.fromhex(site["expect"]), "little")
     packet = site["addr"] & ~31  # callp is relative to its fetch packet
@@ -29,7 +35,7 @@ def test_callsite_is_retargeted_to_trampoline():
         disp = (w >> 7) & 0x1FFFFF
         return packet + 4 * (disp - (1 << 21) if disp & (1 << 20) else disp)
 
-    assert target(old) == 0xC00AE0F8  # stock midi_channel_msg
+    assert target(old) == stock  # stock midi_channel_msg
     assert target(word) == tramp["addr"]
     assert word & ~(0x1FFFFF << 7) == old & ~(0x1FFFFF << 7)
     assert len(bytes.fromhex(tramp["data"])) <= 24  # the free gap
@@ -50,9 +56,10 @@ def test_section_kind_adds_code():
         patcher.apply(img, {"name": "t", "section": [{"model": "m", "addr": 0x11900002, "data": "00"}]}, "m")
 
 
-def test_handler_falls_through_to_step():
+@pytest.mark.parametrize("build", ["ms50g-3.10", "ms70cdr-2.10"])
+def test_handler_falls_through_to_step(build):
     import re
-    handler, step = PATCH["section"]
+    handler, step = of(build, "section")
     m = re.search(r"\.equ\s+STEP,\s*(0x[0-9A-Fa-f]+)", (ROOT / handler["source"]).read_text())
     assert int(m.group(1), 16) == step["addr"]
     assert step["source"] == "asm/midi_cc/step.S"

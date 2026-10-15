@@ -53,4 +53,6 @@ def test_bin133_checks_stock_hash():
 
 def test_boot_logo_patch_is_one_screen():
     p = patcher.load("patches/boot-logo.yaml")
-    assert [(b["offset"], len(bytes.fromhex(b["data"]))) for b in p["bin133"]] == [(0, 1024)]
+    assert [(b["model"], b["offset"], len(bytes.fromhex(b["data"]))) for b in p["bin133"]] == [
+        ("ms50g-3.10", 0, 1024), ("ms70cdr-2.10", 0, 1024)]
+    assert p["bin133"][0]["data"] == p["bin133"][1]["data"]  # the same logo on both

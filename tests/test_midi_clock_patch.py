@@ -16,11 +16,12 @@ def test_patch_bytes_match_assembly_source():
         for entry in PATCH[kind]:
             if "source" not in entry:
                 continue
-            code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section")
+            code = asm.assemble(ROOT / entry["source"], entry["addr"], whole_packets=kind == "section",
+                                build=entry["model"])
             assert code == bytes.fromhex(entry["data"]), entry["source"]
 
 
-@pytest.mark.parametrize("pair", [0, 2])
+@pytest.mark.parametrize("pair", [0, 2, 4, 6])  # MS-50G, then MS-70CDR
 def test_hook_calls_trampoline(pair):
     site, tramp = PATCH["write"][pair:pair + 2]
     word = int.from_bytes(bytes.fromhex(site["data"]), "little")
@@ -32,23 +33,26 @@ def test_hook_calls_trampoline(pair):
     assert len(bytes.fromhex(tramp["data"])) <= 16  # the free gap
 
 
-def test_no_overlap_with_midi_cc_patch():
+@pytest.mark.parametrize("build", ["ms50g-3.10", "ms70cdr-2.10"])
+def test_no_overlap_with_midi_cc_patch(build):
     def spans(p):
         for e in p.get("write", []) + p.get("section", []):
-            yield e["addr"], e["addr"] + len(bytes.fromhex(e["data"]))
+            if e["model"] == build:
+                yield e["addr"], e["addr"] + len(bytes.fromhex(e["data"]))
     ours = list(spans(PATCH))
     for a, b in spans(CC):
         for c, d in ours:
             assert b <= c or d <= a
-    secs = sorted(PATCH["section"], key=lambda e: e["addr"])
+    secs = sorted((e for e in PATCH["section"] if e["model"] == build), key=lambda e: e["addr"])
     for a, b in zip(secs, secs[1:]):
         assert a["addr"] + len(bytes.fromhex(a["data"])) <= b["addr"]
     assert secs[-1]["addr"] + len(bytes.fromhex(secs[-1]["data"])) <= 0x11820000  # end of L2
 
 
-def test_transport_block():
-    block = bytes.fromhex(PATCH["section"][-1]["data"])
-    assert PATCH["section"][-1]["addr"] == 0x1181FF00  # published to the effects pack
+@pytest.mark.parametrize("i", [3, 7])  # MS-50G, MS-70CDR: the same block
+def test_transport_block(i):
+    block = bytes.fromhex(PATCH["section"][i]["data"])
+    assert PATCH["section"][i]["addr"] == 0x1181FF00  # published to the effects pack
     assert int.from_bytes(block[:4], "little") == 0x5A4D5401
     assert int.from_bytes(block[20:24], "little") == 12000
 

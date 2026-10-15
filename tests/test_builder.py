@@ -21,6 +21,7 @@ def test_release_sections_do_not_overlap():
     from zoomms import patcher
     spans = sorted((s["addr"], s["addr"] + len(bytes.fromhex("".join(s["data"].split()))), p)
                    for p in builder.PATCHES
-                   for s in patcher.load(builder.ROOT / "patches" / f"{p}.yaml").get("section", []))
+                   for s in patcher.load(builder.ROOT / "patches" / f"{p}.yaml").get("section", [])
+                   if s["model"] == "ms50g-3.10")  # the release build
     for (_, end, a), (start, _, b) in zip(spans, spans[1:]):
         assert end <= start, f"{a} and {b} overlap at 0x{start:08X}"
