@@ -67,7 +67,7 @@ files are. Each task ends with tests passing and a real build.
 | T3 | **MIDI port:** `midi-cc` (with CC 80/81), `midi-clock`, `midi-settings` | Sonnet | T1, T2r |
 | T4 | **UI port:** `tempo-hold`, `scroll`, `version-1.1`, `boot-logo` | Sonnet | T3 |
 | T5 | **RAM test port:** `ram-test`, then Luca runs it | Sonnet | T2r |
-| T6 | **Looper services port** with the new free regions (done, flash test with the Looper ZDL pending) | Opus | T5 |
+| T6 | **Looper services port** with the new free regions (done, flash-tested with the Looper ZDL) | Opus | T5 |
 | T7 | **PEDAL INPUT** setting | Sonnet | T4 |
 | T8 | Mac builder from Zoom's MS-70CDR Mac updater, if one exists (low priority) | Sonnet | T4 |
 
@@ -81,6 +81,9 @@ on the 70CDR.
 T4 flash-tested 2026-10-15 (Luca): boot logo and v1.1, tempo screen, HOLD FOR
 (TUNER / TEMPO / MOMENTARY), combos and tuner EXIT, scrolling with wrap and
 bounce, TEMPO LOCK, CC and Program Change.
+
+T6 flash-tested 2026-10-15 (Luca): looper services build with the Looper ZDL
+(status box changes, Roll on the bar's first slice) "working well".
 
 RAM test (T5) run 2026-10-15 by Luca on the 70CDR OS: all five regions 0
 after boot and after heavy use. Free: 1 `0xC00F3100`-`0xC0197FFF`, 2
