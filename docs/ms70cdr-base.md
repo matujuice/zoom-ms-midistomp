@@ -78,6 +78,10 @@ patches kept, MIDI menu saved, Program Change (START NO. 0/1), CC on/off and
 knobs, CC 80/81 patch up/down, clock, Start/Stop, MIDI CHANNEL, stereo input
 on the 70CDR.
 
+T4 flash-tested 2026-10-15 (Luca): boot logo and v1.1, tempo screen, HOLD FOR
+(TUNER / TEMPO / MOMENTARY), combos and tuner EXIT, scrolling with wrap and
+bounce, TEMPO LOCK, CC and Program Change.
+
 RAM test (T5) run 2026-10-15 by Luca on the 70CDR OS: all five regions 0
 after boot and after heavy use. Free: 1 `0xC00F3100`-`0xC0197FFF`, 2
 `0xC0198000`-`0xC01FFFFF` (bigger than on the 50G, no overlay table there),
