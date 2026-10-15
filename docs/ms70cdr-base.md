@@ -78,5 +78,11 @@ patches kept, MIDI menu saved, Program Change (START NO. 0/1), CC on/off and
 knobs, CC 80/81 patch up/down, clock, Start/Stop, MIDI CHANNEL, stereo input
 on the 70CDR.
 
+RAM test (T5) run 2026-10-15 by Luca on the 70CDR OS: all five regions 0
+after boot and after heavy use. Free: 1 `0xC00F3100`-`0xC0197FFF`, 2
+`0xC0198000`-`0xC01FFFFF` (bigger than on the 50G, no overlay table there),
+3 `0xC0636980`-`0xC07CFFFF`, 4 `0xC07F4000`-`0xC07FFFFF`, 5 shared RAM
+`0x80000000`-`0x8001FFFF`.
+
 Release: one builder and one updater for all three pedals; then Mixer Mode and
 Perform mode as in `docs/v2.0-brief.md`.
