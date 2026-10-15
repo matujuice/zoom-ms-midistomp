@@ -24,10 +24,12 @@ code), 128 bytes, loaded at boot.
 | 13 | 52 | firmware | GPIO register that lights the LED (write the mask) |
 | 14 | 56 | firmware | GPIO register that darkens it |
 | 15 | 60 | firmware | the LED's bit |
-| 16 | 64 | ZDL | pulse level 0..32 (LED duty, status box fill) |
+| 16 | 64 | ZDL | LED level 0..32 (its own PWM) |
 | 17, 18 | 68 | ZDL | 8 status characters, space padded |
+| 19 | 76 | ZDL | loop progress 0..256 (status box fill) |
+| 20 | 80 | ZDL | 1 = status box inverted (pulse, blink) |
 | 24-26 | 96 | firmware | private (last heartbeat, polls without one, "was under the cursor") |
-| 27-29 | 108 | firmware | private (status text and fill step last drawn) |
+| 27-29 | 108 | firmware | private (status text, progress / 4 + inverted x 256 last drawn) |
 | 31 | 124 | boot | end mark `0x5A4C53FF` |
 
 Big buffer (RAM test, issue #19; nothing in the OS writes there):
@@ -64,11 +66,12 @@ With the looper's own 705 KB slot block that is 3.3 MB: 24.7 s stereo or
   When the cursor leaves the looper the poll flips the LED task's "written"
   bit (`0xC00EF078` bit 0) so it writes the new effect's state again.
 - **Screen:** while word 12 is 1 and no overlay or prompt is open, every
-  screen draw adds a status box top right of the Effect View (x 79-127,
-  y 0-9, above the knob frame at y 11): the 8 characters of words 17-18 in the
-  OS font on a dither fill set by word 16 (0-3 none, 4-11 25 %, 12-19 50 %,
-  20-27 75 %, 28-32 full). From 75 % the text is white with a black 1-pixel
-  edge, below it black with a white edge. The 16 ms poll asks the UI for a
-  redraw (event 0x40) when the text or the fill step changes.
+  screen draw adds a status box to the Looper's Effect View: knob pages
+  x 74-127, y 0-10 (above the knob frame at y 11), cover x 68-126, y 19-32
+  (the panel under LOOPER). A white box with a black border, filled black from
+  the left by word 19, the text of words 17-18 centred in the Effect View's bold
+  font (proportional) and inverted over the fill; word 20 inverts the inside.
+  The 16 ms poll asks the UI for a redraw (event 0x40) when the text, the
+  progress (in 64ths) or word 20 changes.
 - **Never** change the address, magic or word layout without a new magic
   (version byte).
