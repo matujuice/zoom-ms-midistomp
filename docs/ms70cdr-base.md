@@ -73,5 +73,9 @@ files are. Each task ends with tests passing and a real build.
 
 T3 and T4 each end with a flash test by Luca before the next starts.
 
+T3 flash-tested 2026-10-15 (Luca, MS-60B and MS-70CDR): boots with effects and
+patches kept, MIDI menu saved, Program Change (START NO. 0/1), CC on/off and
+knobs, clock, Start/Stop, MIDI CHANNEL, stereo input on the 70CDR.
+
 Release: one builder and one updater for all three pedals; then Mixer Mode and
 Perform mode as in `docs/v2.0-brief.md`.
