@@ -1,4 +1,4 @@
-# Builds the MIDISTOMP V1.0 logo from the stock MULTISTOMP MS-50G bitmap (BIN/133 pages 0-7).
+# Builds the MIDISTOMP logo from the stock MULTISTOMP MS-70CDR bitmap (BIN/133 pages 0-7).
 # Usage: python3 scripts/midistomp_logo.py 133_data_133.bin preview.png logo.bin
 # (133_data_133.bin from `zoomms updater-parts <stock updater> --out DIR`;
 # logo.bin = the 1024 bytes in patches/boot-logo.yaml)
@@ -18,22 +18,21 @@ def draw(rows,x,y):
             if c=='#': out[y+j][x+i]=1
 S=-5  # whole logo shift to stay centred
 # top line: M from stock, then I D I, then the stock S...TOMP block
-blit(5,19,6,14,15-5+S)          # M at 15
-blit(51,54,6,14,31-51+S)        # I at 31
+# (the 70CDR bitmap has the top line 1 column left of the MS-50G one)
+blit(4,18,6,14,15-4+S)          # M at 15
+blit(50,53,6,14,31-50+S)        # I at 31
 draw(["##########...","###########..","###......###.","###.......###","###.......###","###.......###","###......###.","###########..","##########..."],36+S,6)  # D
-blit(51,54,6,14,S)              # I at 51 (stock position)
-blit(55,127,6,17,S)             # S, bar, TOMP
+blit(50,53,6,14,1+S)            # I at 51
+blit(54,127,6,17,1+S)           # S, bar, TOMP
 for y in (16,17):               # S bottom bar: start under the new M
     for x in range(72+S): out[y][x]=0  # only the bar; TOMP's bottom rows stay
     for x in range(15+S, (72 if y==16 else 71)+S): out[y][x]=1
-# bottom line: M O D (M and O are the stock "M" and "0" of MS-50G), centred;
+# bottom line: M O D from the stock "MS-70CDR" letters M, 0 and D, centred;
 # the OS prints the version under it
-x=30
-blit(11,38,20,40,x-11); x+=28+3   # stock "M" is columns 11-38
-blit(80,96,20,40,x-80); x+=17+3   # stock "0" is columns 80-96
-for y in range(21,41):            # D: straight left stroke, right half of the "0"
-    for i in range(17):
-        if i<6 or i>=8 and src[y][80+i] or i<10 and (y<=24 or y>=37): out[y][x+i]=1
+x=35
+blit(0,22,20,40,x-0); x+=23+3     # stock "M" is columns 0-22
+blit(61,75,20,40,x-61); x+=15+3   # stock "0" is columns 61-75
+blit(97,111,20,40,x-97)           # stock "D" is columns 97-111
 img=Image.new('L',(W,H),20)
 for y in range(H):
     for x in range(W):

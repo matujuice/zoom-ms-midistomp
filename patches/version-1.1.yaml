@@ -8,13 +8,13 @@ replace:
     count: 2   # the menu list and the version screen title
 section:
   # "v1.1", in DDR the RAM test (#19) found unused
-  - model: ms50g-3.10
+  - model: ms70cdr-2.10
     addr: 0xC00F2000
     data: "76312e3100000000"
 write:
   # Boot screen: sprintf(buf, "v%s", version) -> format = our "v1.1" string.
-  # mvk/mvkh .S2 0xC00E4DB4,b0 -> 0xC00F2000 (keeps the mvkh parallel bit)
-  - model: ms50g-3.10
-    addr: 0xC00CD960
-    expect: "2ada26006b076000"
+  # mvk/mvkh .S2 0xC00E4914,b0 -> 0xC00F2000 (keeps the mvkh parallel bit)
+  - model: ms70cdr-2.10
+    addr: 0xC00CD7C0
+    expect: "2a8a24006b076000"
     data: "2a001000eb076000"

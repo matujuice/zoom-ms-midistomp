@@ -133,6 +133,13 @@ CC handler moved from L2 `0x1181DEA0` to DDR `0xC00F2800` (T2r decision);
 every other L2 section keeps its address. Three trampoline caves differ from
 the 50G ones (CC `0xC00BB190`, record 51 save `0xC00C6968`, both only 16 B).
 
+T4 converts `tempo-hold`, `scroll`, `version-1.1` and `boot-logo` the same way
+(addresses and B14 offsets MODE 320, PENDING 340, HOLD_FIRED 348 from the
+map; the trampoline caves are the map's, each checked as zero bytes after a
+`bnop b3,5`). `boot-logo` patches the 70CDR BIN/133 (its stock logo says
+MS-70CDR), rebuilt by `scripts/midistomp_logo.py` from the 70CDR bitmap. The
+tempo-hold, scroll and version sections below still quote the MS-50G values.
+
 ### MIDI CC patch (issue #4, `patches/midi-cc.yaml`)
 
 Built for the MS-50G 3.10 OS only (the patch refuses other builds). Source in

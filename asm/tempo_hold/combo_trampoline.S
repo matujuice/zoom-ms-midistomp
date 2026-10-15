@@ -1,7 +1,7 @@
-; Far jump from DDR to combo_hook in L2 (hold.S vector table), MS-50G 3.10.
-; Placed at 0xC00D44D0: zero bytes after a function's return (bnop b3,5) at the
+; Far jump from DDR to combo_hook in L2 (hold.S vector table), MS-70CDR 2.10.
+; Placed at 0xC00D4090: zero bytes after a function's return (bnop b3,5) at the
 ; end of a plain fetch packet, never a branch target. Called from
-; 0xC00AD090, 0xC00AD064, 0xC00AD034; B3 still holds the return address. Clobbers B0 (caller-saved).
+; 0xC00ACF6C, 0xC00ACF40, 0xC00ACF10; B3 still holds the return address. Clobbers B0 (caller-saved).
         .text
         .global combo_trampoline
 combo_trampoline:

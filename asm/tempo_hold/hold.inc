@@ -8,9 +8,9 @@
         .equ    V_PRESST, 8                 ; time of that press
         .equ    V_MARM, 12                  ; 1 = flip back on a long press
         .equ    V_SWALLOW, 16               ; releases to ignore, bit = event - 64
-        .equ    MODE, 328                   ; B14 offset, 0 = play
-        .equ    PENDING, 348                ; B14 offset, stock keys cancel it first
-        .equ    HOLD_FIRED, 360             ; B14 offset, 1 = the release does not tap
+        .equ    MODE, 320                   ; B14 offset, 0 = play
+        .equ    PENDING, 340                ; B14 offset, stock keys cancel it first
+        .equ    HOLD_FIRED, 348             ; B14 offset, 1 = the release does not tap
         .equ    HOLD_WORD, 0xC009D920       ; stock HOLD FOR: 0 tuner, 1 tempo
         .equ    SW_STATE, 0xC009DF90        ; 7 switches, bit i clear = down
         .equ    BOTTOM, 3                   ; the type key under the footswitch
@@ -26,21 +26,21 @@
         .equ    MAX_BPM, 250
         .equ    TEXT_Y, 53                  ; inside the box, under the BPM
 
-        .equ    OVL_GET, 0xC00CBA10         ; (0) -> overlay state, -1 = none
-        .equ    OVL_SET, 0xC00CB8A4         ; (0, state, ms)
-        .equ    TEMPO_BOX, 0xC00AAC48       ; (0, tempo)
+        .equ    OVL_GET, 0xC00CCD6C         ; (0) -> overlay state, -1 = none
+        .equ    OVL_SET, 0xC00CCC84         ; (0, state, ms)
+        .equ    TEMPO_BOX, 0xC00AAB10       ; (0, tempo)
         .equ    DRAW_TEXT, 0xC009FCE0       ; (0, string, x, y)
         .equ    CLAMP, 0xC00A766C           ; (value, min, max)
-        .equ    TOGGLE, 0xC00ABDE4          ; (slot)
-        .equ    IS_DIRTY, 0xC00B87F4
-        .equ    STOCK_KNOB, 0xC00AC214
-        .equ    STOCK_TAP, 0xC00B9DA8
-        .equ    STOCK_HOLD, 0xC00ABE58
-        .equ    STOCK_RELEASE, 0xC00ACA1C
-        .equ    STOCK_TYPE_HOLD, 0xC00ABB80
-        .equ    STOCK_CURSOR_HOLD, 0xC00ABA90
-        .equ    STOCK_TYPE_REL, 0xC00AC574
-        .equ    STOCK_CURSOR_REL, 0xC00AC434
+        .equ    TOGGLE, 0xC00ABCB8          ; (slot)
+        .equ    IS_DIRTY, 0xC00B8534
+        .equ    STOCK_KNOB, 0xC00AC0E8
+        .equ    STOCK_TAP, 0xC00BA488
+        .equ    STOCK_HOLD, 0xC00ABD30
+        .equ    STOCK_RELEASE, 0xC00AC8FC
+        .equ    STOCK_TYPE_HOLD, 0xC00ABA58
+        .equ    STOCK_CURSOR_HOLD, 0xC00AB968
+        .equ    STOCK_TYPE_REL, 0xC00AC450
+        .equ    STOCK_CURSOR_REL, 0xC00AC30C
 
 ; Branch to an absolute address (B0).
         .macro  JUMP target

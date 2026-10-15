@@ -1,5 +1,5 @@
 ; Tempo screen, HOLD FOR MOMENTARY and button combos (issue #28, v0.6),
-; MS-50G 3.10 OS.
+; MS-70CDR 2.10 OS.
 ;
 ; Tempo screen (overlay state 2, footswitch hold with HOLD FOR TEMPO; state
 ; 5, knob 1 press on a patch with a tempo effect): drawn by the stock box

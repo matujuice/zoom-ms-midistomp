@@ -1,24 +1,24 @@
-; Faster effect scrolling with wrap (issue #37), MS-50G 3.10 OS.
+; Faster effect scrolling with wrap (issue #37), MS-70CDR 2.10 OS.
 ;
 ; Left/right in the effect view (released, events 73/75) call the stock
-; slide step(dir) at 0xC00C4C64: 4 frames of 32 px with sleep(100) between
+; slide step(dir) at 0xC00C4AE4: 4 frames of 32 px with sleep(100) between
 ; them, so about 0.4 s a step. At the end of the chain the handler calls a
-; 2 px bump (0xC00C4DCC) instead.
+; 2 px bump (0xC00C4C4C) instead.
 ;   frame_sleep: the slide's sleep(100) call goes here: sleeps V_FRAME ms
 ;                (FRAME_MS, or WRAP_MS while wrapping).
 ;   wrap(dir):   replaces the bump: slides back across the chain with
 ;                step(-dir) until the other end, WRAP_MS frames, then the
 ;                stock bump in the travel direction (a stop), its 125 ms
 ;                pause cut to BOUNCE_MS.
-; End tests are the key handler's own (0xC00AC4B4-0xC00AC528): +1 ends at
+; End tests are the key handler's own (0xC00AC38C-0xC00AC400): +1 ends at
 ; cursor byte == 6 - effect count (word 1), -1 ends at cursor byte == 5.
 ;
 ; In DDR at 0xC00F2100, RAM test region 1 (issue #19), after midi-cc's
 ; step.S at 0xC00F2020 (scroll.yaml).
 
-        .equ    STOCK_STEP, 0xC00C4C64      ; step(A4 = dir +1 / -1)
-        .equ    STOCK_SLEEP, 0xC00CF000     ; sleep(A4 = ms), inferred
-        .equ    STOCK_BUMP, 0xC00C4DCC      ; bump(A4 = dir): 2 px out, sleep, back
+        .equ    STOCK_STEP, 0xC00C4AE4      ; step(A4 = dir +1 / -1)
+        .equ    STOCK_SLEEP, 0xC00CEBC0     ; sleep(A4 = ms), inferred
+        .equ    STOCK_BUMP, 0xC00C4C4C      ; bump(A4 = dir): 2 px out, sleep, back
         .equ    CURSOR, 0xC009C064          ; byte 0 = cursor (5 = effect 1), word 1 = effect count
         .equ    FRAME_MS, 8                 ; stock 100
         .equ    WRAP_MS, 5
@@ -60,7 +60,7 @@ wrap:           ; A4 = dir of the key that hit the end
 wrap_loop:
         mvkl    .S1     CURSOR, a3
         mvkh    .S1     CURSOR, a3
-        ldb     .D1T1   *a3, a5             ; cursor, as 0xC00C09D4(0)
+        ldb     .D1T1   *a3, a5             ; cursor, as 0xC00C0834(0)
         ldw     .D1T1   *+a3(4), a6
         nop     4
         mvk     .S1     6, a7
