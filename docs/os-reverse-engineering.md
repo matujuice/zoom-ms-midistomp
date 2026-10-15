@@ -532,7 +532,15 @@ midi-clock, tempo-hold and scroll. Block layout and rules:
   at + 24; the bank base pointer is at `0x1181DE70`). So the LED is lit with the
   pin low (inferred). There is no fast timer in the LED path (16 ms), so the
   Looper ZDL does the PWM from its audio block.
-- **Effect View draw** (for the status box, not done yet): play mode
+- **Status box (r2):** every screen draw ends at `0xC00BA9CC` (`callp
+  0xC00B5794 || mv a13, a4`, after the overlay draw, before the LCD send
+  `0xC00B5A80`); that callp now goes to `draw_pre`. Overlay state from
+  `0xC00CBA10(0)` (-1 = none), prompt flag `B14+348`. The OS font is 6 column
+  bytes a character at `0xC00E9188 + 6 x code` (rows 0-6). The knob page's
+  frame is drawn at y 11 (`0xC00AB2E8(0, 0, 11, 128, 53)` in `0xC00CB0C0`), so
+  the box uses y 0-9. Stock draws mark the 8-pixel rows to send in the byte
+  at `0xC00EF118` (bit = row). The UI event (`B14+676`) bit 0x40 redraws.
+- **Effect View draw:** play mode
   (`B14+328` = 0) draws through `0xC00BA2F8`, which picks the slot under the
   cursor and calls `0xC00AA478(0, slot)` (the effect's cover image and its knob
   boxes, from the slot's screen record `0xC00B07F0(slot)`) or `0xC00CB0C0(0,

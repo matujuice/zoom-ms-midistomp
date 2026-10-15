@@ -27,6 +27,7 @@ code), 128 bytes, loaded at boot.
 | 16 | 64 | ZDL | pulse level 0..32 (LED duty, status box fill) |
 | 17, 18 | 68 | ZDL | 8 status characters, space padded |
 | 24-26 | 96 | firmware | private (last heartbeat, polls without one, "was under the cursor") |
+| 27-29 | 108 | firmware | private (status text and fill step last drawn) |
 | 31 | 124 | boot | end mark `0x5A4C53FF` |
 
 Big buffer (RAM test, issue #19; nothing in the OS writes there):
@@ -62,5 +63,12 @@ With the looper's own 705 KB slot block that is 3.3 MB: 24.7 s stereo or
   (PWM); the LED task only writes on a change, so it stays out of the way.
   When the cursor leaves the looper the poll flips the LED task's "written"
   bit (`0xC00EF078` bit 0) so it writes the new effect's state again.
+- **Screen:** while word 12 is 1 and no overlay or prompt is open, every
+  screen draw adds a status box top right of the Effect View (x 79-127,
+  y 0-9, above the knob frame at y 11): the 8 characters of words 17-18 in the
+  OS font on a dither fill set by word 16 (0-3 none, 4-11 25 %, 12-19 50 %,
+  20-27 75 %, 28-32 full). From 75 % the text is white with a black 1-pixel
+  edge, below it black with a white edge. The 16 ms poll asks the UI for a
+  redraw (event 0x40) when the text or the fill step changes.
 - **Never** change the address, magic or word layout without a new magic
   (version byte).

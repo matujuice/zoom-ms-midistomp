@@ -18,6 +18,8 @@
         .equ    S_LASTHB, 96                ; firmware private: heartbeat seen last poll
         .equ    S_STALE, 100                ; firmware private: polls without a heartbeat
         .equ    S_WASMINE, 104              ; firmware private: S_MINE last poll
+        .equ    S_DTEXT, 108                ; firmware private: status text last drawn (8 bytes)
+        .equ    S_DSTEP, 116                ; firmware private: box fill step last drawn
 
         .equ    STALE_POLLS, 3              ; 16 ms polls: free the claim after ~48 ms
         .equ    SLOT_STATE, 0x11F03004      ; word 1 of slot 0's state block = its params pointer
@@ -27,3 +29,13 @@
         .equ    CURSOR, 0xC009C064          ; signed byte: cursor of view 0
         .equ    CURSOR_SLOT, 0xC00EEEB0     ; word [24 x cursor]: slot under it (view 0)
         .equ    MODE, 328                   ; B14 offset, 0 = play
+        .equ    PENDING, 348                ; B14 offset, a prompt over the Effect View
+        .equ    UI_EVENT, 676               ; B14 offset, the UI task's event
+        .equ    EV_REDRAW, 0x40             ; UI refresh (as the MIDI CC knob change)
+        .equ    EVENT_POST, 0xC00CC680      ; (event, mask)
+        .equ    OVL_GET, 0xC00CBA10         ; (0) -> overlay state, -1 = none
+        .equ    LCD_MODE, 0xC00B5794        ; stock call at 0xC00BA9CC, before the LCD send
+        .equ    FB, 0x11816800              ; frame buffer: column bytes, 128 per 8-pixel row
+        .equ    FB_DIRTY, 0xC00EF118        ; byte: rows to send (bit = 8-pixel row)
+        .equ    FONT, 0xC00E9188            ; 6 column bytes a character, by char code
+        .equ    BOX_X, 79                   ; status box: x 79-127, y 0-9 (frame line at y 11)
