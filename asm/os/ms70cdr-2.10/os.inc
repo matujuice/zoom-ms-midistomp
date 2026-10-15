@@ -97,6 +97,19 @@
         .equ    STOCK_BUMP, 0xC00C4C4C      ; bump(A4 = dir)
         .equ    CURSOR, 0xC009C064          ; byte 0 = cursor (5 = effect 1), word 1 = effect count
 
+; Looper services (asm/looper/looper.S)
+        .equ    SLOT_STATE, 0x11F03004      ; word 1 of slot 0's state block = its params pointer
+        .equ    SLOT_STRIDE, 212            ; state block per slot (6 slots)
+        .equ    GPIO_BANK01, 0x1181DEF0     ; pointer the OS's GPIO writer uses (pin 0 = LED)
+        .equ    LED_APPLIED, 0xC00EEB10     ; bit 0: LED state the LED task wrote last
+        .equ    CURSOR_SLOT, 0xC00EE748     ; word [24 x cursor]: slot under it (view 0)
+        .equ    EV_REDRAW, 0x40             ; UI event bit: refresh (as the MIDI CC knob change)
+        .equ    DRAW_NEXT, 0xC00D5720       ; stock call at 0xC00BB0EC (the 50G 0xC00D5B60), the last before the LCD send
+        .equ    FB, 0x11816800              ; frame buffer: column bytes, 128 per 8-pixel row
+        .equ    FB_DIRTY, 0xC00EEB30        ; byte: rows to send (bit = 8-pixel row)
+        .equ    FONT7, 0xC00E87D8           ; the Effect View's bold font: 7 column bytes a character
+        .equ    VIEW_KNOBS, 0xC009D398      ; word: 1 = knob pages, 0 = cover
+
 ; MIDISTOMP layout that differs per build
         .equ    CC_HANDLER, 0xC00F2800      ; handler.S in DDR: the OS uses L2 up to 0x1181DF04
         .equ    CC_TRAMP, 0xC00E1F70       ; asm/midi_cc/trampoline.S (midi_gate jumps here)

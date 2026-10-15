@@ -1,4 +1,4 @@
-; Looper services block (v2.0 step 2), MS-50G 3.10 OS. Layout and rules:
+; Looper services block (v2.0 step 2), MS-50G 3.10 and MS-70CDR 2.10 OS (the same). Layout and rules:
 ; docs/looper-services.md. The Looper ZDL reads and writes it with plain loads
 ; and stores; nothing calls into the firmware.
         .equ    SV, 0xC00F3000              ; RAM test region 1, after the MOD code
@@ -24,20 +24,6 @@
         .equ    S_DKEY, 116                 ; firmware private: progress / 4 + inverted x 256 last drawn
 
         .equ    STALE_POLLS, 3              ; 16 ms polls: free the claim after ~48 ms
-        .equ    SLOT_STATE, 0x11F03004      ; word 1 of slot 0's state block = its params pointer
-        .equ    SLOT_STRIDE, 212
-        .equ    GPIO_BANK01, 0x1181DE70     ; pointer the OS's GPIO writer uses (pin 0 = LED)
-        .equ    LED_APPLIED, 0xC00EF078     ; bit 0: LED state the LED task wrote last
-        .equ    CURSOR, 0xC009C064          ; signed byte: cursor of view 0
-        .equ    CURSOR_SLOT, 0xC00EEEB0     ; word [24 x cursor]: slot under it (view 0)
-        .equ    MODE, 328                   ; B14 offset, 0 = play
-        .equ    PENDING, 348                ; B14 offset, a prompt over the Effect View
-        .equ    UI_EVENT, 676               ; B14 offset, the UI task's event
-        .equ    EV_REDRAW, 0x40             ; UI refresh (as the MIDI CC knob change)
-        .equ    EVENT_POST, 0xC00CC680      ; (event, mask)
-        .equ    OVL_GET, 0xC00CBA10         ; (0) -> overlay state, -1 = none
-        .equ    LCD_MODE, 0xC00B5794        ; stock call at 0xC00BA9CC, before the LCD send
-        .equ    FB, 0x11816800              ; frame buffer: column bytes, 128 per 8-pixel row
-        .equ    FB_DIRTY, 0xC00EF118        ; byte: rows to send (bit = 8-pixel row)
-        .equ    FONT7, 0xC00E8C78           ; the Effect View's bold font: 7 column bytes a character
-        .equ    VIEW_KNOBS, 0xC009D398      ; word: 1 = knob pages, 0 = cover
+
+; The OS addresses the hooks use (slot state blocks, LED, cursor, screen) are
+; in asm/os/<build>/os.inc, "Looper services".
