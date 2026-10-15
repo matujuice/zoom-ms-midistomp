@@ -63,7 +63,7 @@ bootloader steps stay skipped. `ms50g-3.10-stock-keepboot.exe` skips BIN/133
 and so leaves the MIDISTOMP logo in place; Zoom's own updater restores it.
 
 The v0.3 line needs `patches/midi-clock.yaml` as tagged `v0.3`, the v1.0 line
-`patches/midi-cc.yaml` as tagged `v1.0`.
+`patches/midi-cc.yaml` as tagged `v1.0` (v1.1 adds CC 80/81 to it).
 
 Changing assembly in `asm/` needs GNU binutils for tic6x
 (`scripts/build-c6x-binutils.sh`); regenerate the bytes in the patch file with

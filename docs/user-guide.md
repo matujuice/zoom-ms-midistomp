@@ -1,4 +1,4 @@
-<p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.0" width="720"></p>
+<p align="center"><img src="img/banner.png" alt="MIDISTOMP MOD v1.1" width="720"></p>
 
 <h1 align="center">MIDISTOMP V1.1 user guide</h1>
 
@@ -27,7 +27,7 @@ playing aids. It is not made or supported by Zoom.
 |---|---|
 | MS-50G | Runs it. Tested with the Mac updater: PC, CC, MIDI clock, MIDI menu, channel filter, combos and HOLD FOR all work. |
 | MS-60B with the MS-50G 3.10 firmware cross-flashed | Runs it; tested with the Windows updater. |
-| MS-70CDR | Untested. It should boot, but stereo may not work (inferred). A tested MS-70CDR version will follow once the author has one. |
+| MS-70CDR | Reported working by a user (flashed with the Windows builder, v1.0): it boots and runs, but the audio comes out **mono**. Not tested by the author; a proper MS-70CDR version will follow once the author has one. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
 
 You get 6 effects per patch, like the MS-50G firmware.
@@ -59,7 +59,7 @@ updater yourself from Zoom's official one. This needs Windows, or a Mac
 8. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v1.1** and
    the last menu entry reads **V1.1**.
 
-   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.0 boot screen" width="400">
+   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v1.1 boot screen" width="400">
 
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's bootloader, which keeps the update mode always available.
@@ -217,7 +217,7 @@ it can rewrite the firmware and remove MIDISTOMP (inferred, not tested).
   Pro) can add lag; pass the clock through unchanged if you can.
 - **Some delays cut out on tempo changes.** That is the effect itself (see
   MIDI clock above).
-- **MS-70CDR** is untested; stereo may not work.
+- **MS-70CDR**: one user reports it runs, with mono output (#35). Not tested by the author.
 - **Going back to an older MIDISTOMP or stock** may start the pedal on patch 1
   once.
 - *Is my pedal at risk?* The bootloader is never rewritten, so update mode is
