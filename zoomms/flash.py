@@ -12,13 +12,15 @@ MS-50G v3.10:
     erase 0x3FD000 +0x3000      write BIN/133
     erase 0x040000 +0xB0000     write BIN/129 main OS, last
 
-MS-60B / MS-70CDR also write BIN/137 (effects file system) at 0x0F0000.
+MS-60B / MS-70CDR also write BIN/137 (effects file system, 2912256 B) at
+0x0F0000, between the BIN/133 and main OS steps.
 
 Erasing the OS trailer first and writing the OS last looks like how the
 bootloader knows an update was interrupted (inferred). The stock updater
 rewrites the bootloader on every update, which is the one step that could
 brick a pedal beyond USB recovery if interrupted. build_updater() therefore
-turns the bootloader steps (and BIN/133) into no-ops: the loop in the updater
+turns the bootloader steps (and BIN/133) into no-ops, and the BIN/137 erase and
+write too, so an update never deletes the user's installed effects: the loop in the updater
 skips any step whose type is not 1 or 2.
 
 BIN/133 starts with the boot logo (128x64, page format: one byte = 8 vertical
@@ -73,12 +75,13 @@ def find_script(exe: bytes) -> list[Step]:
 
 
 def boot_steps(steps: list[Step], keep_133: bool = False) -> list[Step]:
-    """Steps touching the bootloader area (and BIN/133 unless keep_133)."""
+    """Steps touching the bootloader area, the effects file system (0xF0000) and
+    BIN/133 (unless keep_133): all the steps an update must not run."""
     out = []
     for s in steps:
         if s.addr < 0x40000:
             out.append(s)
-        elif not keep_133 and s.addr == 0x3FD000:
+        elif s.addr == 0xF0000 or (not keep_133 and s.addr == 0x3FD000):
             out.append(s)
     return out
 

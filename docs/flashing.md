@@ -10,10 +10,11 @@ The stock updater runs a fixed script (see `zoomms/flash.py`):
 4. (MS-60B, MS-70CDR only) erase and rewrite the effects file system
 5. erase and write the main OS
 
-Updaters built by `zoomms build` skip steps 2 and 3. The bootloader holds the
+Updaters built by `zoomms build` skip steps 2, 3 and 4. The bootloader holds the
 USB update mode, so never touching it keeps that recovery path intact even if
-an update is interrupted. Built from the MS-50G updater, the effects file
-system (step 4) is not touched either, so your installed effects stay.
+an update is interrupted. Skipping step 4 (the MS-70CDR updater has it; the
+MS-50G one never did) keeps your installed effects: an update never deletes them.
+The MIDISTOMP builder takes Zoom's MS-70CDR 2.10 updater (`--build-id ms70cdr-2.10`).
 
 They are also unsigned: Zoom's signature is removed because it no longer
 matches. Windows SmartScreen will warn; choose "More info" then "Run anyway".
