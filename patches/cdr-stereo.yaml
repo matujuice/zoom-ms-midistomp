@@ -1,0 +1,101 @@
+# TEST BUILD, MS-70CDR only (owner's pedal), never released: true stereo input.
+#   The R jack's ADC (McASP AXR4) is routed and read as on the MS-70CDR 2.10 OS, and the
+#   70CDR input stages (deinterleave, dual-range combine + DC blocker, to float) feed the
+#   chain L and R inputs separately. Always on, no mono fallback (R = R jack).
+#   Do not flash on an MS-50G/60B: there AXR4/GPIO 52 have an unknown board role.
+# Design, addresses and what is confirmed: docs/ms70cdr-port.md, "Stereo input patch (test build)".
+# Apply after looper (its section ends at 0xC00F2800). Hex from
+#   zoomms asm asm/cdr_stereo/<file> --addr <addr>   (add --section for the section);
+# the compact (16-bit) edits and the callp are hand-encoded, tests/test_cdr_stereo_patch.py checks them.
+name: cdr-stereo
+description: TEST MS-70CDR true stereo input (AXR4 + 70CDR input stages)
+builds: [ms50g-3.10]
+write:
+  # PINMUX10[23:20] = 1: pad AXR0_4 to McASP AXR4 instead of GPIO 52 (compact set .S2 b0,23,23,b0
+  # -> set .S2 b0,20,20,b0, the 70CDR halfword)
+  - model: ms50g-3.10
+    addr: 0x11818274
+    expect: "23f0"
+    data: "2390"
+  # GPIO init: bank 3 DIR 0x1020 -> 0x1030, GPIO 52 is an input (compact mvk .S2 32,b0 -> 48,b0)
+  - model: ms50g-3.10
+    addr: 0xC00CE292
+    expect: "3300"
+    data: "3310"
+  # McASP init: RFMT = 0x000180F0 (RBUSEL = 0, RX through the DMA port)
+  - model: ms50g-3.10
+    addr: 0xC00C3210
+    expect: "287c4000"
+    data: "28784000"
+    source: asm/cdr_stereo/rfmt.S
+  # McASP init: stw b1,*+a4(124) (RINTCTL = 0, now done in stereo.S boot) -> set a0,3,3,a0 (XFMT stays 0x000180F8)
+  - model: ms50g-3.10
+    addr: 0xC00C323C
+    expect: "76e29300"
+    data: "88630000"
+    source: asm/cdr_stereo/xfmt.S
+  # McASP init: PFUNC = 0x0200FF8F (AXR4 is McASP)
+  - model: ms50g-3.10
+    addr: 0xC00C32A0
+    expect: "aacfff036a808103"
+    data: "aac7ff036a008103"
+    source: asm/cdr_stereo/pfunc.S
+  # McASP init: PDIR = 0x1600FFCF (AXR4 is an input)
+  - model: ms50g-3.10
+    addr: 0xC00C32AC
+    expect: "a8ef7f00"
+    data: "a8e77f00"
+    source: asm/cdr_stereo/pdir.S
+  # 0xC00C5BA0 (called by the McASP init): RX PaRAM 0 DST reset 0x11F034F8 -> new buffer A 0x11F03B80
+  - model: ms50g-3.10
+    addr: 0xC00C5BB8
+    expect: "287c1a00"
+    data: "28c01d00"
+    source: asm/cdr_stereo/rx_reset.S
+  # Boot: callp McASP init 0xC00C31A4 -> callp stereo.S boot 0xC00F2800 (which calls the McASP init)
+  - model: ms50g-3.10
+    addr: 0xC00D47F8
+    expect: "9238dd1f"
+    data: "12043c10"
+  # L2 audio call list: callp rx_deint, in_combine, to_float -> far jump to stereo.S stereo_in
+  - model: ms50g-3.10
+    addr: 0x1181BD6C
+    expect: "92d1ff1f1270ff1f1240ff1f"
+    data: "2a801400ea07600062a38000"
+    source: asm/cdr_stereo/call_list.S
+section:
+  # In DDR RAM test region 1 after looper.S (which ends at 0xC00F2800): boot at +0, stereo_in at +0x100
+  - model: ms50g-3.10
+    addr: 0xC00F2800
+    source: asm/cdr_stereo/stereo.S
+    data: >-
+      f754bc01290000022ac8000269e800026be8000259a3800242c0810275e29302
+      f7029002290020032a00100369e000036ae80003290480032a00800369088003
+      6a04800329c01d042a001e0469f808046af80804292084042a30840479c0a404
+      7a30990476221803744298037462180476829803762224037442a40374622404
+      7682a403f6222403f442a403f6622404f782a40328248000a1e187007436a002
+      10ffff8f008000002ad218026a0660026203100062818601e652bc0100600000
+      62030c0000800000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      2806200068e000006502800029c29d012a009e0269f888016af8880229000008
+      2a00000869fb3f086afb3f08290080082a008008698081086a808108fab90400
+      290000092a00000950408021690028096b0028095a908f022921bd092a21bd09
+      691290096a129009a9de420aaade420ae9ed2f0aeaed2f0a29f49f0a2af49f0a
+      69ff8f0a6aff8f0a290c600b2a0c600be900700bea00700b29e8bf0b2ae8bf0b
+      69fe8f0b6afe8f0ba9a52f0caaa52f0c69f8020c6af8020c2900800c2a00800c
+      6900c00c6a00c00ca9ff7f0daaff7f0de9ff3f0deaff3f0d2900800d2a00800d
+      6900980d6a00980d29401e032a409e0069f808036af888006502180ee782040e
+      291c1b022a2c1b026522980ee7a2840e69f808026af808026542180fe7c2040f
+      28ac9b026562980fe7e2840f69f8880258a3a0000060000065020c03e6021403
+      65428c03e74294035108800152088002718643147286431471a6d31472a6d314
+      0000000071c6641372c6641371e6e41372e6e4130020000071c6601372c66013
+      59031c015a031c0171464c1172464c11004000007940a40e7a40a40ef90a7500
+      fa0a7500d90f20dea10674cedb0f203ea206742ef9814704fa81470479026504
+      7a026504790065047a0065047106491473064914f89a730000400000a1082104
+      a2082104f901e904fb01e90471069d1372069d135903a4045a03a40471269914
+      7226991471c65b1172c65b1171e65f1372e65f130000000079e2240f7ae2240f
+      71c6d71372c6d7130040000079e288037ae2880379e298037ae29803a1489c0f
+      a2489c0f5909fc035b09fc03a0e187000040000001eeec0303eeec0310dfff8f
+      0040000075369003f7369003d90f1cd4a0161cc4743614042bbc5e00f6e2840f
+      ebc00800f402040e63030000f422840ef442040ff462840ff682040ef6a2840e
+      f6c2040f00000000000000000000000000000000000000000000000000000000
