@@ -1,12 +1,17 @@
-# Builds MIDISTOMP-builder.exe (no Zoom code inside). Pushing a tag vX.Y
-# publishes the release with it, notes from docs/releases/vX.Y.md; a release
-# published by hand gets it attached. On pull requests it is a workflow artifact.
+# Builds MIDISTOMP-builder.exe (no Zoom code inside). Running it by hand with
+# release = vX.Y (or pushing tag vX.Y) publishes that release from this commit,
+# notes from docs/releases/vX.Y.md; a release published by hand gets the builder
+# attached. On pull requests it is a workflow artifact.
 name: builder
 on:
   pull_request:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish this release (e.g. v1.2); empty = build only"
+        required: false
   release:
     types: [published]
 permissions:
@@ -36,8 +41,9 @@ jobs:
         run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder.exe --clobber
         env:
           GH_TOKEN: ${{ github.token }}
-      - if: github.event_name == 'push'
+      - if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release != '')
         shell: bash
-        run: gh release create "$GITHUB_REF_NAME" dist/MIDISTOMP-builder.exe --title "MIDISTOMP MOD $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+        run: gh release create "$TAG" dist/MIDISTOMP-builder.exe --target "$GITHUB_SHA" --title "MIDISTOMP MOD $TAG" --notes-file "docs/releases/$TAG.md"
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release || github.ref_name }}
