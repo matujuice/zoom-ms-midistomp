@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/img/banner.png" alt="MIDISTOMP MOD v1.0" width="720"></p>
+<p align="center"><img src="docs/img/banner.png" alt="MIDISTOMP MOD v1.1" width="720"></p>
 
 <h1 align="center">MIDISTOMP</h1>
 
@@ -14,8 +14,9 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 
 > **Tested on an MS-60B** running the MS-50G 3.10 firmware. The MS-50G runs the
 > same firmware it is built from and is tested too: flashed from a Mac, with PC,
-> CC, MIDI clock, the MIDI menu and the button combos working. An MS-70CDR version
-> will be tested and built once I get one. Tried it on another pedal?
+> CC, MIDI clock, the MIDI menu and the button combos working. An MS-70CDR owner
+> reports v1.0 flashing and running fine, with mono output; I will build and test
+> a proper MS-70CDR version once I get mine. Tried it on another pedal?
 > [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
 
 <p align="center"><img width="1920" height="1536" alt="zoom midistomp mod v1 0 update" src="https://github.com/user-attachments/assets/49f817ca-8fe0-4b5a-8190-f3cc83cfe124" /></p>
