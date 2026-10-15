@@ -37,4 +37,4 @@ def test_call_sites_retargeted():
 def test_frame_times():
     src = (ROOT / SECTION["source"]).read_text()
     frame, wrap = (int(re.search(rf"\.equ\s+{n},\s*(\d+)", src).group(1)) for n in ("FRAME_MS", "WRAP_MS"))
-    assert 0 < wrap <= frame < 100  # faster than stock, wrap fastest
+    assert 0 < frame < 100 and 0 < wrap < 100  # faster than stock

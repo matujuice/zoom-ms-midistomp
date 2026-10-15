@@ -27,7 +27,7 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 | **Program Change** | loads patches from a DAW, an app or a drum machine |
 | **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#5-midi-cc-chart) |
 | **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
-| **Faster scrolling** | left/right move between effects about 4x faster and wrap around at the ends |
+| **Faster scrolling** | left/right move between effects several times faster and wrap around at the ends |
 | **Patch up/down by CC** | CC 80 / 81 load the previous / next patch |
 | **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
 | **Tempo screen** | turn the knob or tap, TEMPO LOCK across patches |

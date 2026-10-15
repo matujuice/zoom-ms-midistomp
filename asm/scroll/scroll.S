@@ -9,15 +9,15 @@
 ;   wrap(dir):   replaces the bump: slides back across the chain with
 ;                step(-dir) until the other end, WRAP_MS frames.
 ; End tests are the key handler's own (0xC00AC4B4-0xC00AC528): +1 ends at
-; cursor byte == word 1 - 6, -1 ends at cursor byte == 5.
+; cursor byte == 6 - effect count (word 1), -1 ends at cursor byte == 5.
 ;
 ; In DDR at 0xC00F2100, RAM test region 1 (issue #19), after midi-cc's
 ; step.S at 0xC00F2020 (scroll.yaml).
 
         .equ    STOCK_STEP, 0xC00C4C64      ; step(A4 = dir +1 / -1)
         .equ    STOCK_SLEEP, 0xC00CF000     ; sleep(A4 = ms), inferred
-        .equ    CURSOR, 0xC009C064          ; byte 0 = cursor, word 1 = end + 6
-        .equ    FRAME_MS, 25                ; stock 100
+        .equ    CURSOR, 0xC009C064          ; byte 0 = cursor (5 = effect 1), word 1 = effect count
+        .equ    FRAME_MS, 8                 ; stock 100
         .equ    WRAP_MS, 10
         .equ    MAX_STEPS, 6                ; never loop if a step can't move
 
@@ -59,7 +59,8 @@ wrap_loop:
         ldb     .D1T1   *a3, a5             ; cursor, as 0xC00C09D4(0)
         ldw     .D1T1   *+a3(4), a6
         nop     4
-        add     .L1     -6, a6, a6          ; +1 end
+        mvk     .S1     6, a7
+        sub     .L1     a7, a6, a6          ; +1 end: 6 - effects
         mvk     .S1     5, a7               ; -1 end
         cmplt   .L1     0, a10, a1          ; going +1
   [!a1] mv      .L1     a7, a6

@@ -171,7 +171,7 @@ tuning fork under down + right (photo in section 2).
 In the tuner, pressing the middle knob (**EXIT**) goes back to the effects.
 
 **Faster scrolling** (from v1.1): left and right move between the effects of
-a patch about four times faster than stock. At the last effect, one more
+a patch several times faster than stock. At the last effect, one more
 press slides quickly back across the chain to the first one, and the other
 way round. Like stock, the move happens when you let go of the key.
 
