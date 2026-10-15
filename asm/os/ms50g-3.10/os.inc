@@ -99,4 +99,5 @@
 
 ; MIDISTOMP layout that differs per build
         .equ    CC_HANDLER, 0x1181DEA0      ; asm/midi_cc/handler.S (L2)
+        .equ    CC_TRAMP, 0xC00AF408       ; asm/midi_cc/trampoline.S (midi_gate jumps here)
         .equ    TUNER_LABEL_TRAMP, 0xC00DAFD0 ; asm/tempo_hold/tuner_label_trampoline.S

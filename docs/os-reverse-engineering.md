@@ -387,7 +387,10 @@ patch `patches/midi-settings.yaml`.
   after a change calls `0xC00B9D04`. `midi_gate` sits in front of both
   Task_MIDI calls of `midi_channel_msg` (CC `0xC00AF088`, PC `0xC00AF0AC`,
   via `0xC00B2FAC`): channel filter, receive off, and with PROG CH START 1
-  PC n loads patch n (PC 0 dropped, PC 127 untouched). `poll.S` calls
+  PC n loads patch n (PC 0 dropped, PC 127 untouched). A CC that passes
+  goes on through midi-cc's trampoline (`0xC00AF408`), so `looper`'s
+  `cc_pre` sees it (before 2026-10-15 it went straight to the handler and
+  the looper's on/off CC never counted). `poll.S` calls
   `tempo_lock` every 16 ms: for 16 rounds after the patch number changes it
   asks (`V_WANT`) for the tempo of two rounds before the change, if the
   patch load changed it; quiet for 2 s after boot.

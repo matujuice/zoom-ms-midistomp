@@ -99,4 +99,5 @@
 
 ; MIDISTOMP layout that differs per build
         .equ    CC_HANDLER, 0xC00F2800      ; handler.S in DDR: the OS uses L2 up to 0x1181DF04
+        .equ    CC_TRAMP, 0xC00E1F70       ; asm/midi_cc/trampoline.S (midi_gate jumps here)
         .equ    TUNER_LABEL_TRAMP, 0xC00DFA50 ; asm/tempo_hold/tuner_label_trampoline.S

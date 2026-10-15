@@ -122,3 +122,21 @@ def test_no_overlap():
             assert b <= c or d <= a, hex(c)
     end = PATCH["section"][0]["addr"] + len(SEC)
     assert end <= 0x1181FF00  # transport block
+
+
+def _mvk_pairs(data):
+    """Constants of the mvkl/mvkh .S2 pairs to b0 in code (as the JUMP macro emits them)."""
+    words = [int.from_bytes(data[i:i + 4], "little") for i in range(0, len(data) - 7, 4)]
+    return {(h >> 7 & 0xFFFF) << 16 | l >> 7 & 0xFFFF for l, h in zip(words, words[1:])
+            if l & 0xFF80007F == 0x2A and h & 0xFF80007F == 0x6A}
+
+
+def test_cc_goes_through_the_midi_cc_trampoline():
+    # midi_gate jumps to midi-cc's trampoline, not straight to the handler, so
+    # looper.yaml's cc_pre (which retargets that trampoline) is on the CC path
+    for build in ("ms50g-3.10", "ms70cdr-2.10"):
+        sec = bytes.fromhex(_view(ALL, build)["section"][0]["data"].replace(" ", "").replace("\n", ""))
+        tramp = _view(patcher.load(ROOT / "patches/midi-cc.yaml"), build)["write"][1]["addr"]
+        handler = _view(patcher.load(ROOT / "patches/midi-cc.yaml"), build)["section"][0]["addr"]
+        pairs = _mvk_pairs(sec)
+        assert tramp in pairs and handler not in pairs

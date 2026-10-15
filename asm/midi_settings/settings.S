@@ -868,7 +868,7 @@ mg_channel_ok:
 mg_pc:
         JUMP    MIDI_CHANNEL_MSG
 mg_cc:
-        JUMP    CC_HANDLER
+        JUMP    CC_TRAMP                    ; midi-cc's trampoline: looper.yaml hooks it
 
 ; TEMPO LOCK, called by poll.S every 16 ms (footswitch task) before it
 ; applies V_WANT. While idle it remembers the tempo of one round ago; for
