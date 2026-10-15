@@ -157,3 +157,76 @@ sequence:
   - 70CDR owners want the stock 70CDR effect set, or
   - the A patch shows analog differences that cannot be fixed in software (gain or
     calibration).
+
+## Model detection (one image for MS-50G/60B and MS-70CDR)
+
+Static analysis, 2026-10-15. Addresses are MS-50G 3.10 unless marked (70CDR 2.10, 60B 2.10).
+
+**Flash map** (both updaters' step tables): boot `0x000000` +0x40000, OS `0x040000` +0xB0000,
+FS (BIN/137) `0x0F0000` +0x2C7000, BIN/133 `0x3FD000` +0x3000. The MS-50G updater erases and
+writes boot, BIN/133 and OS; the 70CDR updater also writes the FS **[C]**. So a 70CDR flashed
+with any MS-50G-based updater keeps its factory 70CDR file system (this corrects section 3).
+
+**1. SysEx model byte = BIN/133 offset 0x2C00 (flash `0x3FFC00`) [C].**
+- `0xC00BB960` picks the flash layout from the JEDEC id (`0xC00BB908`: F8 32 15 = 2 MB part,
+  base `0x1D0000`; otherwise base `0x3FD000`, stored at B14+20). `0xC00E0D40` reads 0x2C01
+  bytes from that base (SPI fast-read `0xC00BB574`) and takes the last one. Same code in the 70CDR.
+- Stock BIN/133 byte 0x2C00: 0x58 in the MS-50G updater, 0x61 in the 70CDR updater (60B: 0x5F per
+  `models/`). The rest of the 4 KB sector is 0xFF.
+- Every MIDISTOMP build includes `boot-logo` (`scripts/midistomp_builder.py` PATCHES), so it keeps
+  the BIN/133 erase+write with **MS-50G** data: every MIDISTOMP pedal, 60B and 70CDR, now has 0x58
+  there **[I, follows from the flash steps]**. The stock MS-50G updater does the same.
+- Verdict: correct from the factory, but already lost on every installed pedal. It is usable only if
+  MIDISTOMP stops writing BIN/133 (logo drawn by the OS instead) and 70CDR users run the stock 70CDR
+  updater once. One wrong flash loses it again. Secondary signal at best: 0x61 means 70CDR, 0x58 means unknown.
+
+**2. GPIO straps: none found.** GPIO init (writes OUT, then DIR, per bank; DIR bit 1 = input):
+MS-50G `0xC00CE234`, 60B `0xC00BE654` (byte for byte the same values), 70CDR `0xC00CD5B8`. Differences:
+
+| GPIO | MS-50G / 60B | MS-70CDR | use in the 70CDR OS |
+|---|---|---|---|
+| 39 (GP2[7]) | output, low | output, **high** | flash read `0xC00B8E64`: addr >= 0x400000 -> GPIO39=0, addr -= 0x400000 (upper flash bank select) |
+| 52 (GP3[4]) | output, low | **input** | no direct reader found |
+| 90 (GP5[10]) | output, low | **input** | R-jack poll (section 2): depends on the cable, not a model id |
+
+- GPIO 63 is an output, low, in all three. No OS reads a pin at boot to choose a model. The MS-50G
+  OS has the GPIO 90 read helper `0xC00CE0A0`, but nothing calls it.
+- The bootloader (BIN/136) is identical on all three (also the MS-60B `boot.elf`). It builds no GPIO
+  or SYSCFG address and never reads `0x3FFC00`. Its USB name is the generic "ZOOM MS Series".
+  It cannot tell the models apart **[C for what was searched]**.
+- Today the MS-50G OS on a 70CDR drives GPIO 52, GPIO 90 and AXR4 low against whatever drives them
+  on that board **[I: possible contention, already happening on the user's pedal]**.
+
+**3. AXR4 activity probe (recommended) [design I, facts C].**
+- MS-50G and 60B McASP init (`0xC00C32A0`; 60B `0xC00B3740`): PFUNC `0x0300FF9F`, PDIR `0x1600FFDF`.
+  AXR0-4 and AXR7-15 are all GPIO outputs, and no PDOUT/PDSET/PDCLR write was found, so all of them
+  are driven low. This is the usual way to park unused pins. Nothing in software uses AXR4 as a
+  control line **[C]**; its board connection is **[I]**.
+- On the 70CDR, AXR4 is the data out of the second (R) ADC. It is clocked by the same McASP
+  frame/bit clocks as AXR5. An I2S ADC sends sign and noise bits all the time, so the pin keeps
+  toggling even with no cable in.
+- Probe: after the McASP clocks run, set PDIR bit 4 = 0 (input) and keep PFUNC GPIO. Sample PDIN
+  (McASP +0x1C) bit 4 a few thousand times over about 10 ms and count transitions. If there are
+  transitions: 70CDR, so apply the stereo config (section 2) and then GPIO 39/52/90/63 like the
+  70CDR OS. If there are none: restore PDIR `0x1600FFDF`. The 60B/50G then end up exactly as today.
+- Safety: an input cannot drive anything. The worst case on a 50G/60B is a few ms with the pin floating.
+- A false negative (ADC held silent) gives today's mono, which is safe. A false positive needs a
+  floating pin that toggles. Mitigation: require many transitions **[I: OMAP-L138 AXR pull
+  default not checked]**.
+- Never switch GPIO 39/52/63/90 on a pedal that failed the probe: their 50G/60B roles are unknown.
+
+**4. Weak heuristics:** the FS content (70CDR stock ZDLs survive the cross-flash, but users and Zoom
+Effect Manager change it) and the flash JEDEC id (production variation, the same check in both OSes).
+
+**Ranking:** (1) AXR4 probe: hardware-based, independent of flash history and cables, safe.
+(2) Flash byte `0x3FFC00`: only after the updater change, as confirmation.
+(3) GPIO 90: no, it depends on the cable. GPIO straps or the bootloader: nothing found.
+
+**Harmless on-pedal tests.**
+- `zoomms identify` on the owner's 60B and on the 70CDR: expect 0x58 on both. This would confirm
+  that the model byte was overwritten.
+- A debug build that only runs the probe (input, sample, restore) and prints the transition count
+  and the ones count next to the version on the boot screen.
+  - Owner's MS-60B first: expect 0 transitions.
+  - Then a 70CDR owner, with no cable, then L only, then L+R: expect many in every case.
+  - No other pin and no audio path changes in that build.
