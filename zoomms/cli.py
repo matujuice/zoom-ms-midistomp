@@ -70,14 +70,31 @@ def cmd_ais(args) -> int:
     return 0
 
 
-def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], build_id: str):
+def build_stamp(patch_paths: list[str], given: list[str] = ()) -> dict:
+    """Text for the patches' stamp fields: version (from a version-X.Y patch),
+    commit (git short hash), date (today), label ("DEV"); KEY=TEXT overrides."""
+    import datetime
+    import subprocess
+    version = next((f"V{Path(p).stem[8:]}" for p in patch_paths if Path(p).stem.startswith("version-")), "?")
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                                cwd=Path(__file__).parent, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = "?"
+    stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": "DEV"}
+    stamp.update(kv.split("=", 1) for kv in given)
+    return stamp
+
+
+def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], build_id: str, stamp: list[str] = ()):
     """(new main OS, new BIN/133 or None if unchanged, parsed patched OS), or None on a patch error."""
     img = ais.parse(original)
     d133 = bytearray(stock_133)
+    texts = build_stamp(patch_paths, stamp)
     for patch_path in patch_paths:
         patch = patcher.load(patch_path)
         try:
-            lines = patcher.apply(img, patch, build_id) + patcher.apply_bin133(d133, patch, build_id)
+            lines = patcher.apply(img, patch, build_id, texts) + patcher.apply_bin133(d133, patch, build_id)
         except patcher.PatchError as e:
             print(f"error: {e}", file=sys.stderr)
             return None
@@ -94,7 +111,7 @@ def cmd_build(args) -> int:
     p133 = next(p for p in found if p.resource_id == 133)
     original = parts.read_part(args.updater, os_part)
     stock_133 = parts.read_part(args.updater, p133)
-    patched = _apply_patches(original, stock_133, args.patch, args.build_id)
+    patched = _apply_patches(original, stock_133, args.patch, args.build_id, args.stamp)
     if patched is None:
         return 1
     new_os, new_133, img = patched
@@ -123,7 +140,7 @@ def cmd_build_mac(args) -> int:
     res = macapp.resources(Path(args.app))
     original = (res / "Main.bin").read_bytes()
     stock_133 = (res / "Preset.bin").read_bytes()
-    patched = _apply_patches(original, stock_133, args.patch, args.build_id)
+    patched = _apply_patches(original, stock_133, args.patch, args.build_id, args.stamp)
     if patched is None:
         return 1
     new_os, new_133, img = patched
@@ -204,6 +221,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("updater", help="stock official updater .exe")
     p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
+    p.add_argument("--stamp", action="append", default=[], metavar="KEY=TEXT",
+                   help="stamp field text (version, commit, date, label; defaults: version-X.Y patch, git, today, DEV)")
     p.add_argument("--out", required=True)
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader like the stock updater does (not recommended)")
@@ -212,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("app", help="stock official updater .app")
     p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
+    p.add_argument("--stamp", action="append", default=[], metavar="KEY=TEXT",
+                   help="stamp field text (version, commit, date, label; defaults: version-X.Y patch, git, today, DEV)")
     p.add_argument("--out", required=True, help="new .app (must not exist)")
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader like the stock updater does (not recommended)")

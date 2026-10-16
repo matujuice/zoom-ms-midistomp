@@ -543,7 +543,7 @@ midi-clock, tempo-hold and scroll. Block layout and rules:
   `ctx[1]`.
 - **Slot under the cursor:** the footswitch press (`0xC00ACBE8`-`0xC00ACC2C`)
   reads the cursor byte (`0xC00C09D4(view)` = signed byte at
-  `0xC009C064 + 4 x view`), then the slot word at `0xC00EEEB0 + 24 x cursor +
+  `0xC009C064 + 4 x view`), then the slot word at `0xC00EECB0 + 24 x cursor +
   4 x view`; bit `slot` of `0xC009C060` set skips the flip. The play-mode draw
   (`0xC00BA2F8`) uses the same lookup.
 - **LED:** `Task_UpdateLED` (`0xC00C760C`) runs `0xC00C7520` every 16 ms. Bit 0

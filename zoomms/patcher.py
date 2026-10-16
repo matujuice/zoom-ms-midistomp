@@ -11,7 +11,9 @@ Patch kinds supported so far:
     section:   - model: ms50g-3.10  addr: 0x...  data: "hex"  source: asm/...
         New code or data loaded by the boot image as an extra section (into RAM
         nothing else uses). `source` names the assembly it was built from;
-        tests check the bytes still match it.
+        tests check the bytes still match it. Optional `stamp: {key: offset}`:
+        16-byte "<key>" placeholders the build fills with text (version,
+        commit, date, label: see `zoomms build --stamp`).
     bin133:    - model: ms50g-3.10  offset: 0  expect_sha256: "..."  data: "hex"
         Overwrite bytes of updater part BIN/133 (the boot logo), not the OS.
         `expect_sha256` is the hash of the stock bytes being replaced, so no
@@ -39,7 +41,28 @@ def _bytes(v) -> bytes:
     return v.encode("latin-1") if isinstance(v, str) else bytes(v)
 
 
-def apply(img: ais.AisImage, patch: dict, build_id: str) -> list[str]:
+STAMP_SIZE = 16
+
+
+def stamp_placeholder(key: str) -> bytes:
+    return f"<{key}>".encode().ljust(STAMP_SIZE, b"\0")
+
+
+def stamp_section(sec: dict, stamp: dict | None, name: str = "patch") -> bytes:
+    """The section's bytes with its `stamp:` fields ({key: offset}) filled from
+    `stamp` ({key: text}): 16-byte zero-padded ASCII, at most 15 characters.
+    Keys missing from `stamp` keep their placeholder."""
+    data = bytearray.fromhex(sec["data"])
+    for key, off in sec.get("stamp", {}).items():
+        if data[off:off + STAMP_SIZE] != stamp_placeholder(key):
+            raise PatchError(f"{name}: no <{key}> placeholder at section +{off}")
+        if stamp and key in stamp:
+            text = str(stamp[key]).encode("ascii")[:STAMP_SIZE - 1]
+            data[off:off + STAMP_SIZE] = text.ljust(STAMP_SIZE, b"\0")
+    return bytes(data)
+
+
+def apply(img: ais.AisImage, patch: dict, build_id: str, stamp: dict | None = None) -> list[str]:
     log = []
     if "builds" in patch and build_id not in patch["builds"]:
         raise PatchError(f"{patch['name']}: only written for {', '.join(patch['builds'])}, not {build_id or 'this build'}")
@@ -69,7 +92,7 @@ def apply(img: ais.AisImage, patch: dict, build_id: str) -> list[str]:
     for sec in patch.get("section", []):
         if sec["model"] != build_id:
             continue
-        data = bytes.fromhex(sec["data"])
+        data = stamp_section(sec, stamp, patch["name"])
         try:
             img.add_section(sec["addr"], data)
         except ais.AisError as e:

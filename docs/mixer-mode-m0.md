@@ -15,7 +15,9 @@ real CPU headroom is unknown until a probe measures it.
 
 **Audio block** (L2 call list at `0x1181BDE0`, once per DMA half-buffer = **8 frames**:
 RX ACNT 8, BCNT 16, 4 words per frame, and the `to_float` loop runs 8 times) **[C]**. At 44.1 kHz
-and 456 MHz that is about 82 700 cycles per block **[I: clock from `docs/ms70cdr-port.md`]**.
+and 300 MHz that is **54 422 cycles per block** (one every 181 µs) **[I: the AIS PLL setup
+suggests 300 MHz and probe v1's PER MAX of 55-57k cycles matches; the earlier guess was 456 MHz
+/ 82 700]**.
 
 | order | address | what | label |
 |---|---|---|---|
@@ -32,8 +34,8 @@ and 456 MHz that is about 82 700 cycles per block **[I: clock from `docs/ms70cdr
 
 **Slot loop [C]:** `B14+576` (`0xC00EF988`) = slot, 0 to 5, in index order. For each slot:
 `A4 = 0x11F03000 + 212 x slot` (getter `0xC00C8E6C` via the far stub `0x1181BF50`), then a call
-through the audio-function table **`0xC00EE930`** (6 words, `.cinit` data, all `0xC00E0780` at boot). Which screen position is slot 0 is
-**[I]** (slot 0 runs first; the screen probably shows it rightmost, next to the input).
+through the audio-function table **`0xC00EE930`** (6 words, `.cinit` data, all `0xC00E0780` at boot). Slot 0 runs first
+and is the **rightmost** effect on screen: the signal flows right to left (probe v1, 2026-10-16).
 
 **Per-slot buffers.** The template writer `0xC00C8AC0` fills all six 212-byte state blocks
 with the **same** pointers **[C]**. No other code builds these constants **[C, const scan]**.
@@ -333,68 +335,110 @@ Plus a save hook that writes record 52 whenever the patch is saved, and a load h
 
 Route B only if P4 finds non-zero bytes 14/15 in stored patches.
 
+## Probe v1 results (2026-10-16)
+
+From Luca's pedal (MS-60B on the 70CDR 2.10 OS) with probe v1.
+
+- **Clock 300 MHz, not 456.** The AIS PLL setup (function 5, arg `0x18010202`) points to
+  300 MHz, and PER MAX was always about 55 000-57 000 cycles: one 8-frame block at 44.1 kHz at
+  300 MHz is **54 422 cycles**.
+- **Why PER AVG moved with load** (12 005 empty, 15 492 light, 36 379-44 925 heavy) **[C for
+  the mechanism, I that it explains the numbers]**: the OS sets PDCCMD bit 16 (`0x01810000`,
+  "power the CPU down on IDLE", function `0xC00D42E4`, called at boot) and its idle task runs
+  `IDLE` (`0x1181A8C0`). While the CPU sleeps its clock stops, and the time-stamp counter TSCL
+  stops with it. So a TSCL "period" counts only the **busy** cycles between two blocks: PER AVG
+  is the whole CPU load (audio + UI + everything), and it equals the real period only when the
+  CPU never slept (PER MAX). v1's LOAD% divided by PER AVG and was too high. Since v2, every %
+  is against 54 422.
+- **Heavy patch near DSP Full (declared 213):** FX avg 23 000, block avg 25 600 = **47 %** of a
+  block, block max 33 000 = **61 %**. All work together (PER AVG 36-45k) = 67-83 %. So about
+  **39 % headroom** in the worst block; the 225 limit is conservative.
+- **Patch switch (CC 80/81):** one block of about 113 000 cycles (2 periods): the switch itself
+  overruns, as stock does; normal blocks before and after.
+- **Slot order:** slot 0 = the **rightmost** effect on screen, and it runs first: the signal
+  flows right to left.
+- **P2's cursor lookup was wrong** ("CUR 2 SLOT 3072"): the table `0xC00EE948` came from a
+  mismatched site (float code). The footswitch reads `0xC00EE748 + 24 x cursor` (`mvk -6328`
+  at `0xC00ACAE0`); fixed in v2 and in `docs/ms70cdr-addresses.md`. **The looper
+  (`asm/looper/services.inc`) still uses the wrong value.**
+- **P4:** OR of bytes 14/15/17 = 00 over all 50 records, OK 50, NZ -1: **Route A confirmed.**
+  P8 = knob 8 confirmed (LO-FI Dly knob 8 at 6 showed P8 6).
+- **P3 BUS: some effects write elsewhere.** ICE Delay (about 10 200 cycles), AnalogDly and Gyre
+  (third party), on and running, showed F0 A0 D0: they never changed F (`0x11F03738` /
+  `0x11F03758`), Acc or Dry. Chorus, Ambience, DualDigiD and the pack effects showed F4096.
+  Yet the disassembly of ANLGDLY and ICEDLY shows both **store to `ctx[5]`** (L and R, all
+  samples), and both use the shuttle (`ctx[11]`, `ctx[12]`); ICE Delay also reads Dry
+  (`ctx[4]`). So either those slots get a different `ctx[5]` at call time, or their output
+  goes through the shuttle or a DDR buffer. P6 in v2 answers it. This matters for buses: an
+  effect whose output does not land in F cannot be routed by copying F.
+
 ## Probe build: how to read it
 
-One test firmware answers P1-P5 (the editor round trip was dropped). It is MIDISTOMP V1.2
-(MIDI, tempo, combos, scrolling all work as usual) plus probe screens. It **never writes flash**
-and runs your effects exactly as stock, in the same order. Not for release.
+Test firmware v2, not for release. It is MIDISTOMP V1.2 (MIDI, tempo, combos, scrolling as
+usual) plus probe screens, and it **never writes flash**. Your effects run as stock, in the
+same order. One change on purpose: **the DSP Full limit is 300 instead of 225**, so you can
+load heavier patches and watch the CPU (see "Limits").
 
 - **Build** (maintainers): the release set plus `patches/m0-probe.yaml`, last:
   `zoomms build <MS-70CDR 2.10 updater> --build-id ms70cdr-2.10 --patch patches/version-1.2.yaml
   --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml
   --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/scroll.yaml
-  --patch patches/m0-probe.yaml --out "build/out/MIDISTOMP M0 probe.exe"`.
+  --patch patches/m0-probe.yaml --stamp "label=M0 PROBE V2" --out "build/out/MIDISTOMP M0 probe v2.exe"`.
+  `--stamp` fills page 0: version (from the version patch), commit (`git rev-parse --short
+  HEAD`), date (today) and label (default `DEV`), each `KEY=TEXT`, at most 15 characters.
   Source `asm/m0_probe/`, tests `tests/test_m0_probe_patch.py`.
-- **Flash** it like any MIDISTOMP updater. To go back, flash the normal V1.2 updater. If the
-  pedal has no sound or freezes after boot: update mode (hold Up + Down while plugging in USB,
-  user guide section 3) and flash V1.2.
+- **Flash** it like any MIDISTOMP updater. To go back, flash the normal V1.2 updater. No sound
+  or a freeze after boot: update mode (hold Up + Down while plugging in USB, user guide
+  section 3) and flash V1.2.
 - **Open:** press the left knob in the effect chain view (menu), pick the last entry,
-  **M0PROBE**. **Turn any knob** to change page (8 pages, it wraps). The **middle knob** leaves,
-  as before (its EXIT label is not drawn: the pages use that row). Pages P1-P3 refresh by
-  themselves about twice a second; if a number never changes, turn a knob one step and back.
-- The pedal keeps playing while a probe page is open, so play a sound into it (the bus checks
-  need signal).
+  **M0PROBE**. It opens on page 0 (what is flashed). **Turn any knob** to change page (11
+  pages, it wraps). The **middle knob** leaves (its EXIT label is not drawn).
+- **The probe only measures while this screen is open.** Opening it clears every count and
+  maximum, so numbers start fresh; give the live pages 1-2 s. Closed, it costs a few dozen
+  cycles per block (one flag check per hook). Leave the screen open while you play.
+- Play a sound into the pedal: the bus checks need signal.
 
 ### The pages
 
-Numbers are DSP clock cycles. One audio block is 8 samples, about 82 700 cycles at 456 MHz.
-"Window" = the last 4096 blocks (0.74 s). The number after `#` in the P1 title counts windows:
-if it goes up, the probe is running.
+Numbers are DSP clock cycles. One audio block = 8 samples = **54 422 cycles** (300 MHz).
+"Window" = the last 4096 blocks (0.74 s). Pages 0-6 refresh about twice a second.
 
 | page | row | meaning | hope |
 |---|---|---|---|
-| **P1 CPU** | `PER a MAX b` | time between two blocks: average, longest | a about 82 700; b close to a (a much bigger b = a block came late: audio dropout) |
-| | `BLK min avg max` | time the whole audio block takes (without the probe's own checks) | max well under PER |
-| | `FX min avg max` | the part spent inside the 6 effects | |
-| | `LOAD a% MAX b%` | BLK avg and BLK max as % of PER | this is the real CPU load. 100 - MAX = headroom for Mixer Mode |
-| | `PEAK n p%` | longest block since you opened P1 (turning back to P1 resets it) | stays under 100 % even while you switch patches |
-| | `FXPK n PRB m` | longest effect time since then; m = what the probe itself cost in the last block | m small (a few thousand at most) |
-| **P2 CUR c SLOT s** | 6 rows `k NAME cost` | the chain runner's slot k (0 runs first): effect name and its DSP cost from the ZDL (the number the "DSP Full" check adds up, limit 225). `-` empty, `MUTE` while loading, `?` unknown | tells which screen position is slot 0. Title: cursor position c (the effect under the cursor when you opened the menu) sits on slot s |
-| **P3 CYCLES** | `k AVG a MAX b` | cycles of slot k's effect per block | with P2's cost: cycles per cost unit |
-| **P3 BUS F/A/D** | `k Fn An Dn` | in how many of the window's 4096 blocks slot k's effect changed F (the chain signal, ctx[5]), Acc (the direct-to-output buffer, ctx[6]) and Dry (the pedal input, ctx[4]) | F about 4096 for every effect that is on (with signal); A 0 except LineSel-like effects; **D always 0** (an effect writing Dry would break buses) |
-| **P4 RECORDS** | `OR 14:xx 15:xx 17:xx` | all stored patches 0-49 ORed together: bytes 14, 15 and 17 of every slot block | **00 00 00** (then Route A of M0b is safe) |
-| | `110:xx OK n NZ r` | byte 110 & E0 (same OR); n patches read; r = first patch with a non-zero byte, -1 = none | `110:00`, OK = number of stored patches (50 if all were ever saved), NZ -1 |
-| | `S s ONo ID xxxxxxxx` | current patch, the slot under the cursor: on/off and effect id | |
-| | `P1 ... P4`, `P5 ... P7`, `P8 a  P9 b` | that slot's 9 knob words as saved | with LOFIDLY (9 knobs), knob 8 at its maximum: **P8 = that maximum** (confirms w9 = P8) |
-| **P5 STORE** | `BANK IN USE b`, `HDR`, `DATA`, `GAP` | record store: live bank (0/1), header and data write pointers (flash addresses), free bytes between them | HDR inside the live bank, DATA above it, GAP positive |
-| **P5 BANK 0 / BANK 1** | 4 rows `oo xx..` | first 36 bytes of each bank (offset, 9 bytes in hex) | the live bank starts with the store's magic words; the other holds older data or FF (we just want to see it) |
+| **0 MIDISTOMP V1.2** | `BUILD DEV`, `COMMIT`, `DATE`, label | what is flashed | the label you were told (e.g. `M0 PROBE V2`) |
+| **P1 CPU #n** | | n counts windows: about 81 per minute (that checks the block rate) | |
+| | `PER a MAX b` | busy cycles between two blocks (the counter stops while the CPU sleeps): a = all work per block, b = longest gap | b about 54 400-57 000 |
+| | `BLK min avg max` | time the whole audio block takes (without the probe's checks) | |
+| | `FX min avg max` | the part inside the 6 effects | |
+| | `LOAD a% MAX b%` | BLK avg and BLK max as % of 54 422 | **the real audio load**; 100 - MAX = headroom for Mixer Mode |
+| | `PEAK n p%` | longest block since you turned to P1, and its % | under 100 % except at a patch switch |
+| | `DSP t/300 CPU c%` | t = the patch's declared DSP total (what DSP Full adds up), c = PER avg as % of 54 422 (all CPU work) | compare t with LOAD |
+| **P2 CUR c SLOT s** | 6 rows `k NAME cost` | slot k (0 = rightmost, runs first): effect and its DSP cost. `-` empty, `MUTE` loading | title: cursor c is on slot s |
+| **P3 CYC PRB p** | `k AVG a MAX b` | cycles of slot k's effect per block; p = the probe's own cycles in the last block | |
+| **P3 BUS F/A/D** | `k Fn An Dn` | blocks (of 4096) in which slot k changed F (`0x11F03738`), Acc (`0x11F03778`), Dry (`0x11F03838`) | D always 0 |
+| **P6 CTX SLOT s** | `4 xxxxxxxx 5 xxxxxxxx` ... `10 xxxxxxxx` | the pointers `ctx[4]`-`ctx[10]` that slot s (the one under the cursor) got at its last call | 4 = `11F03838`, 5 = `11F03738`, 6 = `11F03778`, 7 = `C005C94C`, 8 = `C005C8C8`, 9 = `C0068C80`, 10 = `C0068C00` (the boot template) |
+| | `DIF 0:mm 1:mm ...` | for each slot, which of those 7 words differ from slot s (bit 0 = ctx[4] ... bit 6 = ctx[10], hex) | `00` everywhere; anything else: that slot gets other buffers |
+| **P6 BUS CTX 4-10** | `k abcdefg` | one character per buffer `ctx[4]`...`ctx[10]` of slot k: did the effect change the 64 bytes there? `-` never, `*` every block, `0`-`9` = tenths of the blocks | for most effects `-*-----` (writes F only). **This page costs extra CPU** (about 3 000 cycles a block): don't open it with a patch near the limit |
+| **P4 RECORDS** | as v1 | patch-record bytes; the slot shown is now really the one under the cursor | |
+| **P5 STORE, BANK 0, BANK 1** | as v1 | record store | |
 
-**Limits.** P3 only sees writes: reading Dry (the gates and reverbs that use the pedal input)
-cannot be seen this way, that needs a listening test in M1. An effect that adds exact zeros (no
-signal) counts as "not written", so play something. The XOR check can in theory miss a change
-(two changes cancelling), which is negligible over 4096 blocks. CPU figures include other
-interrupts that hit during the block. Slot cost `?` means the descriptor did not match the
-running function (it should not happen).
+**Limits.** The bus checks only see writes, not reads. An effect that writes exactly what was
+there (silence, or a dry signal at unity) counts as "not written", so play something and turn
+the effect's mix up. P6 BUS watches the first 64 bytes at each pointer. **DSP limit 300:** a
+patch above 225 may overload the CPU: you may hear clicks or dropouts, and that is what we want
+to measure. If the pedal stops responding, power-cycle it; if it boots into the heavy patch
+and freezes, use update mode and flash V1.2. Save no patch above 225 that you want to keep:
+the normal firmware will bypass effects to fit it.
 
-### What to send back
+### What to send back (v2)
 
-1. Photos of every page (P1, P2, P3 CYCLES, P3 BUS, P4, P5, BANK 0, BANK 1) with an **empty
-   patch** (no effects).
-2. P1, P2, P3 CYCLES and P3 BUS with **two normal patches** (name them), and with **one heavy
-   patch** just under DSP Full (6 effects, e.g. reverbs and delays). Play while you take the
-   photos. For the heavy one, also switch to it and back while on P1 and photograph `PEAK`.
-3. P2 with the cursor on the **leftmost** effect, then on the **rightmost** (leave the menu,
-   move the cursor, come back).
-4. P4 with LOFIDLY in a slot, its knob 8 turned to the maximum, the cursor on it (the patch
-   does not need to be saved for P8, but save it once so P4's OR includes it).
-5. Anything odd: clicks, dropouts, a frozen screen, a number that never moves.
+1. Page 0 (to check the build), then **P1** with an empty patch, waiting 2 s.
+2. **P6 CTX and P6 BUS** with a patch holding **ICE Delay and a chorus** (any order), playing:
+   P6 CTX once with the cursor on ICE Delay and once on the chorus; P6 BUS once. Also P3 BUS.
+3. **P1** with a **very heavy patch above 225** declared (the `DSP` row shows the total): play
+   hard, wait 5 s, photo; then switch to it and back with CC 80/81 while on P1 and photo
+   `PEAK`. Say whether you heard clicks.
+4. **P2 cursor check:** P2 with the cursor on the leftmost effect, then on the rightmost
+   (leave the menu, move the cursor, come back): the title's SLOT should be 5-ish on the left
+   and 0 on the right for a full chain.
+5. A stopwatch on P1's `#` for 60 s (expect about 81), and anything odd.

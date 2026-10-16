@@ -1,4 +1,5 @@
 import importlib.util
+import struct
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,53 @@ def test_ui_call_sites():
     for addr in (0xC00C6998, 0xC00A93D0, 0xC00A8364):
         old, new = (_word(bytes.fromhex(WRITES[addr][k])) for k in ("expect", "data"))
         assert old & ~(0x1FFFFF << 7) == new & ~(0x1FFFFF << 7)     # still callp .S2 b3, parallel bit kept
+
+
+def test_dsp_limit_225_to_300():
+    old, new = (_word(bytes.fromhex(WRITES[0xC00BB52C][k])) for k in ("expect", "data"))
+    field = 0xFFFF << 7                                             # mvkh cst16
+    assert old & ~field == new & ~field                             # same mvkh .S2, b4
+    high_half = lambda w: struct.unpack("<f", ((w >> 7 & 0xFFFF) << 16).to_bytes(4, "little"))[0]
+    assert (high_half(old), high_half(new)) == (225.0, 300.0)      # the mvk 0 before it sets the low half
+
+
+def test_stamp_fields_filled_at_build_time():
+    from zoomms import cli
+    texts = cli.build_stamp(["patches/version-1.2.yaml"], ["label=M0 PROBE V2"])
+    assert texts["version"] == "V1.2" and texts["label"] == "M0 PROBE V2" and texts["commit"]
+    assert len(texts["date"]) == 10 and texts["date"][4] == "-"                 # YYYY-MM-DD
+    plain, filled = _data(SEC), patcher.stamp_section(SEC, texts)
+    assert patcher.stamp_section(SEC, None) == plain                            # no text: placeholders stay
+    for key, off in SEC["stamp"].items():
+        assert plain[off:off + 16] == patcher.stamp_placeholder(key)
+        assert filled[off:off + 16] == texts[key].encode()[:15].ljust(16, b"\0")
+    changed = [i for i in range(len(plain)) if plain[i] != filled[i]]
+    assert all(any(o <= i < o + 16 for o in SEC["stamp"].values()) for i in changed)
+    with pytest.raises(patcher.PatchError):
+        patcher.stamp_section({**SEC, "stamp": {"version": 0}}, texts)          # no placeholder there
+
+
+def _disassemble():
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / "a.ld").write_text(f"SECTIONS {{ . = 0x{BASE:08X}; .text : {{ *(.text) }} }}\n")
+        run = lambda *a: subprocess.run(a, check=True, capture_output=True, text=True).stdout
+        run(asm.PREFIX + "as", "-mlittle-endian", "-march=c674x", "-o", str(tmp / "a.o"), str(ROOT / SEC["source"]))
+        run(asm.PREFIX + "ld", "-EL", "-T", str(tmp / "a.ld"), "-e", hex(BASE), "-o", str(tmp / "a.elf"), str(tmp / "a.o"))
+        return run(asm.PREFIX + "objdump", "-d", str(tmp / "a.elf"))
+
+
+@pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
+def test_audio_hooks_skip_everything_while_the_screen_is_closed():
+    lines = _disassemble().splitlines()
+    for entry, skip_to, most in (("blk_start", "bs_out", 7), ("blk_end", "be_out", 7), ("chain", "cf_slot", 8)):
+        start = next(i for i, l in enumerate(lines) if l.endswith(f"<{entry}>:"))
+        body = [l for l in lines[start + 1:] if l.count("\t") >= 2]
+        first = next(i for i, l in enumerate(body) if " b .S" in l and l.split("\t")[2].startswith("[!"))
+        assert first < most and f"<{skip_to}>" in body[first], (entry, body[first])   # a flag test, then out
+        assert any("ldw" in l and "*-" in l for l in body[:first]), entry              # the flag below vars
 
 
 def test_vectors_branch_into_the_section():

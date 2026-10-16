@@ -314,7 +314,7 @@ Key loop (Task key handler) callp sequence, one to one in both OSes: this is how
 | SLOT_STRIDE | state block size per slot | 212 | 212 | same getter code (mvk 212,a0) | high |
 | LED_APPLIED | bit 0: LED state the LED task wrote last | `0xC00EF078` | `0xC00EEB10` | 3 aligned mvk/mvkh sites in the LED task (0xC00C75B4 / 0xC00C73F4); 0xC00EF070 -> 0xC00EEB08 (13 votes) is the neighbour word | high |
 | CURSOR | signed byte: cursor of view 0 | `0xC009C064` | `0xC009C064` | see scroll | high |
-| CURSOR_SLOT | word [24 x cursor]: slot under it | `0xC00EEEB0` | `0xC00EE948` | 2 aligned mvk/mvkh sites in the footswitch press code (0xC00CC128 / 0xC00CB9E8) | high |
+| CURSOR_SLOT | word [24 x cursor]: slot under it | `0xC00EECB0` | `0xC00EE748` | the footswitch press lookup itself: `mvk -4944` at 0xC00ACC00 / `mvk -6328` at 0xC00ACAE0 (+ `mvkh 0xC00E0000`) after the cursor getter. Was `0xC00EEEB0` / `0xC00EE948` until 2026-10-16 (wrong: the 70CDR site 0xC00CB9E8 is float code), and M0 probe v1 showed slot 3072 / 1024 on the 70CDR | high |
 | FB | frame buffer (column bytes, 128 per 8-pixel row) | `0x11816800` | `0x11816800` | 48 aligned mvk/mvkh sites build the same value | high |
 | FB_DIRTY | byte: rows to send | `0xC00EF118` | `0xC00EEBB0` | 37 aligned const sites; it is the word just before the first data section (0xC00EF11C / 0xC00EEBB4) | high |
 | FONT7 | Effect View bold font, 7 bytes a character | `0xC00E8C78` | `0xC00E87D8` | content equal (first 28 bytes) + 3 aligned const sites | high |
