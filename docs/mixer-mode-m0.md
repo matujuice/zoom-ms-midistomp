@@ -372,6 +372,32 @@ From Luca's pedal (MS-60B on the 70CDR 2.10 OS) with probe v1.
   goes through the shuttle or a DDR buffer. P6 in v2 answers it. This matters for buses: an
   effect whose output does not land in F cannot be routed by copying F.
 
+## Probe v2 results, round 1 (2026-10-16)
+
+P2 + P3 CYC on two 6-effect patches. Optimized pack ZDLs, except Choral and DirtBox (old builds,
+declared 20). Old = the v1 table in the pack's docs/STEREO.md (settings differ).
+
+| Patch A slot | P3 avg / max | old avg |
+|---|---|---|
+| 0 EuGate | 3 338 / 6 478 | 2 284 |
+| 1 Scrub | 4 288 / 8 233 | 2 765 |
+| 2 DubSiren | 5 683 / 10 953 | 3 807 |
+| 3 S.GN_L | 4 244 / 10 352 | 4 705 |
+| 4 Choral (old) | 18 850 / 27 503 | 24 100 |
+| 5 GAIN | 258 / 4 005 | |
+
+Patch A sums to about 36 700: fits. Patch B (Breather 7 381, Choral 22 371, DirtBox 11 015,
+DualShft 11 355, DubSiren 9 391, GridDly 9 980) sums to about **71 500, more than the 54 422 of a
+block**, at a declared 203: the patch overruns, and its per-slot numbers (2-3x the old ones, even
+GridDly) are inflated, not usable as costs. **[I]** The inflation comes from interrupts landing
+inside the timed calls.
+
+- The P2 name check (descriptor's audio function = `FX_TABLE[slot]`) passed on every slot, so the
+  names and P3 rows match.
+- EuGate, Scrub and DubSiren measure about 1.5x the v1 table in patch A. Code or settings is not
+  known yet: needs an A/B with the same knob settings, new vs backup ZDL.
+- The cursor lookup still fails sometimes: "CUR 5 SLOT -107" (CUR 1 gave SLOT 5).
+
 ## Probe build: how to read it
 
 Test firmware v2, not for release. It is MIDISTOMP V1.2 (MIDI, tempo, combos, scrolling as
