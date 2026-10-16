@@ -1,4 +1,4 @@
-# Handoff: v2.0 work, 2026-10-16
+# Handoff: v2.0 work, 2026-10-16 (updated after probe v2 round 1)
 
 For a new Claude session running **locally on Luca's Windows PC**. Read this, then each repo's
 CLAUDE.md. It replaces a cloud session that could not reach the PC.
@@ -9,8 +9,8 @@ Both on branch `claude/epic-thompson-rggzx8`; pull both first.
 
 | Repo | Head at handoff | What |
 |---|---|---|
-| [zoom-ms-midistomp](https://github.com/matujuice/zoom-ms-midistomp) | `a871363` probe v2 | firmware mod (patches, asm, builder) |
-| [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack) | `7a0a010` Choral CPU | the custom effects (.ZDL) |
+| [zoom-ms-midistomp](https://github.com/matujuice/zoom-ms-midistomp) | `f3e6bd9` probe v2 round 1 results | firmware mod (patches, asm, builder) |
+| [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack) | `e5c854c` DirtBox/Choral shrink | the custom effects (.ZDL) |
 
 Local paths: the effects pack clone is in `Documenti\GitHub`. ZDLs go to
 `C:\Users\lucam\OneDrive\Desktop\ZOOM MS FX\ZoomMultistompZDL-main\ZoomMultistompZDL-main\dist`
@@ -35,22 +35,35 @@ Downloads. **Locally you can build both repos yourself**; the cloud session coul
 - **Probe v2** built and sent (`build/out/MIDISTOMP M0 probe v2.exe`, sha256 `6cfe2f50…270e`):
   version page 0, measures only while its screen is open, honest load vs 54,422 cycles/block,
   P6 CTX/BUS (where stock delays write), cursor fix, **DSP limit 300** (test only).
-  **Waiting for Luca's photos** (list in mixer-mode-m0.md, "What to send back (v2)").
+  **Round 1 photos read** (P2 + P3 CYC on two patches): results in
+  [mixer-mode-m0.md, "Probe v2 results, round 1"](mixer-mode-m0.md#probe-v2-results-round-1-2026-10-16).
+  P2 names match P3 rows (photos had only been paired wrong). Patch B summed ~71,500 cycles
+  (> 54,422: overrun, its numbers are inflated). Cursor lookup still fails sometimes
+  ("CUR 5 SLOT -107"). The rest of the v2 checklist is still open.
 - **Effects CPU rewrite** (all 11 effects, host A/B vs old code: identical or below -80 dB, except
   Choral fix 3 at -23 dB worst on fast vowel moves, judged inaudible). First TI build: no errors, no
-  `.switch`/`push_rts`. 10 ZDLs copied. **DirtBox 39.7 KB and Choral 30.9 KB are too big** (36 KB
-  hung the pedal; target < 28 KB). A task "Shrink DirtBox and Choral under 28 KB" was queued:
-  try `--opt_for_space=1` (check no `push_rts`), then `NOSWP` on DirtBox's per-model loops and
-  Choral's coldest loops. WaveFold's main loop may not pipeline ("did not find schedule").
+  `.switch`/`push_rts`. WaveFold's main loop may not pipeline ("did not find schedule").
+- **DirtBox/Choral shrink done** (`e5c854c`, built locally): DirtBox 25,274 B, Choral 28,866 B.
+  CGT 8.5 has no per-loop `NOSWP` and `--opt_for_space` pulls in `pop_rts`, so: DirtBox's
+  per-model loops and `ab_prepare` became single `-O1` functions (`AB_SMALL_FUNC`); Choral uses
+  `SR_NOSWP` (an asm NOP) on cold loops and `-O1` copies of init/text helpers. Host tests pass
+  (run in the cloud after the commit). Not yet loaded on the pedal.
+- **Did the rewrite raise CPU?** Possibly. In patch A, EuGate 3,338 / Scrub 4,288 / DubSiren 5,683
+  avg vs 2,284 / 2,765 / 3,807 in the old table (STEREO.md); S.GN_L is 10% lower. Settings and
+  patch differ, so not proven. Suspect: software pipelining grows code, and six effects + OS
+  share L1P, so cache misses may eat the gain (host A/B can't see that). **Decide with an A/B on
+  the pedal**: each effect alone, same knobs, new ZDL vs `backup-before-cpu-opt`, P3 CYC each.
+  If new loses: smaller code (`SR_NOSWP`-style / `-O1` on loops) or revert that effect.
 - **Declared DSP costs** (`dsp_cost` in each manifest, written by `build/linker.py`) are the
   pre-rewrite measurements; lower them after the probe measures the new builds (P3 CYC, about
   100 cycles per cost unit). Choral is 150 for now (it measured ~240).
 
 ## Next, in order
 
-1. Shrink DirtBox and Choral (above), copy, push.
-2. Read Luca's probe v2 photos; update mixer-mode-m0.md. Then a P3 CYC round on the new ZDLs and
-   update the `dsp_cost` values and the effects pack's docs/STEREO.md table.
+1. Pedal A/B (above): EuGate, Scrub, DubSiren alone, new vs old ZDL, P3 CYC; patch B again, P1
+   only. Also load the shrunk DirtBox and Choral and check they run.
+2. From those numbers: keep, shrink or revert each effect; then update `dsp_cost` in the manifests
+   and the effects pack's docs/STEREO.md table. Fix the P2 cursor lookup (-107) in the probe.
 3. Builder: **probe in every build except releases** (the release workflow input decides; no
    option to forget). The probe must move above the Mixer engine's DDR region (`0xC00F3100`+)
    before M1 uses it. Every dev build stamps page 0 (`--stamp label=...`).
