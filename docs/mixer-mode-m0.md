@@ -409,7 +409,7 @@ load heavier patches and watch the CPU (see "Limits").
   `zoomms build <MS-70CDR 2.10 updater> --build-id ms70cdr-2.10 --patch patches/version-1.2.yaml
   --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml
   --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/scroll.yaml
-  --patch patches/m0-probe.yaml --stamp "label=M0 PROBE V2" --out "build/out/MIDISTOMP M0 probe v2.exe"`.
+  --patch patches/m0-probe.yaml --patch patches/m0-probe-chain.yaml --stamp "label=M0 PROBE V2" --out "build/out/MIDISTOMP M0 probe v2.exe"`.
   `--stamp` fills page 0: version (from the version patch), commit (`git rev-parse --short
   HEAD`), date (today) and label (default `DEV`), each `KEY=TEXT`, at most 15 characters.
   Source `asm/m0_probe/`, tests `tests/test_m0_probe_patch.py`.

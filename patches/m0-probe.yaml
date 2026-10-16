@@ -1,7 +1,8 @@
 # Mixer Mode M0 hardware probes P1-P6, v2 (docs/mixer-mode-m0.md, "Probe build:
 # how to read it"). Diagnostic build only, never released. MS-70CDR 2.10 OS.
 # Build: the release set (scripts/midistomp_builder.py PATCHES) plus this patch,
-# applied last. Page 0 shows what is flashed (version, commit, date, label:
+# then m0-probe-chain.yaml (the slot-loop hook; left out in mixer builds).
+# Page 0 shows what is flashed (version, commit, date, label:
 # filled in at build time, zoomms build --stamp); measuring runs only while the
 # probe screen is open:
 #   P1 CPU meter (TSCL around the audio block and each effect, rated against
@@ -40,12 +41,6 @@ write:
     expect: "eab02102"
     data: "6acb2102"
     source: asm/m0_probe/dsp_limit.S
-  # Audio block: the slot loop's first fetch packet -> chain (+ 4 zero words)
-  - model: ms70cdr-2.10
-    addr: 0x1181BE00
-    expect: "2a9874026a076002270446567f9000005aa300026e0c07b5132a0010200080e4"
-    data: "2a88980fea07e00f62037c000080000000000000000000000000000000000000"
-    source: asm/m0_probe/chain_jump.S
   # Task_SwitchNrmlSpdRead's 16 ms round: callp poll trampoline -> probe_poll
   - model: ms70cdr-2.10
     addr: 0xC00C6998

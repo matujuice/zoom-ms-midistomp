@@ -1,0 +1,15 @@
+# M0 probe's slot-loop hook (asm/m0_probe/chain_jump.S): the probe's chain
+# (vector +16 of m0-probe.yaml) runs the stock loop with per-slot timing and bus
+# checks (P1 FX row, P3, P6). Applied after m0-probe.yaml in the probe build.
+# Left out when the Mixer engine (mixer-m1.yaml) owns that packet: then P1's
+# BLK / LOAD still measure the whole block, the per-slot rows read 0.
+name: m0-probe-chain
+description: M0 probe slot-loop hook (per-slot CPU and bus checks)
+builds: [ms70cdr-2.10]
+write:
+  # Audio block: the slot loop's first fetch packet -> chain (+ 4 zero words)
+  - model: ms70cdr-2.10
+    addr: 0x1181BE00
+    expect: "2a9874026a076002270446567f9000005aa300026e0c07b5132a0010200080e4"
+    data: "2a88980fea07e00f62037c000080000000000000000000000000000000000000"
+    source: asm/m0_probe/chain_jump.S

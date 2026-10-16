@@ -8,15 +8,16 @@ from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = patcher.load(ROOT / "patches/m0-probe.yaml")
+CHAIN = patcher.load(ROOT / "patches/m0-probe-chain.yaml")  # the slot-loop hook, split off for mixer builds
 CLOCK = patcher.load(ROOT / "patches/midi-clock.yaml")
 SEC = PATCH["section"][0]
 BASE = SEC["addr"]
-WRITES = {w["addr"]: w for w in PATCH["write"]}
+WRITES = {w["addr"]: w for w in PATCH["write"] + CHAIN["write"]}
 
 spec = importlib.util.spec_from_file_location("builder", ROOT / "scripts" / "midistomp_builder.py")
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-PROBE_SET = builder.PATCHES + ["m0-probe"]  # the probe build: release set, then this patch
+PROBE_SET = builder.PATCHES + ["m0-probe", "m0-probe-chain"]  # the probe build: release set, then these
 
 
 def _data(entry):
@@ -41,7 +42,7 @@ def far_target(hexdata):
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_bytes_match_assembly_sources():
     assert asm.assemble(ROOT / SEC["source"], BASE, whole_packets=True) == _data(SEC)
-    for w in PATCH["write"]:
+    for w in PATCH["write"] + CHAIN["write"]:
         if "source" in w:
             code, data = asm.assemble(ROOT / w["source"], w["addr"]), _data(w)
             assert data == code + b"\0" * (len(data) - len(code))  # zero words = nops
@@ -146,7 +147,7 @@ def test_probe_build_does_not_overlap():
     # the probe's writes only touch what no other patch in the set writes, except the
     # poll call it takes over from midi-clock.yaml (checked by its expect)
     others = [(a, e, p) for a, e, p in _spans(builder.PATCHES)]
-    for w in PATCH["write"]:
+    for w in PATCH["write"] + CHAIN["write"]:
         a, e = w["addr"], w["addr"] + len(bytes.fromhex(w["data"]))
         hits = [p for s, t, p in others if s < e and a < t]
         assert hits == ([] if a != 0xC00C6998 else ["midi-clock write"]), (hex(a), hits)

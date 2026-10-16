@@ -40,3 +40,38 @@ flash test by Luca before the next one starts, as in the 70CDR port.
 - Parallel and Serial in M2; Split input, Split output and PEDAL INPUT in M3.
 - Old patches load as Serial with every effect in Pre.
 - M0 starts now.
+
+## M1 test build (2026-10-16)
+
+`patches/mixer-m1.yaml` (source `asm/mixer/`): the engine at DDR `0xC00F6000`, layout fixed at
+section +32, slot 0 first: **PRE PRE A B POST POST**. On screen (signal flows right to left):
+the 2 rightmost effects are Pre, the 3rd from the right is Bus A, the 4th is Bus B, the 2
+leftmost are Post. MIX is 50/50, no limiter yet (a 50/50 sum is never louder than the louder
+bus; the limiter comes with the M2 levels). With positions 3 and 4 empty both buses carry the
+same signal, so it sounds like stock. The probe's P1 is in the build (`m0-probe.yaml`), its
+slot-loop hook (`m0-probe-chain.yaml`) is not: same packet, so P1's FX row and P3 read 0.
+
+`zoomms build <MS-70CDR 2.10 updater> --build-id ms70cdr-2.10 --patch patches/version-1.2.yaml
+--patch patches/boot-logo.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml
+--patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/scroll.yaml
+--patch patches/m0-probe.yaml --patch patches/mixer-m1.yaml --stamp "label=M1 MIXER"
+--out "build/out/MIDISTOMP M1 mixer.exe"`
+
+Assembled locally with TI's `cl6x` (CGT 8.5, the source has no macros); GNU binutils is
+still the reference (`tests/test_mixer_patch.py`, skipped without it).
+
+**Pedal results (Luca, MS-70CDR, 2026-10-16): works.** Stock-equal with positions 3-4 empty,
+parallel drive + chorus/delay heard side by side, effect change and CC 80/81 switches without
+clicks.
+
+| patch | declared DSP | BLK min / avg / max | LOAD avg / max | PEAK |
+|---|---|---|---|---|
+| empty | 0 | 5 228 / 5 291 / 7 038 | 9 % / 12 % | 15 % |
+| heavy (Arena, LO-FI Dly, FuzzSmile, Air, StonePha, LOFI Rev) | 293.4 | 32 018 / 35 316 / 42 126 | 64 % / 77 % | 83 % |
+
+- Engine cost is lost in the noise: empty-patch PER AVG 12 204 vs 12 005 in probe v1.
+- About **100 cycles per declared unit** ((35 316 - 5 291) / 293.4 = 102; probe v1 gave 95).
+- At 293 declared the worst block still had 23 % headroom, so the stock 225 limit is very
+  conservative. The final limit is still open (handoff "Later").
+- Not checked yet: effects that did not write F in probe v1 (ICE Delay, AnalogDly, Gyre) on
+  Bus A or B. If their output does not land in F, copying F cannot route them.
