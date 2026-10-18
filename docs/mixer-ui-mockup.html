@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v18 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock covers, font, CHO selection and EXIT box measured on Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v19 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock covers, font, CHO selection and EXIT box measured on Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -121,7 +121,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <li>Two cover rows don't fit at the stock 23 rows: covers are 19 rows (edges 2 rows thick instead of 3, the outer row 1 px shorter at each end; no clear rows around the name) in the stock font, and the CHO frame is 2 px all round, so the bus rows sit 3 rows apart.</li>
           <li>For the same reason there is no hint row: the ◄ ► scroll arrows sit in the title bar ends, the Smart Warning text replaces the title while the cursor is on that effect, and the knob hints sit at the left end of their softkey ({} turns, HOLD for DELETE, ^v for Bus A ↔ B).</li>
           <li>IN and OUT are the stock plug icons copied pixel for pixel (body, ridges, ring and rounded tip), one per channel (the upper one is L, as printed on the case). Only the cable is thinner. Mono: one plug, one line. Stereo: two plugs and double lines.</li>
-          <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 7 pixels instead of 4. Where two lines cross without joining, one hops over the other.</li>
+          <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 7 pixels instead of 4. Where two lines cross without joining, one hops over the other. With no effect between a jack and [ROUTE] or [MIX], each plug's cable runs straight into the node at its own row.</li>
           <li>Scrolling is stock: 3 columns, the cursor's column always in the middle. A bus column holds its Bus A and Bus B effect one above the other.</li>
           <li>The knob pages show the bus as a filled tag at the right of the tab row.</li>
         </ul>
@@ -418,9 +418,9 @@ const PLUG = [[0, 3, 4, 4], [3, 7, 1, 1], [4, 1, 1, 2], [4, 7, 1, 2],   // cable
   [5, 0, 13, 1], [5, 9, 13, 1], [18, 0, 1, 10],                          // body
   [19, 2, 5, 1], [19, 7, 5, 1], [21, 3, 2, 4],                           // ring with its thick insulator bar
   [24, 3, 1, 1], [24, 6, 1, 1], [25, 2, 2, 1], [25, 7, 2, 1], [27, 3, 1, 4]];   // rounded tip
+const plugs = (out, lanes) => lanes.length > 1 || (out && MIX.vals.out === 0) ? [YA, YB] : [YC];   // Output Stereo: both jacks, even from one line
 function drawJack(kind, l, lanes) {   // one plug per channel; L is the upper one, as printed on the case
-  const out = kind === "OUT", H = [], V = [];
-  const ys = lanes.length > 1 || (out && MIX.vals.out === 0) ? [YA, YB] : [YC];   // Output Stereo: both jacks, even from one line
+  const out = kind === "OUT", H = [], V = [], ys = plugs(out, lanes);
   lanes = ys.map((_, i) => lanes[i] ?? lanes[0]);
   const px = (x, w = 1) => out ? l + CW - 1 - (x - l) - (w - 1) : x;   // mirror for OUT
   ys.forEach((y, i) => {
@@ -437,19 +437,23 @@ function drawJack(kind, l, lanes) {   // one plug per channel; L is the upper on
 }
 function drawChain() {
   const cols = columns(), k = cols.findIndex(c => c.e === S.cur || c.a === S.cur || c.b === S.cur);
-  const gw = j => gapFan(cols, j) ? 7 : 4, X = [];
+  const gw = j => gapFan(cols, j) ? 7 : 4, X = [], isNode = c => c && c.e && c.e.node && !c.jack;
+  const lanesOf = i => {   // a jack's lines; next to a node (tall enough for both) the cables go straight in at the plug rows
+    const c = cols[i], L = c.jack === "IN" ? c.left : arriving(cols, i);
+    return isNode(cols[c.jack === "IN" ? i + 1 : i - 1]) ? plugs(c.jack === "OUT", L) : L;
+  };
   X[k] = 45;
   for (let i = k - 1; i >= 0 && i >= k - 2; i--) X[i] = X[i + 1] + CW + gw(i);
   for (let i = k + 1; i < cols.length && i <= k + 2; i++) X[i] = X[i - 1] - CW - gw(i - 1);
   for (let j = k - 2; j <= k + 1; j++) {   // lines in the gap between column j and j + 1, out to the edges
     if (!cols[j] || !cols[j + 1]) continue;
-    const g = X[j + 1] + CW, w = X[j] - g, f = gapFan(cols, j);
-    f ? fan(g, w, f.g, f.split) : cols[j].left.forEach(y => hline(g, y, w, dead(cols[j], y)));
+    const g = X[j + 1] + CW, w = X[j] - g, f = gapFan(cols, j), s = [j, j + 1].find(i => cols[i].jack && isNode(cols[2 * j + 1 - i]));
+    s !== undefined ? lanesOf(s).forEach(y => hline(g, y, w)) : f ? fan(g, w, f.g, f.split) : cols[j].left.forEach(y => hline(g, y, w, dead(cols[j], y)));
   }
   for (let i = k - 1; i <= k + 1; i++) {
     const c = cols[i]; if (!c) continue;
     const l = X[i];
-    if (c.jack) drawJack(c.jack, l, c.jack === "IN" ? c.left : arriving(cols, i));
+    if (c.jack) drawJack(c.jack, l, lanesOf(i));
     else if (c.e && c.e.node) drawNode(c.e, l);
     else if (c.e) {
       drawCover(c.e, l, c.y);
