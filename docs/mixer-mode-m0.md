@@ -371,6 +371,7 @@ From Luca's pedal (MS-60B on the 70CDR 2.10 OS) with probe v1.
   (`ctx[4]`). So either those slots get a different `ctx[5]` at call time, or their output
   goes through the shuttle or a DDR buffer. P6 in v2 answers it. This matters for buses: an
   effect whose output does not land in F cannot be routed by copying F.
+  Answered by P6 in v2: see "Probe v2 results, P6" below. ICE Delay and AnalogDly do write F.
 
 ## Probe v2 results, round 1 (2026-10-16)
 
@@ -397,6 +398,25 @@ inside the timed calls.
 - EuGate, Scrub and DubSiren measure about 1.5x the v1 table in patch A. Code or settings is not
   known yet: needs an A/B with the same knob settings, new vs backup ZDL.
 - The cursor lookup still fails sometimes: "CUR 5 SLOT -107" (CUR 1 gave SLOT 5).
+
+## Probe v2 results, P6 (2026-10-18)
+
+Build `ms70cdr-2.10-midistomp-2.0-probe-v2-p6.exe`, on the MS-70CDR 2.10. Patch 1: ICE Delay and a
+chorus in slots 0 and 1, playing. Patch 2: the same with AnalogDly instead of ICE Delay.
+
+| Page | Patch 1 | Patch 2 |
+|---|---|---|
+| P6 CTX | 4 `11F03838`, 5 `11F03738`, 6 `11F03778`, 7 `C00CC94C`, 8 `C00CC8C8`, 9 `C00D8C80`, 10 `C00D8C00`; DIF 00 on all 6 slots | same |
+| P6 BUS | slot 0 `-*-----`, slot 1 `-*-----`, slots 2-5 `-------` (empty) | same |
+| P3 BUS F/A/D | slot 0 F4096, slot 1 F4096, A0 D0; slots 2-5 F0 A0 D0 | not read |
+
+- ICE Delay and AnalogDly get the same `ctx` pointers as every other slot and write F (`ctx[5]`)
+  every block, the same as the chorus. The v1 F0 for them is not reproduced.
+- So they can be routed on a bus by copying F. The M1 caveat is closed for those two.
+- Gyre (third party) is not tested. Low priority.
+- Quirk: with the cursor moved to the chorus, the P6 CTX title still read SLOT 0. DIF is 00 for
+  every slot, so the values are the same either way. The title may not follow the cursor. Not
+  investigated.
 
 ## Probe build: how to read it
 
@@ -442,7 +462,7 @@ Numbers are DSP clock cycles. One audio block = 8 samples = **54 422 cycles** (3
 | **P2 CUR c SLOT s** | 6 rows `k NAME cost` | slot k (0 = rightmost, runs first): effect and its DSP cost. `-` empty, `MUTE` loading | title: cursor c is on slot s |
 | **P3 CYC PRB p** | `k AVG a MAX b` | cycles of slot k's effect per block; p = the probe's own cycles in the last block | |
 | **P3 BUS F/A/D** | `k Fn An Dn` | blocks (of 4096) in which slot k changed F (`0x11F03738`), Acc (`0x11F03778`), Dry (`0x11F03838`) | D always 0 |
-| **P6 CTX SLOT s** | `4 xxxxxxxx 5 xxxxxxxx` ... `10 xxxxxxxx` | the pointers `ctx[4]`-`ctx[10]` that slot s (the one under the cursor) got at its last call | 4 = `11F03838`, 5 = `11F03738`, 6 = `11F03778`, 7 = `C005C94C`, 8 = `C005C8C8`, 9 = `C0068C80`, 10 = `C0068C00` (the boot template) |
+| **P6 CTX SLOT s** | `4 xxxxxxxx 5 xxxxxxxx` ... `10 xxxxxxxx` | the pointers `ctx[4]`-`ctx[10]` that slot s (the one under the cursor) got at its last call | 4 = `11F03838`, 5 = `11F03738`, 6 = `11F03778`, 7 = `C00CC94C`, 8 = `C00CC8C8`, 9 = `C00D8C80`, 10 = `C00D8C00` (measured on the 70CDR 2.10) |
 | | `DIF 0:mm 1:mm ...` | for each slot, which of those 7 words differ from slot s (bit 0 = ctx[4] ... bit 6 = ctx[10], hex) | `00` everywhere; anything else: that slot gets other buffers |
 | **P6 BUS CTX 4-10** | `k abcdefg` | one character per buffer `ctx[4]`...`ctx[10]` of slot k: did the effect change the 64 bytes there? `-` never, `*` every block, `0`-`9` = tenths of the blocks | for most effects `-*-----` (writes F only). **This page costs extra CPU** (about 3 000 cycles a block): don't open it with a patch near the limit |
 | **P4 RECORDS** | as v1 | patch-record bytes; the slot shown is now really the one under the cursor | |

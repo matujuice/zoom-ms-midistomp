@@ -92,8 +92,8 @@ clicks.
 - About **100 cycles per declared unit** ((35 316 - 5 291) / 293.4 = 102; probe v1 gave 95).
 - At 293 declared the worst block still had 23 % headroom, so the stock 225 limit is very
   conservative. The final limit is still open (handoff "Later").
-- Not checked yet: effects that did not write F in probe v1 (ICE Delay, AnalogDly, Gyre) on
-  Bus A or B. If their output does not land in F, copying F cannot route them.
+- ICE Delay and AnalogDly write F on every slot (probe v2 P6, 2026-10-18), so copying F routes
+  them. Their F0 in probe v1 is not reproduced. Gyre is not checked.
 
 ## M2 test build (2026-10-16)
 
