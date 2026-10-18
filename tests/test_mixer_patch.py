@@ -161,3 +161,19 @@ def _spans(names):
             yield s["addr"], s["addr"] + len(_data(s)), p
         for w in patch.get("write", []):
             yield w["addr"], w["addr"] + len(bytes.fromhex(w["data"])), p + " write"
+
+
+def test_save_buf_is_the_stock_live_save_buffer():
+    # Needs Zoom's MS-70CDR 2.10 updater (never committed): MIDISTOMP_70CDR_UPDATER=path
+    import os
+    import re
+    from zoomms import ais, parts
+    path = Path(os.environ.get("MIDISTOMP_70CDR_UPDATER", ROOT / "MS-70CDR_v2.10_Win_E/ZOOM MS-70CDR v2.10 Updater.exe"))
+    if not path.is_file():
+        pytest.skip("no MS-70CDR updater")
+    os_part = next(p for p in parts.find_parts(path) if p.resource_id == 129)
+    img = ais.parse(parts.read_part(path, os_part))
+    lo, hi = (int.from_bytes(img.read(a, 4), "little") >> 7 & 0xFFFF for a in (0xC00B84D8, 0xC00B84E0))
+    stock = hi << 16 | lo                                            # 0xC00B84D0: mvk / mvkh of the buffer it packs into
+    src = (ROOT / "asm/mixer/mixer.S").read_text()
+    assert int(re.search(r"\.equ\s+SAVE_BUF,\s*(0x[0-9A-Fa-f]+)", src).group(1), 16) == stock
