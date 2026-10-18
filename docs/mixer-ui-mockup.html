@@ -114,7 +114,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
         <h2>Changed from stock</h2>
         <ul>
           <li>The crane and the lift space are gone. Bus A sits where the lifted cover used to go, and Bus B in the stock row. Pre and Post sit between them, on the line where the fork splits.</li>
-          <li>Cursor: a thin 1-px border. Selected: like stock CHO, the cover filled plus a separate thin square frame with a 1-px gap.</li>
+          <li>Cursor: a thin 1-px border. Selected: like stock CHO, the cover filled 1 px inside a thin square frame (a 1-px gap).</li>
           <li>[ROUTE] and [MIX] are square boxes (stock EXIT style: 1-px line, no rounding, no thick bottom) as wide as a cover and as tall as both bus rows, with their names spelled out.</li>
           <li>IN and OUT are the stock plug icons copied pixel for pixel (body, ridges, ring and rounded tip), one per channel (the upper one is L, as printed on the case). Only the cable is thinner. Mono: one plug, one line. Stereo: two plugs and double lines.</li>
           <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 8 pixels instead of 4. Where two lines cross without joining, one hops over the other.</li>
@@ -359,13 +359,12 @@ function checker(x, y, w, h) {
 function drawCover(e, l, cy) {
   const y = cy - 9, cur = S.cur === e, inv = cur && S.sel;
   fill(l, y, CW, CH, BG);
-  if (inv) { fill(l + 1, y, CW - 2, CH); fill(l, y + 1, CW, CH - 2); }
+  if (inv) { fill(l + 2, y + 1, CW - 4, CH - 2); fill(l + 1, y + 2, CW - 2, CH - 4); }   // fill 1 px inset: the gap is its own ring
   else if (e.on && !e.full) {
     rect(l, y, CW, CH - 1); fill(l + 1, y + CH - 2, CW - 2, 2);
   }
   else checker(l, y, CW, CH);   // OFF, or bypassed by DSP FULL
-  if (cur && !inv) rect(l - 1, y - 1, CW + 2, CH + 2);
-  if (inv) sq(l - 2, y - 2, CW + 4, CH + 4);   // stock CHO: thin square frame, 1-px gap
+  if (cur) (inv ? sq : rect)(l - 1, y - 1, CW + 2, CH + 2);   // selected: square frame like stock CHO
   const c = inv ? BG : INK, a = e.name.slice(0, 5), z = e.full ? "FULL" : e.name.slice(5, 10), wt = warn(e);
   if (wt && cy === YC) { fill(l + 12, 10, 9, 8); t5("!", l + 14, 10, BG); }   // Smart Warning tag, where the A/B tags were
   const tab = wt && cy !== YC ? 5 : 0;   // bus rows have no room above: the tag sits in the cover's top-left corner
@@ -375,9 +374,8 @@ function drawCover(e, l, cy) {
 }
 function drawNode(n, l) {   // as wide as a cover, as tall as both bus rows
   const top = YA - 4, h = YB - YA + 9, cur = S.cur === n, inv = cur && S.sel;
-  fill(l, top, CW, h, inv ? INK : BG); sq(l, top, CW, h);   // stock EXIT box: square, 1 px, no thick bottom
-  if (cur && !inv) sq(l - 1, top - 1, CW + 2, h + 2);
-  if (inv) sq(l - 2, top - 2, CW + 4, h + 4);
+  if (inv) fill(l + 1, top + 1, CW - 2, h - 2); else { fill(l, top, CW, h, BG); sq(l, top, CW, h); }   // stock EXIT box: square, 1 px, no thick bottom
+  if (cur) sq(l - 1, top - 1, CW + 2, h + 2);
   t5(n.node, l + Math.floor((CW - w5(n.node)) / 2), YC - 3, inv ? BG : INK);
   if (n === MIX && silent()) t5("!", l + 14, YC + 6, inv ? BG : INK);
 }
