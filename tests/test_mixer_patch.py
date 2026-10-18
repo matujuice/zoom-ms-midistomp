@@ -22,7 +22,7 @@ M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: releas
 
 # mixer.S fixed offsets
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
-       "rec_save": 40, "keys": 48, "draw": 56, "cc": 64}
+       "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "poll": 120}
 LAYOUT, MAIL, LIVE, SAVED, MENU6, MAXES, DEFAULTS, PAGES = 128, 136, 144, 156, 200, 224, 236, 248
 MAGIC = 0x4D
 
@@ -77,7 +77,7 @@ def test_vectors_point_at_their_handlers():
         w = _word(data, off // 4)
         assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
         assert BASE + 288 <= b_target(BASE + off, w) < BASE + len(data)   # into the code
-    assert data[72:128] == b"\0" * 56
+    assert data[72:120] == b"\0" * 48
 
 
 def test_callp_sites_reach_their_vectors():
@@ -115,6 +115,14 @@ def test_auto_save_hook_retargets_tempo_hold():
     assert far_target(w["expect"]) == 0xC00B8534 and far_target(w["data"]) == BASE + VEC["dirty"]
 
 
+def test_poll_trampoline_chains_through_the_mixer():
+    w = WRITES[0xC00C82D0]
+    clock = [x for x in patcher.load(ROOT / "patches/midi-clock.yaml")["write"] if x["addr"] == 0xC00C82D0][0]
+    assert w["expect"] == clock["data"] and far_target(clock["data"]) == 0x1181E800   # midi-clock's, to poll.S
+    assert far_target(w["data"]) == BASE + VEC["poll"]
+    assert ".equ    POLL, 0x1181E800" in (ROOT / "asm/mixer/mixer.S").read_text()      # the mixer poll goes on there
+
+
 def test_menu_writes_match_the_settings_section():
     sec = [s for s in SETTINGS["section"] if s["addr"] == 0x1181EA00][0]
     sb = _data(sec)
@@ -135,7 +143,7 @@ def test_data_block():
     assert data[LIVE:LIVE + 12] == defaults == data[SAVED:SAVED + 12]
     maxes = data[MAXES:MAXES + 12]
     assert all(d <= m for d, m in zip(defaults[:11], maxes))
-    pages = data[PAGES:PAGES + 16]
+    pages = data[PAGES:PAGES + 24]
     used = sorted(p for p in pages if p != 255)
     assert used == list(range(11))                                   # every setting on exactly one knob
 
@@ -150,7 +158,8 @@ def test_m2_build_does_not_overlap():
         assert hit in ([], ["midi-cc"], ["midi-settings"], ["tempo-hold"]), hex(a)
     other_writes = [s for s in _spans(M2_SET) if s[2].endswith("write") and s[2] != "mixer-m2 write"]
     for a, e, _ in _spans(["mixer-m2"]):                            # no write that another patch also makes
-        assert not [p for s, t, p in other_writes if s < e and a < t], hex(a)
+        hit = [p for s, t, p in other_writes if s < e and a < t]
+        assert hit in ([], ["midi-clock write"] if a == 0xC00C82D0 else []), hex(a)   # the poll trampoline, chained
     assert BASE + len(_data(SEC)) <= 0xC0102000                     # inside the 64 KB MOD code area (looper buffer above)
 
 

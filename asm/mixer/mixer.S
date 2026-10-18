@@ -1,23 +1,27 @@
 ; Mixer Mode M2 (docs/mixer-mode-plan.md), MS-70CDR 2.10 OS. Test builds only.
 ;
 ; The bus engine of M1 plus the node settings, saved per patch:
-;   [ROUTE] Send (A <-> B, centre = both full), Input Level, Mode (Serial /
-;           Parallel), Bus A Level, Bus B Level
-;   [MIX]   Crossfade (A <-> B), Master, Curve (Smooth / DJ / Cut),
+;   IN      Input Level
+;   [ROUTE] Send (A <-> B, centre = both full), Mode (Serial / Parallel),
+;           Bus A Level, Bus B Level
+;   [MIX]   Crossfade (A <-> B), Curve (Smooth / DJ / Cut),
 ;           Bus A Level, Bus B Level, Phase Invert B
-; on the MIXER screen (menu entry 5, screen 15) and on MIDI CC 85-95.
+;   OUT     Master, and a LIMIT tag while the limiter cuts (poll)
+; on the MIXER screen (menu entry 5, screen 15) and on MIDI CC 85-95. Levels
+; go 0-150, 100 = unity.
 ;
 ; Engine (replaces the stock slot loop: packet 0x1181BE00 jumps to +0,
 ; chain_jump.S). The stock loop calls slots 0-5 in order on one shared stereo
 ; buffer F (ctx[5], 0x11F03738, LLLLLLLL RRRRRRRR float32, effects work in
-; place). Serial does the same. Parallel runs the same calls by bus:
-;   1. the PRE slots on F, S = In x F (the split point)
+; place). Both modes start with F x Input Level. Serial then does the same.
+; Parallel runs the same calls by bus:
+;   1. the PRE slots on F, S = F (the split point)
 ;   2. F = SendA x RouteA x S, the BUS A slots, A = F
 ;   3. F = SendB x RouteB x S, the BUS B slots
-;   4. F = cA x A + cB x F, cA/cB = curve x Mix level x Master (x -1 Phase B)
-;   5. the safety limiter on F, then the POST slots
-; and goes on at 0x1181BE48 (the stock post mix). Serial scales F by Master
-; after the last slot (no limiter: Master only turns down). Gains are recomputed every
+;   4. F = cA x A + cB x F, cA/cB = curve x Mix level (x -1 Phase B)
+;   5. the POST slots
+; Both modes end with F x Master, then the safety limiter, and go on at
+; 0x1181BE48 (the stock post mix). Gains are recomputed every
 ; block and smoothed (g += (target - g) / 4), so knob and CC moves don't step.
 ; F is swapped by content, never by pointer: two OS slot functions (mute,
 ; gain) hard-code 0x11F03738.
@@ -40,7 +44,8 @@
 ;     LIVE in and SAVED = LIVE. Other saves (copies, editor store, factory
 ;     reset) are packed records that carry their own bytes. A patch load
 ;     that auto saves the patch it leaves (0xC00B89F4, after the unpack)
-;     gets PREV, the settings LIVE had before the unpack.
+;     gets PREV, the settings LIVE had before the unpack; unpack_live
+;     sets that save up for mixer-only edits too.
 ;   - pack_dump (the patch sent to an editor): stock pack, put LIVE in.
 ;   - dirty (IS_DIRTY): stock, or LIVE differs from SAVED.
 ; A patch without MAGIC (stock, v1.x, factory) loads the defaults: Serial.
@@ -53,17 +58,20 @@
         .equ    BASE, 0xC00F6000
         .equ    LAYOUT, BASE + 128          ; [6] bus of each slot
         .equ    MAIL, BASE + 136            ; [6] routing probe ZDL: 0x80 | bus
-        .equ    MSER, BASE + 72             ; Master in Serial, smoothed (float)
+        .equ    MASTER, BASE + 72           ; Master, smoothed (float)
         .equ    PREV, BASE + 76             ; [12] LIVE before a patch load
         .equ    PEND, BASE + 88             ; 1: the load's auto save gets PREV
+        .equ    LIMHIT, BASE + 89           ; 1: the limiter cut the gain (poll clears)
+        .equ    SHOWN, BASE + 90            ; LIMIT tag as last drawn
+        .equ    HOLD, BASE + 92             ; polls left to show LIMIT
         .equ    LIVE, BASE + 144            ; [12] settings of the patch played
         .equ    SAVED, BASE + 156           ; [12] ... as saved in flash
-        .equ    PAGE, BASE + 168            ; MIXER screen page 0-3
+        .equ    PAGE, BASE + 168            ; MIXER screen page 0-5
         .equ    GAINS, BASE + 176           ; In, SendA, SendB, cA, cB, limiter
         .equ    MENU6, BASE + 200           ; menu entry names
         .equ    MAXES, BASE + 224           ; [12] maximum of each setting
         .equ    DEFAULTS, BASE + 236        ; [12]
-        .equ    PAGES, BASE + 248           ; [4][4] setting under knob 1-3
+        .equ    PAGES, BASE + 248           ; [6][4] setting under knob 1-3
 
         .equ    AFTER_LOOP, 0x1181BE48      ; stock: callp 0x1181B090 (post mix)
         .equ    FX_TABLE, 0xC00EE930        ; audio function of each slot
@@ -82,6 +90,8 @@
         .equ    IS_DIRTY, 0xC00B8534        ; -> 1 = patch differs from saved
         .equ    REC_SAVE, 0xC00B49F4        ; (record, buffer)
         .equ    SAVE_BUF, 0xC009C2A8        ; live patch, packed for saving
+        .equ    LIVE_PATCH, 0xC009BF58      ; the patch played, unpacked
+        .equ    MEMCPY, 0xC00E09C0          ; (dst, src, n)
         .equ    SET_SCREEN, 0xC00A75E0      ; (screen, row)
         .equ    KEY_DONE, 0xC00A83C0        ; key dispatcher epilogue, A4 = redraw
         .equ    DRAW_DONE, 0xC00A9404       ; draw dispatcher epilogue
@@ -93,6 +103,10 @@
         .equ    STR_BLANK, 0xC00E9101
         .equ    STEP, 0xC00F2020            ; midi_cc step.S: CC 80/81, then stock
         .equ    UI_REFRESH, 0xC00ACD84
+        .equ    POLL, 0x1181E800            ; midi_clock poll.S (L2)
+        .equ    MODE, 320                   ; B14 offsets: 11 = menu
+        .equ    SCREEN, 352                 ; 15 = MIXER
+        .equ    HOLD_POLLS, 30              ; LIMIT stays about 0.5 s
         .equ    EVENT_POST, 0xC00CBF40
         .equ    UI_EVENT_OFS, 656           ; B14 offset
         .equ    EV_ENTER, 34                ; knob 1 press
@@ -145,8 +159,10 @@ vectors:
         nop     5
         b       .S2     cc                  ; +64 midi_cc handler.S: CCs not 14-73
         nop     5
-        .word   0, 0, 0, 0, 0, 0            ; +72 MSER, PREV, PEND
-        .word   0, 0, 0, 0, 0, 0, 0, 0      ; +96
+        .word   0, 0, 0, 0, 0, 0            ; +72 MASTER, PREV, PEND, LIMHIT, SHOWN, HOLD
+        .word   0, 0, 0, 0, 0, 0            ; +96
+        b       .S2     poll                ; +120 jump from midi-clock's poll trampoline
+        nop     5
 
 ; +128: data at fixed offsets (the .equ above), never executed
         .byte   0, 0, 0, 0, 0, 0, 0, 0      ; +128 LAYOUT
@@ -159,16 +175,27 @@ vectors:
         ; +200 MENU6: the five menu entries (midi_settings.S) with MIXER
         ; before the version entry
         .word   0xC00E8FE4, 0xC00E8FF7, 0xC00E9004, 0x1181EC63, s_mixer, 0xC00E900D
-        .byte   1, 100, 100, 100, 100, 100, 100, 2, 100, 100, 1, 255 ; +224 MAXES
+        .byte   1, 100, 150, 150, 150, 100, 150, 2, 150, 150, 1, 255 ; +224 MAXES
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +236 DEFAULTS
-        ; +248 PAGES: ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2
-        .byte   S_SEND, S_IN, S_MODE, NONE, S_RA, S_RB, NONE, NONE
-        .byte   S_XF, S_MASTER, S_CURVE, NONE, S_MA, S_MB, S_PHASE, NONE
-        .word   0, 0, 0, 0, 0, 0            ; to +288
+        ; +248 PAGES: IN, ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2, OUT
+        .byte   S_IN, NONE, NONE, NONE
+        .byte   S_SEND, NONE, S_MODE, NONE, S_RA, S_RB, NONE, NONE
+        .byte   S_XF, NONE, S_CURVE, NONE, S_MA, S_MB, S_PHASE, NONE
+        .byte   S_MASTER, NONE, NONE, NONE
+        .word   0, 0, 0, 0                  ; to +288
 
 ; ---------------------------------------------------------------- engine
 
 engine:
+        mvk     .L1     S_IN, a4            ; the chain's start, both modes: Input Level
+        callp   .S2     pct, b3
+        mvkl    .S1     GAINS, a5
+        mvkh    .S1     GAINS, a5
+        callp   .S2     smooth, b3
+        mvkl    .S1     BUF_F, a4
+        mvkh    .S1     BUF_F, a4
+        mv      .L1     a4, a5
+        callp   .S2     scale16, b3         ; A6 = the smoothed Input Level
         mvkl    .S1     LIVE, a3
         mvkh    .S1     LIVE, a3
         ldbu    .D1T2   *+a3(S_MODE), b0
@@ -186,11 +213,7 @@ e_split:
         mvkh    .S1     BUF_F, a4
         mvkl    .S1     BUF_S, a5
         mvkh    .S1     BUF_S, a5
-        mvkl    .S1     GAINS, a7
-        mvkh    .S1     GAINS, a7
-        ldw     .D1T1   *+a7(0), a6         ; In
-        nop     4
-        callp   .S2     scale16, b3         ; S = In x F
+        callp   .S2     copy16, b3          ; S = F
         mvkl    .S1     BUF_S, a4
         mvkh    .S1     BUF_S, a4
         mvkl    .S1     BUF_F, a5
@@ -232,32 +255,28 @@ e_mix:
         ldw     .D1T2   *+a7(16), b6        ; cB
         nop     4
         callp   .S2     mix16, b3           ; F = cA x A + cB x F
-        callp   .S2     limit, b3           ; limiter gain
-        mvkl    .S1     BUF_F, a4
-        mvkh    .S1     BUF_F, a4
-        mv      .L1     a4, a5
-        mvkl    .S1     GAINS, a7
-        mvkh    .S1     GAINS, a7
-        ldw     .D1T1   *+a7(20), a6
-        nop     4
-        callp   .S2     scale16, b3         ; F = limiter x F
         mvk     .L1     POST, a11
         b       .S1     run_bus
-        addkpc  .S2     e_out, b10, 4
+        addkpc  .S2     e_master, b10, 4
 serial:
         mvk     .L1     PRE, a11
         b       .S1     run_bus
         addkpc  .S2     e_master, b10, 4
 e_master:
-        mvk     .L1     S_MASTER, a4        ; Serial: Master on the chain's end
+        mvk     .L1     S_MASTER, a4        ; the chain's end, both modes: Master
         callp   .S2     pct, b3
-        mvkl    .S1     MSER, a5
-        mvkh    .S1     MSER, a5
+        mvkl    .S1     MASTER, a5
+        mvkh    .S1     MASTER, a5
         callp   .S2     smooth, b3
         mvkl    .S1     BUF_F, a4
         mvkh    .S1     BUF_F, a4
         mv      .L1     a4, a5
         callp   .S2     scale16, b3         ; A6 = the smoothed Master
+        callp   .S2     limit, b3           ; then the safety limiter
+        mvkl    .S1     BUF_F, a4
+        mvkh    .S1     BUF_F, a4
+        mv      .L1     a4, a5
+        callp   .S2     scale16, b3         ; A6 = its gain
 e_out:
         callp   .S2     latch, b3
         mvk     .L2     6, b0
@@ -347,11 +366,6 @@ gains_update:
         mvkl    .S1     GAINS + 8, a5
         mvkh    .S1     GAINS + 8, a5
         callp   .S2     smooth, b3
-        mvk     .L1     S_IN, a4
-        callp   .S2     pct, b3
-        mvkl    .S1     GAINS, a5
-        mvkh    .S1     GAINS, a5
-        callp   .S2     smooth, b3
         ; crossfade: DJ unless the curve says otherwise
         mvk     .L1     S_XF, a4
         callp   .S2     pct, b3
@@ -393,14 +407,9 @@ gu_smooth:
         callp   .S2     eqp, b3
         mv      .L1     a4, a13
 gu_mix:
-        mvk     .L1     S_MASTER, a4
-        callp   .S2     pct, b3
-        mv      .L1     a4, a15             ; Master
         mvk     .L1     S_MA, a4
         callp   .S2     pct, b3
         mpysp   .M1     a4, a13, a4
-        nop     3
-        mpysp   .M1     a4, a15, a4
         nop     3
         mvkl    .S1     GAINS + 12, a5
         mvkh    .S1     GAINS + 12, a5
@@ -408,8 +417,6 @@ gu_mix:
         mvk     .L1     S_MB, a4
         callp   .S2     pct, b3
         mpysp   .M1     a4, a14, a4
-        nop     3
-        mpysp   .M1     a4, a15, a4
         nop     3
         mvkl    .S1     LIVE, a0
         mvkh    .S1     LIVE, a0
@@ -536,7 +543,10 @@ lm_peak:
         mpysp   .M1     a2, a3, a2
         nop     3
         mpysp   .M1     a2, a9, a6          ; 0.98 / peak
-        nop     3
+        mvkl    .S1     LIMHIT, a0
+        mvkh    .S1     LIMHIT, a0
+        mvk     .L1     1, a1
+        stb     .D1T1   a1, *a0
         b       .S1     lm_store
         nop     5
 lm_release:
@@ -605,7 +615,42 @@ cp_loop:
 
 ; Patch load into the live patch (A4 = 0xC009BF58) or into its saved copy
 ; (A4 = 0xC009C07C); B4 = packed record. B3 = return into the OS.
+; unpack_live runs in the load routine (0xC00B88E4): A11 = the patch it leaves
+; (-1: none), B11 = 1 when its stock IS_DIRTY (0xC00B892C, not hookable) found
+; edits, the live patch already copied to its B15+4 for the save at 0xC00B89F4.
+; Mixer-only edits get that same copy and save, like any stock edit.
 unpack_live:
+        mvk     .L1     -1, a0
+        cmpeq   .L1     a11, a0, a1
+  [!a1] mv      .L1X    b11, a1
+  [a1]  b       .S1     ul_go               ; no patch left, or stock saves it
+        nop     5
+        addk    .S2     -16, b15
+        stw     .D2T2   b3, *+b15(4)
+        stw     .D2T1   a4, *+b15(8)
+        stw     .D2T2   b4, *+b15(12)
+        callp   .S2     dirty, b3           ; here only the settings can differ
+        mv      .L1     a4, a1
+  [!a1] b       .S1     ul_pop
+        nop     5
+        mv      .L1X    b15, a4
+        addk    .S1     20, a4              ; the load routine's B15+4
+        mvkl    .S2     LIVE_PATCH, b4
+        mvkh    .S2     LIVE_PATCH, b4
+        mvk     .S1     0x124, a6
+        mvkl    .S2     MEMCPY, b5
+        mvkh    .S2     MEMCPY, b5
+        b       .S2     b5
+        addkpc  .S2     ul_set, b3, 4
+ul_set:
+        mvk     .L2     1, b11
+ul_pop:
+        ldw     .D2T2   *+b15(4), b3
+        ldw     .D2T1   *+b15(8), a4
+        ldw     .D2T2   *+b15(12), b4
+        nop     4
+        addk    .S2     16, b15
+ul_go:
         mvk     .L1     0, a0
         b       .S1     unpack_hook
         nop     5
@@ -895,7 +940,8 @@ k_page:
         ldw     .D1T1   *a0, a2
         nop     4
         add     .L1     1, a2, a2
-        and     .L1     3, a2, a2
+        cmpgt   .L1     6, a2, a1
+  [!a1] mvk     .L1     0, a2
         stw     .D1T1   a2, *a0
         b       .S1     k_redraw
         nop     5
@@ -927,8 +973,18 @@ k_turn:
         cmpgt   .L1     a3, a7, a1
   [a1]  mv      .L1     a7, a3
         stb     .D1T1   a3, *+a0[a2]
-        b       .S1     k_redraw
-        nop     5
+        mvkl    .S2     UI_REFRESH, b5      ; the edited mark, then the auto save timer
+        mvkh    .S2     UI_REFRESH, b5
+        b       .S2     b5
+        addkpc  .S2     kt_post, b3, 4
+kt_post:
+        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
+        mvk     .S2     64, b4
+        nop     3
+        mvkl    .S2     EVENT_POST, b5
+        mvkh    .S2     EVENT_POST, b5
+        b       .S2     b5
+        addkpc  .S2     k_redraw, b3, 4
 
 ; Screen 15 draw: page title, a row per knob (name, value), softkeys.
 ; Frame: +4 snprintf format, +8 its value, +28 y, +32.. saved registers.
@@ -1027,6 +1083,26 @@ d_next:
         cmpgt   .L1     3, a11, a1
   [a1]  b       .S1     d_row
         nop     5
+        mvkl    .S1     HOLD, a0            ; LIMIT on the OUT page
+        mvkh    .S1     HOLD, a0
+        ldw     .D1T1   *a0, a1
+        nop     4
+  [a1]  mvk     .L1     1, a1
+        stb     .D1T1   a1, *-a0(2)         ; SHOWN
+        cmpeq   .L1     5, a10, a0
+        and     .L1     a0, a1, a1
+  [!a1] b       .S1     d_soft
+        nop     5
+        mvk     .L1     0, a4
+        mvkl    .S2     s_limit, b4
+        mvkh    .S2     s_limit, b4
+        mvk     .L1     1, a6
+        mvk     .S2     32, b6
+        mvkl    .S2     DRAW_TEXT, b5
+        mvkh    .S2     DRAW_TEXT, b5
+        b       .S2     b5
+        addkpc  .S2     d_soft, b3, 4
+d_soft:
         mvk     .L1     0, a4               ; softkeys: PAGE, EXIT, blank
         mvkl    .S2     s_page, b4
         mvkh    .S2     s_page, b4
@@ -1063,6 +1139,58 @@ d_done:
         b       .S2     b3
         nop     5
 
+; Every 16 ms round of Task_SwitchNrmlSpdRead, before midi_clock's poll (B3
+; returns into the task). LIMHIT -> HOLD; a redraw when the LIMIT tag the OUT
+; page shows is out of date. Uses A0-A9, B0-B9.
+poll:
+        addk    .S2     -16, b15
+        stw     .D2T2   b3, *+b15(4)
+        mvkl    .S1     LIMHIT, a0
+        mvkh    .S1     LIMHIT, a0
+        ldbu    .D1T1   *a0, a1
+        ldbu    .D1T1   *+a0(1), a6         ; SHOWN
+        mvkl    .S1     HOLD, a5
+        mvkh    .S1     HOLD, a5
+        ldw     .D1T1   *a5, a2
+        mvk     .L1     0, a4
+        stb     .D1T1   a4, *a0
+        nop     2
+  [a2]  sub     .L1     a2, 1, a2
+  [a1]  mvk     .S1     HOLD_POLLS, a2
+        stw     .D1T1   a2, *a5
+  [a2]  mvk     .L1     1, a2
+        cmpeq   .L1     a2, a6, a1
+  [a1]  b       .S1     pl_out              ; the tag is up to date
+        nop     5
+        ldw     .D2T2   *+b14(MODE), b0
+        ldw     .D2T2   *+b14(SCREEN), b1
+        mvkl    .S1     PAGE, a0
+        mvkh    .S1     PAGE, a0
+        ldw     .D1T1   *a0, a0
+        nop     4
+        cmpeq   .L2     11, b0, b0
+        cmpeq   .L2     15, b1, b1
+        and     .L2     b0, b1, b0
+        cmpeq   .L1     5, a0, a0
+        and     .L2X    b0, a0, b0
+  [!b0] b       .S1     pl_out              ; the OUT page is not open
+        nop     5
+        ldw     .D2T1   *+b14(UI_EVENT_OFS), a4
+        mvk     .S2     64, b4
+        nop     3
+        mvkl    .S2     EVENT_POST, b5
+        mvkh    .S2     EVENT_POST, b5
+        b       .S2     b5
+        addkpc  .S2     pl_out, b3, 4
+pl_out:
+        ldw     .D2T2   *+b15(4), b3
+        nop     4
+        addk    .S2     16, b15
+        mvkl    .S2     POLL, b0
+        mvkh    .S2     POLL, b0
+        b       .S2     b0
+        nop     5
+
 ; ---------------------------------------------------------------- MIDI CC
 
 ; CC 85-95 -> a setting (0-127 scaled to its range), else on to step.S.
@@ -1095,6 +1223,8 @@ cc_ours:
         mpy     .M1     a5, a0, a5
         nop     1
         shru    .S1     a5, 15, a5          ; (value x max + 63) / 127
+        cmpgt   .L1     a5, a3, a1          ; 151 at max 150: the /127 is approximate
+  [a1]  mv      .L1     a3, a5
         mvkl    .S1     LIVE, a0
         mvkh    .S1     LIVE, a0
         stb     .D1T1   a5, *+a0[a2]
@@ -1121,7 +1251,7 @@ cc_done:
 
 ; ---------------------------------------------------------------- tables
 
-titles: .word   s_route1, s_route2, s_mix1, s_mix2
+titles: .word   s_in_t, s_route1, s_route2, s_mix1, s_mix2, s_out
 names:  .word   s_mode, s_send, s_in, s_bus_a, s_bus_b, s_xfade
         .word   s_master, s_curve, s_bus_a, s_bus_b, s_phase
 enums:  .word   mode_names, 0, 0, 0, 0, 0, 0, curve_names, 0, 0, phase_names
@@ -1144,6 +1274,12 @@ s_route2:   .string "ROUTE 2/2"
 s_mix1:     .string "MIX 1/2"
             .byte 0
 s_mix2:     .string "MIX 2/2"
+            .byte 0
+s_out:      .string "OUT"
+            .byte 0
+s_in_t:     .string "IN"
+            .byte 0
+s_limit:    .string "LIMIT"
             .byte 0
 s_mode:     .string "MODE"
             .byte 0

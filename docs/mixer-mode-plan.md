@@ -27,11 +27,27 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M0 | **Research, no build:** find the chain runner, the per-slot buffers, the DSP budget and spare bytes in the patch format on the 70CDR OS. Ends with a go / no-go and the hook points | nothing (a report) | Opus, Sonnet for the address work |
 | M1 | **Engine with fixed test layouts:** the firmware runs Pre → Bus A + Bus B → sum → Post from a layout picked by a test build (e.g. slots 1-2 Pre, 3 on A, 4 on B, 5-6 Post), 50/50 sum, the safety limiter on the output | parallel effects really in parallel; no clicks; what happens at DSP Full | Opus |
 | M2 | **The nodes:** `[ROUTE]` and `[MIX]` with their knob pages in Effect View (Send, Crossfade with the Smooth / DJ / Cut curves, levels, Mode, Output Mode), saved per patch, MIDI CCs. Tested with a **routing probe** ZDL (a sound source, a filter and a delay in one effect, with a BUS: PRE / A / B / POST knob, Luca 2026-10-15); stock effects keep their bus from M3 on | playing Send and Crossfade by knob and CC, patches remember them | Opus engine, Sonnet UI |
+| M2.1 | **Master at the end:** Master and the safety limiter move after Post, in Serial and Parallel (Master leaves the `[MIX]` gains); the MIXER screen gets an OUT page (Master) and `[MIX]` page 1 becomes Crossfade / Curve. Mixer-only edits are saved on a patch change with AUTO SAVE (now lost: the load routine's stock dirty check at `0xC00B892C` can't be hooked, so `unpack_live` sets up the same save when only the mixer settings differ: the load routine itself has no AUTO SAVE check, so mixer edits follow whatever stock does with its own edits); a MIXER screen knob edit marks the patch edited and starts the AUTO SAVE timer like a stock edit (the CC path already does). Saving follows stock in every case: STORE, AUTO SAVE timer, patch change with AUTO SAVE, nothing at power-off | Master turns down Post effects too; mixer-only edits survive a footswitch / MIDI PC patch change | Sonnet, Opus review |
+| M2.2 | **Levels:** Input Level moves to an IN page and acts on the input in every mode (before Pre); Input, the four bus levels and Master go 0-150 (100 = unity, CCs scaled to 150); a `LIMIT` tag on the OUT page while the limiter reduces gain | boost a quiet chain; LIMIT shows when it bites | Sonnet |
 | M3 | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL), **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Mono Serial mode, old patches load as Serial | the full design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
 flash test by Luca before the next one starts, as in the 70CDR port.
+
+## Decided (Luca, 2026-10-18)
+
+- Master Level always acts at the very end of the chain, after Post. It moves
+  from `[MIX]` to the OUT jack's page, with Output Mode (M3; the MIXER screen
+  gets an OUT page in M2.1).
+- The safety limiter (automatic, no setting) is the last thing before the
+  jacks, in Serial and Parallel.
+- Mixer-only edits must not be lost on a patch change with AUTO SAVE.
+- DSP FULL keeps the stock rule in M3; a higher limit is a later, measured feature.
+- Input Level gets its own IN page and sets the input level in every mode.
+- Every level goes to 150, like stock effects.
+- The limiter shows a `LIMIT` tag over the OUT jacks in the Effect Chain screen.
+- No Phase Invert A.
 
 ## Decided (Luca, 2026-10-15)
 
@@ -107,3 +123,17 @@ of the patch it leaves (`0xC00B89F4`, now gets PREV); all six round 2 steps pass
   94 Curve, 95 Phase Invert B. Go in `docs/user-guide.md` section 5 when the mixer ships.
 
 Build: as M1 with `--patch patches/mixer-m2.yaml --stamp "label=M2 MIXER"`.
+
+## M2.1 test build (2026-10-18)
+
+Master and the limiter at the chain's end in both modes, the OUT page, MIXER knob edits mark
+the patch edited, mixer-only edits saved on a patch change by the load routine's own save
+(`unpack_live`). **Pedal results (Luca, 2026-10-18): all steps pass.**
+
+## M2.2 test build (2026-10-18)
+
+Input Level on its own IN page, applied to the input in both modes (before Pre); Input, the
+four bus levels and Master go 0-150 (CCs scale 0-127 to 0-150, so unity is CC 84); a LIMIT tag
+on the OUT page, redrawn by a poll chained in front of midi-clock's (its trampoline at
+`0xC00C82D0` now jumps to the mixer's vector +120, `asm/mixer/poll_trampoline.S`).
+**Pedal results (Luca, 2026-10-18): all steps pass.**
