@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v15 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v16 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -98,7 +98,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <li>Hold knob 2's ● for a moment: DELETE? appears. Press it again to delete the effect, or anything else to cancel.</li>
           <li>[ROUTE] Send 0 and [MIX] XFade 100: the <b>!</b> badge says the output is silent.</li>
           <li>PEDAL INPUT: STEREO, then [ROUTE] Mode Split: L goes only to Bus A, R only to Bus B.</li>
-          <li>Cursor onto OUT (knob 1 to the far left), OPEN: Master Level only. Select [MIX] and turn knob 3 (or OPEN, page 1, knob 2): Output Mode (Stereo, Mono or Split). The lines inside [MIX] and the OUT plugs follow. IN opens Input Level.</li>
+          <li>Cursor onto OUT (knob 1 to the far left), OPEN: Master Level only (with Output Mode Split: Master L on knob 1, Master R on knob 2). Select [MIX] and turn knob 3 (or OPEN, page 1, knob 2): Output Mode (Stereo, Mono or Split). The lines inside [MIX] and the OUT plugs follow. IN opens Input Level (with [ROUTE] Mode Split: Input L and Input R).</li>
           <li>Raise Input Level, a bus level or Master Level above 100: a LIMIT tag shows over the OUT plugs. [MIX] page 3: Mute A / Mute B / Solo; the muted bus is dotted after its last effect.</li>
         </ol>
       </div>
@@ -126,7 +126,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
       <div>
         <h2>Levels, Mute / Solo and LIMIT</h2>
         <ul>
-          <li>Every level (Input, Bus A / B in [ROUTE] and [MIX], Master) goes 0-150, 100 = unity.</li>
+          <li>Every level (Input, Bus A / B in [ROUTE] and [MIX], Master) goes 0-150, 100 = unity. IN and OUT get a second knob (Input R, Master R) only in Split; otherwise knob 1 drives both sides.</li>
           <li>[ROUTE] page 1: Send, Mode. [MIX] page 1: Crossfade, Curve. Page 2: Bus A Level, Bus B Level, Phase Invert (Bus B). Page 3: Mute A, Mute B, Solo (Off / A / B). Solo overrides Mute.</li>
           <li>The LIMIT tag here is a simulation: it shows when the product of the gains on the path to OUT is above 1.0 (Serial: Input x Master; Parallel: Input x bus levels x Master, on any bus that is not muted). The real tag follows the safety limiter.</li>
         </ul>
@@ -203,14 +203,14 @@ const MIX = { node: "MIX", name: "MIX", on: true, vals: {}, pages: [
   [{ l: "MixA", k: "al", max: 150 }, { l: "MixB", k: "bl", max: 150 }, { l: "PhaseB", k: "ph", opts: ["Normal", "Invert"] }],
   [{ l: "MuteA", k: "ma", opts: ["Off", "On"] }, { l: "MuteB", k: "mb", opts: ["Off", "On"] }, { l: "Solo", k: "solo", opts: ["Off", "A", "B"] }]] };
 // The jacks open knob pages like nodes but never move or get selected.
-const IN = { node: "IN", jack: true, name: "IN", on: true, vals: {}, pages: [[{ l: "InLvl", k: "inl", max: 150 }, null, null]] };
-const OUT = { node: "OUT", jack: true, name: "OUT", on: true, vals: {}, pages: [[{ l: "Mastr", k: "master", max: 150 }, null, null]] };
+const IN = { node: "IN", jack: true, name: "IN", on: true, vals: {}, get pages() { return [[{ l: splitIn() ? "InL" : "InLvl", k: "inl", max: 150 }, splitIn() ? { l: "InR", k: "inr", max: 150 } : null, null]]; } };   // Split input: Input L / Input R
+const OUT = { node: "OUT", jack: true, name: "OUT", on: true, vals: {}, get pages() { return [[{ l: MIX.vals.out === 2 ? "MastL" : "Mastr", k: "master", max: 150 }, MIX.vals.out === 2 ? { l: "MastR", k: "mr", max: 150 } : null, null]]; } };   // Output Mode Split: Master L / Master R
 let Z, S;
 function reset() {
   Object.assign(ROUTE.vals, { send: 50, mode: 1, al: 100, bl: 100 });
   Object.assign(MIX.vals, { xf: 50, out: 0, curve: 1, al: 100, bl: 100, ph: 0, ma: 0, mb: 0, solo: 0 });
-  Object.assign(IN.vals, { inl: 100 });
-  Object.assign(OUT.vals, { master: 100 });
+  Object.assign(IN.vals, { inl: 100, inr: 100 });
+  Object.assign(OUT.vals, { master: 100, mr: 100 });
   Z = { PRE: [mk("DirtBox")], A: [mk("GridDly")], B: [mk("Breather"), mk("Sweep", false)], POST: [mk("EuGate")] };   // 5 of 6, so one can be added
   S = { screen: "chain", cur: Z.A[0], sel: false, page: 0, msg: "", stereo: false, popup: "" };
 }
@@ -250,7 +250,7 @@ const nodeMode = n => n === ROUTE ? { p: ROUTE.pages[0][2], max: S.stereo ? 3 : 
 const muted = k => { const s = MIX.vals.solo; return serial() ? false : s ? s === (k === "A" ? 2 : 1) : !!MIX.vals[k === "A" ? "ma" : "mb"]; };
 // Simulated LIMIT: the real tag follows the limiter. Gain on the path to OUT above 1.0 (levels are 0-150, 100 = unity).
 const limiting = () => {
-  const g = IN.vals.inl / 100 * OUT.vals.master / 100;
+  const g = Math.max(IN.vals.inl, IN.vals.inr) / 100 * Math.max(OUT.vals.master, OUT.vals.mr) / 100;   // L / R: the louder side
   return serial() ? g > 1 : ["A", "B"].some(k => !muted(k) && g * ROUTE.vals[k === "A" ? "al" : "bl"] / 100 * MIX.vals[k === "A" ? "al" : "bl"] / 100 > 1);
 };
 const all = () => [...Z.PRE, ...Z.A, ...Z.B, ...Z.POST];
@@ -515,6 +515,8 @@ function knob(k, a, hold) {
     if (a && p) {
       const max = p.opts ? p.opts.length - 1 - (p.k === "mode" && !S.stereo ? 2 : 0) : (p.max || 100), st = p.opts || max <= 20 ? 1 : 5;
       S.cur.vals[p.k] = Math.max(0, Math.min(max, S.cur.vals[p.k] + a * st));
+      if (p.k === "inl" && !splitIn()) IN.vals.inr = IN.vals.inl;   // not Split: knob 1 drives both sides
+      if (p.k === "master" && MIX.vals.out !== 2) OUT.vals.mr = OUT.vals.master;
     } else if (k === 3 && !a) S.page = (S.page + 1) % S.cur.pages.length;
     else if (k === 2 && !a) S.screen = "chain";
     else if (k === 1 && !a) S.msg = "TEMPO: the stock tap tempo";
