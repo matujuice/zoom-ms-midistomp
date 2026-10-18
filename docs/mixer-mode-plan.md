@@ -38,7 +38,8 @@ flash test by Luca before the next one starts, as in the 70CDR port.
 ## Decided (Luca, 2026-10-18)
 
 - Master Level always acts at the very end of the chain, after Post. It moves
-  from `[MIX]` to the OUT jack's page, with Output Mode (M3; the MIXER screen
+  from `[MIX]` to the OUT jack's page; Output Mode stays on `[MIX]`, where
+  Split splits the buses (M3; the MIXER screen
   gets an OUT page in M2.1).
 - The safety limiter (automatic, no setting) is the last thing before the
   jacks, in Serial and Parallel.
