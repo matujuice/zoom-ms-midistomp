@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v19 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock covers, font, CHO selection and EXIT box measured on Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v20 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock covers, font, CHO selection and EXIT box measured on Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -80,7 +80,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <tr><td>Knob 1 press</td><td>SELECT</td><td>DROP</td></tr>
           <tr><td>Knob 2 press</td><td>EXIT</td><td>- (effects: hold for DELETE)</td></tr>
           <tr><td>Knob 2 long press</td><td>-</td><td>DELETE?, then knob 2 press deletes the effect; anything else cancels</td></tr>
-          <tr><td>Knob 3 turn</td><td>-</td><td>Bus A ↔ Bus B; on [ROUTE] Mode, on [MIX] Output Mode</td></tr>
+          <tr><td>Knob 3 turn</td><td>on a bus effect: go to the other bus row</td><td>Bus A ↔ Bus B; on [ROUTE] Mode, on [MIX] Output Mode</td></tr>
           <tr><td>Cursor ◄ ► hold</td><td colspan="2">add an effect on that side, in the same zone (6 max); a short press does nothing</td></tr>
           <tr><td>Cursor ▲ ▼</td><td colspan="2">change the type of the effect under the cursor</td></tr>
           <tr><td>Knob 3 press</td><td>OPEN (knob pages)</td><td>OPEN (knob pages)</td></tr>
@@ -90,7 +90,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
         <h2>Try this</h2>
         <ol>
           <li>Select DirtB, turn knob 1 left: it crosses [ROUTE] onto Bus A.</li>
-          <li>Knob 3 while it is on a bus: it jumps to Bus B.</li>
+          <li>Knob 3 while it is on a bus: it jumps to Bus B. Unselect it (knob 1 press) and knob 3 moves only the cursor to the other bus row; knob 1 then walks that row left to right.</li>
           <li>Select [MIX] and move it: the effects it passes go to Post or back to the buses.</li>
           <li>Open [ROUTE] (knob 3 press), set Mode to Serial: one line, no A/B tags. Back to Paral: every effect returns to its bus.</li>
           <li>Hold Cursor ◄ next to EuGate: a new effect appears; Cursor ▲ until HD Hall: it doesn't fit the DSP, so DSP FULL shows and it is bypassed. Delete another effect and it comes back.</li>
@@ -216,7 +216,7 @@ function reset() {
   Object.assign(IN.vals, { inl: 100, inr: 100 });
   Object.assign(OUT.vals, { master: 100, mr: 100 });
   Z = { PRE: [mk("DirtBox")], A: [mk("GridDly")], B: [mk("Breather"), mk("Sweep", false)], POST: [mk("EuGate")] };   // 5 of 6, so one can be added
-  S = { screen: "chain", cur: Z.A[0], sel: false, page: 0, msg: "", stereo: false, popup: "" };
+  S = { bus: "A", screen: "chain", cur: Z.A[0], sel: false, page: 0, msg: "", stereo: false, popup: "" };
 }
 const serial = () => ROUTE.vals.mode === 0 || ROUTE.vals.mode === 3;
 const monoSer = () => ROUTE.vals.mode === 3;
@@ -466,7 +466,7 @@ function drawChain() {
   fill(0, 0, 128, 9); wt ? t3(wt, 64 - Math.floor(w3(wt) / 2), 2, BG) : t5("EFFECT CHAIN", 64 - Math.floor(w5("EFFECT CHAIN", true) / 2), 1, BG, true);
   if (cols[k + 2]) t3("<", 1, 2, BG);
   if (cols[k - 2]) t3(">", 124, 2, BG);
-  const fx = S.sel && !S.cur.node, nm = S.sel ? nodeMode(S.cur) : null, ab = fx && !S.del && onBus(S.cur) && !serial();
+  const fx = S.sel && !S.cur.node, nm = S.sel ? nodeMode(S.cur) : null, ab = (fx || (!S.sel && otherRow())) && !S.del && onBus(S.cur) && !serial();
   softkeys(S.del ? ["", "DELETE?", ""] : S.sel ? ["DROP", fx ? "DELETE" : "", nm ? nm.p.opts[S.cur.vals[nm.p.k]].toUpperCase() : ab ? "A/B" : ""] : [S.cur.jack ? "" : "SELECT", "EXIT", "OPEN"],
     ["{}", fx && !S.del ? "HOLD" : "", nm ? "{}" : ab ? "^v" : ""]);   // {} turns; HOLD: DELETE needs a long press; ^v: knob 3 moves it up/down
 }
@@ -522,9 +522,18 @@ function drawView() {
 }
 
 // ---- input -----------------------------------------------------------------------------
+// Browsing walks one bus row (the one the cursor was last on); knob 3 switches rows. Serial has no buses.
+const row = () => { if (onBus(S.cur)) S.bus = zoneOf(S.cur); const o = S.bus === "A" ? "B" : "A"; return Z[S.bus].length ? S.bus : o; };
+const otherRow = () => !serial() && onBus(S.cur) && Z[zoneOf(S.cur) === "A" ? "B" : "A"].length;
 function step(dir) {   // left on screen = next in the signal
-  const l = order(), i = l.indexOf(S.cur);
+  const b = row(), l = serial() ? order() : [IN, ...Z.PRE, ROUTE, ...Z[b], MIX, ...Z.POST, OUT], i = l.indexOf(S.cur);
   S.cur = l[Math.max(0, Math.min(l.length - 1, i - dir))]; S.page = 0; S.del = false;
+  if (onBus(S.cur)) S.bus = zoneOf(S.cur);
+}
+function otherBus() {   // same column, else the nearest effect
+  const z = zoneOf(S.cur), o = z === "A" ? "B" : "A";
+  if (!otherRow()) return;
+  S.cur = Z[o][Math.min(Z[z].indexOf(S.cur), Z[o].length - 1)]; S.bus = o; S.page = 0;
 }
 function knob(k, a, hold) {
   S.msg = ""; S.popup = "";
@@ -546,6 +555,7 @@ function knob(k, a, hold) {
       const { p, max } = nodeMode(S.cur); S.cur.vals[p.k] = Math.max(0, Math.min(max, S.cur.vals[p.k] + a));
     }
     else if (k === 3 && a && S.sel && onBus(S.cur) && !serial()) swapBus(S.cur);
+    else if (k === 3 && a && !S.sel) otherBus();
     else if (k === 3 && !a) { S.sel = false; S.screen = "view"; S.page = 0; }   // OPEN, also while selected
   } else {
     const p = (S.cur.pages[S.page] || [])[k - 1];
