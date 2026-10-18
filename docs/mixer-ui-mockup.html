@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v17 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v18 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock covers, font, CHO selection and EXIT box measured on Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -106,19 +106,22 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
         <h2>Taken from the photos</h2>
         <ul>
           <li>128 × 64 pixels, each pixel about 1.45 times taller than wide.</li>
-          <li>Stock covers, 33 × 19 (here 18, see below) with a 4-pixel gap: the name on 2 lines of 5 characters in the 5 × 7 font, a 2-pixel bottom edge, and a checker border when OFF.</li>
-          <li>Title bar, ◄ ► hints, softkey bar. The knob pages copy the stock tab row (name, page tabs 1 2 3), the knob arcs and TEMPO / EXIT / PAGE.</li>
+          <li>Stock covers, 38 × 23 at x 3 / 45 / 87 (4-pixel gaps): top and bottom edges 3 rows thick with stepped corners, 1-pixel sides, a dot inside each corner, the name on 2 lines of 5 characters in the stock 6 × 7 font (2-pixel vertical strokes). Here 38 × 19, see below. Dotted when OFF.</li>
+          <li>Stock CHO (selected, ADD EFFECT UNIT): the cover inverted inside a box 2 pixels larger, so a 2-pixel square frame whose inner corners follow the cover's, the cover's outline left clear as the gap, the inside filled and the name inverted.</li>
+          <li>Stock EXIT: a square 1-pixel box, the word in the stock font, an arrow icon below it.</li>
+          <li>Title bar, softkey bar. The knob pages copy the stock tab row (name, page tabs 1 2 3), the knob arcs and TEMPO / EXIT / PAGE.</li>
         </ul>
       </div>
       <div>
         <h2>Changed from stock</h2>
         <ul>
           <li>The crane and the lift space are gone. Bus A sits where the lifted cover used to go, and Bus B in the stock row. Pre and Post sit between them, on the line where the fork splits.</li>
-          <li>Cursor: a thin 1-px border. Selected: like stock CHO, the cover filled 1 px inside a thin square frame (a 1-px gap).</li>
-          <li>[ROUTE] and [MIX] are square boxes (stock EXIT style: 1-px line, no rounding, no thick bottom) as wide as a cover and as tall as both bus rows, with their names spelled out.</li>
+          <li>Cursor: only the outline of the CHO frame (1 px, square, 2 px outside the item, so a 1-px gap). Selected: the stock CHO look, the item inverted inside that box (2-px frame, 1-px gap, filled inside). Same for [ROUTE] and [MIX]; IN and OUT get the cursor outline only.</li>
+          <li>[ROUTE] and [MIX] are stock EXIT boxes (square, 1-px line) as wide as a cover and as tall as both bus rows: the name in the stock font and an icon of the current mode, signal right to left, an arrowhead on each output. [ROUTE] Mode: Serial one line, Paral one line splitting into two, Split two lines, MonoSer two lines joining into one. [MIX] Output Mode: Stereo two lines joining and splitting again, Mono two lines joining into one, Split two lines. The icon follows knob 3 and the knob pages.</li>
+          <li>Two cover rows don't fit at the stock 23 rows: covers are 19 rows (edges 2 rows thick instead of 3, the outer row 1 px shorter at each end; no clear rows around the name) in the stock font, and the CHO frame is 2 px all round, so the bus rows sit 3 rows apart.</li>
+          <li>For the same reason there is no hint row: the ◄ ► scroll arrows sit in the title bar ends, the Smart Warning text replaces the title while the cursor is on that effect, and the knob hints sit at the left end of their softkey ({} turns, HOLD for DELETE, ^v for Bus A ↔ B).</li>
           <li>IN and OUT are the stock plug icons copied pixel for pixel (body, ridges, ring and rounded tip), one per channel (the upper one is L, as printed on the case). Only the cable is thinner. Mono: one plug, one line. Stereo: two plugs and double lines.</li>
-          <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 8 pixels instead of 4. Where two lines cross without joining, one hops over the other.</li>
-          <li>Covers are 18 rows instead of 19 (no top padding above the name) so the cursor border never touches the title bar or the cover above or below.</li>
+          <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 7 pixels instead of 4. Where two lines cross without joining, one hops over the other.</li>
           <li>Scrolling is stock: 3 columns, the cursor's column always in the middle. A bus column holds its Bus A and Bus B effect one above the other.</li>
           <li>The knob pages show the bus as a filled tag at the right of the tab row.</li>
         </ul>
@@ -134,7 +137,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
       <div>
         <h2>Still open</h2>
         <ol>
-          <li>Smart Warning is a maybe: it needs each effect's channel type. Stock ZDLs may not declare it, so we may keep our own chart (to check together later). Drawn here as a <b>!</b> tag above the cover (in the top-left corner on bus rows, which have no room above), the warning text in the hint row while the cursor is on it, and a <b>!</b> tab plus the text on its knob pages.</li>
+          <li>Smart Warning is a maybe: it needs each effect's channel type. Stock ZDLs may not declare it, so we may keep our own chart (to check together later). Drawn here as a <b>!</b> tag above the cover (in the top-left corner on bus rows, which have no room above), the warning text in the title bar while the cursor is on it, and a <b>!</b> tab plus the text on its knob pages.</li>
           <li>Mono Serial ([ROUTE] Mode MonoSer, stereo input only): Serial with L and R summed to mono at [ROUTE] (the join is drawn just before it, where its splits are drawn too).</li>
           <li>DSP FULL: the popup here is a placeholder; the real one is the stock DSP FULL popup from the effect screen. The DSP costs are made up (budget 100).</li>
         </ol>
@@ -292,11 +295,13 @@ function deleteEffect(e) {   // the cursor goes to the next item in the signal
 }
 
 // ---- Effect Chain screen -----------------------------------------------------------
-// rows: title 0-8, gap 9, Bus A covers 11-28, Pre/Post 21-38, Bus B 31-48, hints 50-54, softkeys 56-63.
-// Covers are 18 rows (stock 19) so the cursor border (1 row outside) never touches the title or the other row.
-// Columns like stock: 3 on screen, the cursor's column always in the middle. 4-px gaps, 8 px where lines split or join.
-// Lines: one per channel. Mono 1 line on row 30; stereo L on 29, R on 31 (bus rows 19/21 and 39/41).
-const CW = 33, CH = 18, YC = 30, YA = 20, YB = 40;
+// rows: title 0-8 (also the scroll arrows and the Smart Warning text), Bus A covers 12-30, Pre/Post 23-41,
+// Bus B 34-52, softkeys 56-63 (the knob hints sit inside them). The cursor outline / selected frame is 2 px outside
+// an item: rows 10-11 and 53-54 at most, 3 rows between the bus rows, so nothing touches the title or the other row.
+// Covers are the stock 38 px wide, 19 rows (stock 23: thick edges 2 rows instead of 3, no clear rows) in the stock font.
+// Columns like stock: 3 on screen at x 3/45/87, the cursor's column always in the middle. 4-px gaps, 7 px where lines split or join.
+// Lines: one per channel. Mono 1 line on row 32; stereo L on 31, R on 33 (bus rows 20/22 and 42/44).
+const CW = 38, CH = 19, YC = 32, YA = 21, YB = 43;
 const lane = (y, st) => st ? [y - 1, y + 1] : [y];
 const splitIn = () => ROUTE.vals.mode === 2;
 const bus = y => splitIn() ? [y] : lane(y, S.stereo);   // Split input: L alone on Bus A, R alone on Bus B
@@ -342,7 +347,7 @@ function fan(g, w, groups, split) {   // one riser per group inside the gap g ..
   const H = [], V = [], R = groups.map(([y, to]) => [Math.min(y, ...to), Math.max(y, ...to)]);
   const one = R.every(([a, b], i) => R.every(([c, d], j) => i === j || b < c || d < a));   // risers that don't overlap line up
   groups.forEach(([y, to], i) => {
-    const d = one ? 0 : 2 * i, x = split ? g + 2 + d : g + w - 3 - d;
+    const d = one ? 1 : 2 * i, x = split ? g + 2 + d : g + w - 3 - d;   // risers in the middle 3 cols, clear of a cursor frame (2 px)
     H.push([y, split ? g + w - 1 : g, x]); to.forEach(t => H.push([t, split ? g : g + w - 1, x]));
     V.push([x, Math.min(y, ...to), Math.max(y, ...to)]);
   });
@@ -350,34 +355,62 @@ function fan(g, w, groups, split) {   // one riser per group inside the gap g ..
 }
 const hline = (x, y, w, dot) => { if (!dot) return fill(x, y, w, 1); for (let i = 0; i < w; i += 2) fill(x + i, y, 1, 1); };
 const dead = (c, y) => { const k = y < YC ? "A" : "B"; return c.bi !== undefined && muted(k) && c.bi >= Z[k].length - 1; };   // a muted bus after its last effect
-function checker(x, y, w, h) {
-  for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
-    const edge = j < 1 || j >= h - 2 || i === 0 || i === w - 1;
-    if (edge && (i + j) % 2 === 0 && !((i === 0 || i === w - 1) && (j === 0 || j === h - 1))) fill(x + i, y + j, 1, 1);
-  }
+// The stock cover: top and bottom edges 2 rows with the outer row 1 px shorter at each end, 1-px sides, a dot inside each corner.
+// t = 1 (edges 1 row) for a selected cover: inverted, its outline becomes the 1-px gap and the fill clears the name by 1 row.
+function pill(l, y, dot, t = 2) {   // dot: OFF, or bypassed by DSP FULL
+  [[1, 0, CW - 2, 1], [0, 1, CW, t - 1], [0, CH - t, CW, t - 1], [1, CH - 1, CW - 2, 1], [0, t, 1, CH - 2 * t], [CW - 1, t, 1, CH - 2 * t],
+   [1, t, 1, 1], [CW - 2, t, 1, 1], [1, CH - 1 - t, 1, 1], [CW - 2, CH - 1 - t, 1, 1]].forEach(([x, yy, w, h]) => {
+    for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) if (!dot || (x + i + yy + j) % 2 === 0) fill(l + x + i, y + yy + j, 1, 1);
+  });
 }
+const RGB = [BG, INK].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
+function invert(x, y, w, h) {   // swap ink and background in a box
+  const d = g.getImageData(x, y, w, h);
+  for (let i = 0; i < d.data.length; i += 4) d.data.set(RGB[d.data[i] < 140 ? 0 : 1], i);
+  g.putImageData(d, x, y);
+}
+// Stock CHO: the item inverted inside a box 2 px larger, so a 2-px square frame, the item's outline as the gap, the inside filled.
+// The cursor is only that box's outline (1 px, then a 1-px gap). Call clear() before drawing the item, mark() after.
+const clear = (x, y, w, h, cur) => cur ? fill(x - 2, y - 2, w + 4, h + 4, BG) : fill(x, y, w, h, BG);
+const mark = (x, y, w, h, sel) => sel ? invert(x - 2, y - 2, w + 4, h + 4) : sq(x - 2, y - 2, w + 4, h + 4);
+const t7 = (s, x, y) => t5(s, x, y, INK, true);   // the stock cover font: 6 x 7, 2-px vertical strokes
 function drawCover(e, l, cy) {
-  const y = cy - 9, cur = S.cur === e, inv = cur && S.sel;
-  fill(l, y, CW, CH, BG);
-  if (inv) { fill(l + 2, y + 1, CW - 4, CH - 2); fill(l + 1, y + 2, CW - 2, CH - 4); }   // fill 1 px inset: the gap is its own ring
-  else if (e.on && !e.full) {
-    rect(l, y, CW, CH - 1); fill(l + 1, y + CH - 2, CW - 2, 2);
-  }
-  else checker(l, y, CW, CH);   // OFF, or bypassed by DSP FULL
-  if (cur) (inv ? sq : rect)(l - 1, y - 1, CW + 2, CH + 2);   // selected: square frame like stock CHO
-  const c = inv ? BG : INK, a = e.name.slice(0, 5), z = e.full ? "FULL" : e.name.slice(5, 10), wt = warn(e);
-  if (wt && cy === YC) { fill(l + 12, 10, 9, 8); t5("!", l + 14, 10, BG); }   // Smart Warning tag, where the A/B tags were
-  const tab = wt && cy !== YC ? 5 : 0;   // bus rows have no room above: the tag sits in the cover's top-left corner
-  if (tab) { fill(l, y, tab, 9, c); t5("!", l, y + 1, inv ? INK : BG); }
-  t5(a, l + tab + Math.floor((CW - tab - w5(a)) / 2), y + 1, c);
-  if (z) t5(z, l + Math.floor((CW - w5(z)) / 2), y + 9, c);
+  const y = cy - 9, cur = S.cur === e, wt = warn(e);
+  clear(l, y, CW, CH, cur);
+  pill(l, y, !e.on || e.full, cur && S.sel ? 1 : 2);
+  if (wt && cy === YC) { fill(l + 15, 11, 8, 9); t5("!", l + 16, 12, BG, true); }   // Smart Warning tag, where the A/B tags were
+  const tab = wt && cy !== YC, n = tab ? 4 : 5;   // bus rows have no room above: the tag sits in the cover's top-left corner
+  if (tab) { fill(l, y, 8, 10); t5("!", l + 1, y + 2, BG, true); }
+  const a = e.name.slice(0, n), z = e.full ? "FULL" : e.name.slice(n, n + 5), x0 = tab ? 9 : 1;
+  t7(a, l + x0 + Math.floor((CW - 1 - x0 - w5(a, true)) / 2), y + 2);
+  t7(z, l + 1 + Math.floor((CW - 2 - w5(z, true)) / 2), y + 10);
+  if (cur) mark(l, y, CW, CH, S.sel);
 }
-function drawNode(n, l) {   // as wide as a cover, as tall as both bus rows
-  const top = YA - 4, h = YB - YA + 9, cur = S.cur === n, inv = cur && S.sel;
-  if (inv) fill(l + 1, top + 1, CW - 2, h - 2); else { fill(l, top, CW, h, BG); sq(l, top, CW, h); }   // stock EXIT box: square, 1 px, no thick bottom
-  if (cur) sq(l - 1, top - 1, CW + 2, h + 2);
-  t5(n.node, l + Math.floor((CW - w5(n.node)) / 2), YC - 3, inv ? BG : INK);
-  if (n === MIX && silent()) t5("!", l + 14, YC + 6, inv ? BG : INK);
+// Mode icons, like the arrow on stock EXIT: 2-row lines, signal from right to left, an arrowhead on each output.
+// Each line is knots [x, top row], x from 0 (output) to 29 (input); rows 0-13.
+const ICON = { Serial: [[[0, 6], [29, 6]]], Split: [[[0, 2], [29, 2]], [[0, 10], [29, 10]]],
+  Paral: [[[0, 2], [11, 2], [19, 6], [29, 6]], [[0, 10], [11, 10], [19, 6], [29, 6]]],
+  Mono: [[[0, 6], [10, 6], [18, 2], [29, 2]], [[0, 6], [10, 6], [18, 10], [29, 10]]],
+  Stereo: [[[0, 2], [5, 2], [13, 6], [16, 6], [24, 2], [29, 2]], [[0, 10], [5, 10], [13, 6], [16, 6], [24, 10], [29, 10]]] };
+ICON.MonoSer = ICON.Mono;
+function icon(name, x, y) {
+  ICON[name].forEach(k => {
+    for (let i = 1; i < k.length; i++) {
+      const [x0, y0] = k[i - 1], [x1, y1] = k[i];
+      for (let c = x0; c <= x1; c++) fill(x + c, y + Math.round(y0 + (y1 - y0) * (c - x0) / (x1 - x0)), 1, 2);
+    }
+    const t = k[0][1];
+    fill(x + 1, y + t - 1, 2, 4); fill(x + 3, y + t - 2, 2, 6);   // arrowhead pointing left
+  });
+}
+function drawNode(n, l) {   // stock EXIT box (square, 1 px), as wide as a cover, as tall as both bus rows: name + mode icon
+  const top = YA - 9, h = YB - YA + CH, cur = S.cur === n, m = nodeMode(n);
+  clear(l, top, CW, h, cur);
+  sq(l, top, CW, h);
+  t7(n.node, l + 1 + Math.floor((CW - 2 - w5(n.node, true)) / 2), top + 2);
+  icon(m.p.opts[n.vals[m.p.k]], l + 4, YC - 6);
+  if (n === MIX && silent()) t5("!", l + 16, top + 31, INK, true);
+  if (cur) mark(l, top, CW, h, S.sel);
 }
 // The stock IN plug, pixel for pixel from the photos (OUT is its mirror).
 // x from the stub's left end, y from the plug's top; the cable is 1 px instead of the stock 4.
@@ -398,13 +431,14 @@ function drawJack(kind, l, lanes) {   // one plug per channel; L is the upper on
     H.push([y, x, px(x0)], [lanes[i], px(l), x]); V.push([x, Math.min(y, lanes[i]), Math.max(y, lanes[i])]);
   });
   wires(H, V);
-  if (S.cur === (out ? OUT : IN)) rect(l - 1, ys[0] - 5, CW + 2, ys[ys.length - 1] - ys[0] + 12);
-  if (out && limiting()) { fill(l + 9, 10, w3("LIMIT") + 2, 7); t3("LIMIT", l + 10, 11, BG); }
+  if (S.cur === (out ? OUT : IN)) mark(l, ys[0] - 4, CW, ys[ys.length - 1] - ys[0] + 10, false);
+  const ty = ys.length > 1 ? YC - 3 : 12;   // between two plugs, else above the one
+  if (out && limiting()) { fill(l + 9, ty, w3("LIMIT") + 2, 7); t3("LIMIT", l + 10, ty + 1, BG); }
 }
 function drawChain() {
   const cols = columns(), k = cols.findIndex(c => c.e === S.cur || c.a === S.cur || c.b === S.cur);
-  const gw = j => gapFan(cols, j) ? 8 : 4, X = [];
-  X[k] = 47;
+  const gw = j => gapFan(cols, j) ? 7 : 4, X = [];
+  X[k] = 45;
   for (let i = k - 1; i >= 0 && i >= k - 2; i--) X[i] = X[i + 1] + CW + gw(i);
   for (let i = k + 1; i < cols.length && i <= k + 2; i++) X[i] = X[i - 1] - CW - gw(i - 1);
   for (let j = k - 2; j <= k + 1; j++) {   // lines in the gap between column j and j + 1, out to the edges
@@ -423,22 +457,20 @@ function drawChain() {
       [[c.a, YA], [c.b, YB]].forEach(([e, y]) => e ? drawCover(e, l, y) : bus(y).forEach(r => hline(l, r, CW, muted(y < YC ? "A" : "B"))));
     }
   }
-  fill(0, 0, 128, 9); t5("EFFECT CHAIN", 64 - Math.floor(w5("EFFECT CHAIN", true) / 2), 1, BG, true);
-  if (cols[k + 2]) t3("<", 0, 50);
-  if (cols[k - 2]) t3(">", 125, 50);
-  t3("{}", 14, 50);
-  const fx = S.sel && !S.cur.node;
-  if (fx && !S.del && onBus(S.cur) && !serial())   // up/down: the left/right arrows turned 90 degrees, side by side
-    [0, 1, 2].forEach(r => { fill(103 - r, 51 + r, 2 * r + 1, 1); fill(109 - r, 53 - r, 2 * r + 1, 1); });
-  if (fx && !S.del) t3("HOLD", 56, 50);   // DELETE needs a long press
-  const wt = !S.sel && warn(S.cur); if (wt) t3(wt, 64 - Math.floor(w3(wt) / 2), 50);
-  const nm = S.sel ? nodeMode(S.cur) : null;
-  if (nm) t3("{}", 103, 50);
-  softkeys(S.del ? ["", "DELETE?", ""] : S.sel ? ["DROP", fx ? "DELETE" : "", nm ? nm.p.opts[S.cur.vals[nm.p.k]].toUpperCase() : onBus(S.cur) && !serial() ? "A/B" : ""] : [S.cur.jack ? "" : "SELECT", "EXIT", "OPEN"]);
+  // no room for a hint row under two cover rows: the warning text and scroll arrows go in the title bar, the knob hints in the softkeys
+  const wt = !S.sel && warn(S.cur);
+  fill(0, 0, 128, 9); wt ? t3(wt, 64 - Math.floor(w3(wt) / 2), 2, BG) : t5("EFFECT CHAIN", 64 - Math.floor(w5("EFFECT CHAIN", true) / 2), 1, BG, true);
+  if (cols[k + 2]) t3("<", 1, 2, BG);
+  if (cols[k - 2]) t3(">", 124, 2, BG);
+  const fx = S.sel && !S.cur.node, nm = S.sel ? nodeMode(S.cur) : null, ab = fx && !S.del && onBus(S.cur) && !serial();
+  softkeys(S.del ? ["", "DELETE?", ""] : S.sel ? ["DROP", fx ? "DELETE" : "", nm ? nm.p.opts[S.cur.vals[nm.p.k]].toUpperCase() : ab ? "A/B" : ""] : [S.cur.jack ? "" : "SELECT", "EXIT", "OPEN"],
+    ["{}", fx && !S.del ? "HOLD" : "", nm ? "{}" : ab ? "^v" : ""]);   // {} turns; HOLD: DELETE needs a long press; ^v: knob 3 moves it up/down
 }
-function softkeys(labels) {
+function softkeys(labels, hints = []) {   // a hint sits at the key's left end, the label centred in the rest
   [[0, 41], [43, 41], [86, 42]].forEach(([x, w], i) => {
-    fill(x, 56, w, 8); const s = labels[i] || ""; t3(s, x + Math.floor((w - w3(s)) / 2), 57, BG);
+    fill(x, 56, w, 8); const s = labels[i] || "", h = hints[i] ? w3(hints[i]) + 3 : 0;
+    if (h) t3(hints[i], x + 1, 57, BG);
+    t3(s, x + h + Math.floor((w - h - w3(s)) / 2), 57, BG);
   });
 }
 
