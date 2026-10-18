@@ -25,7 +25,7 @@ M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: releas
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
        "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "mv_swap": 96, "mv_add": 104,
        "mv_delete": 112, "poll": 120}
-MAIL, LIVE, LAYOUT, SAVED, PREV, MENU6, MAXES, DEFAULTS, PAGES = 136, 144, 156, 162, 180, 200, 248, 266, 284
+UI, LIVE, LAYOUT, SAVED, PREV, MENU6, MAXES, DEFAULTS, PAGES = 136, 144, 156, 162, 180, 200, 248, 266, 284
 CODE = 320                                                           # the code after the data block
 MAGIC = 0x4D
 
@@ -153,7 +153,8 @@ def test_menu_writes_match_the_settings_section():
 
 def test_data_block():
     data = _data(SEC)
-    assert data[MAIL:MAIL + 8] == bytes(8)
+    # chain.h UI bytes: CUR, SEL, BUSROW = A, DELP, ADDBUS = none, FROMCHAIN, PFIRST, PLAST = every MIXER page
+    assert data[UI:UI + 8] == bytes([0, 0, 1, 0, 0xFF, 0, 0, 5])
     assert LAYOUT == LIVE + 12 and SAVED >= LAYOUT + 6 and PREV >= SAVED + 18 and MENU6 >= PREV + 18
     defaults = data[DEFAULTS:DEFAULTS + 18]                          # 12 settings + 6 buses
     assert defaults[0] == 0 and defaults[11] == MAGIC               # Serial, settings present
@@ -161,10 +162,50 @@ def test_data_block():
     assert data[LIVE:LIVE + 18] == defaults == data[SAVED:SAVED + 18]
     maxes = data[MAXES:MAXES + 18]
     assert all(d <= m for d, m in zip(defaults, maxes)) and maxes[12:] == bytes([3] * 6)   # PRE A B POST
-    pages = data[PAGES:PAGES + 32]
+    pages = data[PAGES:PAGES + 24]                                   # six pages (k_page wraps at PLAST + 1 = 6)
     used = sorted(p for p in pages if p != 255)
-    assert used == list(range(11)) + list(range(12, 18))             # every setting and bus on exactly one knob
-    assert PAGES + 32 <= CODE
+    assert used == list(range(11))                                   # every setting on exactly one knob (buses: chain screen)
+    assert PAGES + 24 <= CODE
+
+
+CSEC = PATCH["section"][1]                                           # M3b: chain_vec.asm + chain_keys.c + chain_draw.c
+CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "kp_exit": 24, "s33_keys": 32}
+
+
+def test_chain_section_vectors():
+    data = _data(CSEC)
+    assert CSEC["addr"] == 0xC00F8000 and CSEC["source"] == "asm/mixer/chain_keys.c"
+    assert BASE + len(_data(SEC)) <= CSEC["addr"] and CSEC["addr"] + len(data) <= 0xC0102000   # after mixer.S, below the looper buffer
+    for off in CVEC.values():
+        w = _word(data, off // 4)
+        assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
+        assert CSEC["addr"] + 40 <= b_target(CSEC["addr"] + off, w) < CSEC["addr"] + len(data)
+    src = (ROOT / "asm/mixer/mixer.S").read_text()
+    assert re.search(rf"\.equ\s+CHAIN_POLL,\s*0x{CSEC['addr'] + CVEC['chain_poll']:08X}\b", src)
+
+
+def test_chain_screen_hooks():
+    tables = {0xC00EEFA8: (0xC00A83A0, "keys"), 0xC00EEBBC: (0xC00A93F0, "draw")}   # screen 3 entries, stock stubs
+    for addr, (stock, name) in tables.items():
+        w = WRITES[addr]
+        assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
+        assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
+    callps = {0xC00AC804: (0xC00CCD18, "kp_exit"), 0xC00A832C: (0xC00A7A6C, "s33_keys")}
+    for site, (stock, name) in callps.items():
+        old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
+        assert callp_target(site, old) == stock
+        assert callp_target(site, new) == CSEC["addr"] + CVEC[name]
+        assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
+
+
+def test_sections_match_a_fresh_ti_build():
+    spec = importlib.util.spec_from_file_location("build_mixer_ui", ROOT / "scripts" / "build_mixer_ui.py")
+    b = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(b)
+    if not b.available():
+        pytest.skip("TI CGT not installed (TI_CGT)")
+    assert b.assemble(ROOT / SEC["source"], BASE) == _data(SEC)
+    assert b.build_c() == _data(CSEC)                                # also: links without RTS, no B14
 
 
 def test_m2_build_does_not_overlap():
@@ -204,7 +245,7 @@ def _stock_image():
 
 def test_effect_hooks_expect_the_stock_image():
     img = _stock_image()
-    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294):
+    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00AC804, 0xC00A832C):
         assert img.read(site, 4).hex() == WRITES[site]["expect"]
 
 

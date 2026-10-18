@@ -125,6 +125,89 @@ Considered and not used: the `0xC00B86E4` (apply) calls inside the move (`0xC00B
 add (`0xC00C24C4`) run while the slots are muted, with the slots in A11 / A13; but delete's
 slot is gone from the registers there, and the call-site wrappers keep the three alike.
 
+## M3b: the new Effect Chain screen (2026-10-19, TI dis6x of the 2.10 OS)
+
+What `asm/mixer/chain_keys.c` relies on. Confidence: **high** = read in the code
+path, **medium** = inferred, not seen run.
+
+**Event ids reaching the screen (high).** In the menu mode (`B14[80]` = 11) the main UI loop
+(`0xC00ACDB0`) sends every event to the screen key dispatcher `0xC00A82AC` (call at
+`0xC00AD1EC`); after each one (but 232) it runs `0xC00ACD84` (edited mark, AUTO SAVE timer).
+Key table entry: event in the dispatcher frame `+8`, knob steps `+12` (stock stubs:
+`lddw *+B15[1], A5:A4`), return with A4 = redraw through `0xC00A83C0`.
+
+| id | event | stock play-mode handler |
+|---|---|---|
+| 32 / 33 | footswitch press / release | |
+| 34 | knob 1 press | |
+| 64 | knob 2 press; **also** the redraw request our poll / CC / the looper post | |
+| 65 | knob 2 release (EXIT) | `0xC00AC790` |
+| 66 / 67 | knob 3 press / release (OPEN, PAGE) | `0xC00AC778` (timer 3) / `0xC00AC634` |
+| 68 / 70 | cursor up / down press | `0xC00AC60C` (timers 4 / 5) |
+| 69 / 71 | cursor up / down release: type +1 / -1 | `0xC00AC450` (B4 = 43 / 45) |
+| 72 / 74 | cursor left / right press | `0xC00AC424`: `0xC00C7D60(1)` / `0xC00C7D50(1)` start timers 6 / 7 |
+| 73 / 75 | cursor left / right release | `0xC00AC30C` (stops them) |
+| 160-162 | knob 1-3 turn, A5 = steps, + = right on screen = earlier in the signal | |
+| 227 | timer 3 (knob 3 hold) | `0xC00ABBE8` |
+| 230 / 231 | timer 6 / 7: cursor left / right **hold** (add) | `0xC00AB968` |
+| 232 / 233 | AUTO SAVE timers 8 / 9 | |
+| 225, 226 | **unused by stock**: 225 is our knob 2 long press | |
+
+Timers start / stop with `0xC00C7C80(timer, on)` (wrappers `0xC00C7D60` timer 6,
+`0xC00C7D50` timer 7). In the menu mode the play handlers never run, so **no cursor timer
+starts**: chain_key starts / stops 6 and 7 itself on 72-75. No timer exists for knob 2, so
+the long press is ours: `chain_poll` (every 16 ms, from mixer.S `poll`) counts polls with
+knob 2 down in `SW_STATE` `0xC009DF90` (bit clear = down, knob 2 = bit 0: **medium**) and
+posts 225 (`EVENT_POST 0xC00CBF40(*(B14+656), 225)`) after 38 polls (0.6 s); the release
+that follows is not EXIT.
+
+**Stock add path (high).** `0xC00AB968`: count < 6 (`0xC00C2018`), else the popup
+`0xC00CCB00(0, 0xC00EBD5F, 0xC00EBD5E, 1000)` ("MAX EFFECT UNIT!"); `B14[80]` = 11;
+`0xC00C1FE0(slot, dir)` stores `B14[32]` (ANCHOR) = slot, `B14[33]` (SIDE) = (dir == 1);
+`SET_SCREEN(33, 0)`. The add itself (screen 33 ENTER, `0xC00C22F4` via mv_add) inserts at
+ANCHOR + SIDE. Screens 32 / 33 keys `0xC00A7A6C` (stub `0xC00A832C`, shared): ENTER = 32 or
+34, then `B14[80]` = 0 (play) whether it added or cancelled (row 4).
+**Where screen 33 returns: always play mode**, so we wrap the stub's callp at `0xC00A832C`
+(`s33_keys`): after stock, if the add came from the chain (`UI_FROMCHAIN` = 2) and the mode
+is 0, back to `SET_SCREEN(3, -2)` in mode 11.
+
+**Knob pages EXIT hook (high).** `0xC00AC790` (event 65 in play mode): if the knob pages
+show (`VIEW_KNOBS` `0xC009D398` != 0), `callp 0xC00CCD18 || mvk 1, A4` at **`0xC00AC804`**,
+then `VIEW_KNOBS` = 0 and redraw. We retarget that callp (`kp_exit`): stock, then if opened
+from the chain (`UI_FROMCHAIN` = 1) mode 11, `SET_SCREEN(3, -2)`. Opening them from the chain:
+`B14[80]` = 0, play cursor byte `0xC009C064` = the cursor whose slot
+(`0xC00BA2D8(cursor)` = `CURSOR_SLOTS[6 x VIEW + cursor]`, runtime table `0xC00EE748`) is
+ours, `VIEW_KNOBS` = 1 (play draw `0xC00BA9D8` reads index 0). The same cursor lookup is
+how stock delete `0xC00C2030` finds its slot. **Medium:** that every slot has a cursor in
+the current play view.
+
+**Type change (high).** id = word `0xC009BF5C + 44 x slot`; next = `0xC00CA670(id, dir)`;
+if next >= 0 and != id, `0xC00ABACC(slot, next)` (a nonzero return shows a popup via
+`0xC00AB540`; we skip it).
+
+**Effect state (high).** count `0xC009C068`; ON = record word `0xC009BF58 + 44 x slot` != 0
+and bit slot clear in the DSP-off mask `0xC009C060`; name = `0xC00B056C(slot, 1)` (10 chars,
+two lines of 5).
+
+**Screen entry.** `SET_SCREEN 0xC00A75E0(s, row)`: `B14[88]` = s; row < 4: `B14[89]` = row.
+The menu enters screen 3 with row 0, then `0xC00B6D84` sets `B14[89]` = count - 1 (>= -1).
+We mark our own returns with row -2: any other row is a fresh entry (UI reset).
+
+**Draw handlers (high).** Draw table entries take no arguments and finish by jumping to
+`DRAW_DONE` `0xC00A9404` (screen 3: `0xC00A93F0` = `callp 0xC00B71CC`, `bnop 0xC00A9404`).
+**LCD frame buffer:** `0x11816800 + frame x 1024`, page format: byte `fb[(y >> 3) x 128 + x]`,
+bit `y & 7` (bit 0 on top). Blit `0xC009F9B0(frame, x, y, w, h, src)` copies a page-format
+source (w bytes per page row) and ORs the dirty mask `0xC00EEBB0 + frame`; at y = 0 it is a
+plain copy. chain_draw's row-major buffer is converted to pages and blitted whole, frame 0.
+
+**Free DDR and the C section (high).** The MOD code area is `0xC00F2000`-`0xC0102000` (64 KB,
+RAM test region 1; the looper's buffer starts at `0xC0102000`; the last OS section ends
+`0xC00F1364`). Users: scroll `0xC00F2100`, looper `0xC00F2200`, midi-cc `0xC00F2800`, looper
+services `0xC00F3000`, m0-probe `0xC00F3100`, mixer.S `0xC00F6000`-`0xC00F7280`. **The C
+section is at `0xC00F8000`** (about 19.5 KB with chain_draw.c and its 2 KB of buffers,
+ends `0xC00FCC40`). B14 is the constant `0xC00EF748`, so the C (far data) reads OS variables
+at absolute addresses and never uses B14; built with no RTS (a helper call fails the link).
+
 ## Open questions and pedal probes
 
 1. **Cover width 38 vs 33**: photo the stock screen; decide whether M3 reuses the 38-px bitmaps.

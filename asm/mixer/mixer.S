@@ -28,8 +28,9 @@
 ; gain) hard-code 0x11F03738.
 ;
 ; Bus of each slot (M3a): LAYOUT[slot], saved with the patch, set on the
-; MIXER screen's BUS pages (temporary, until M3b's Effect Chain screen). It
-; follows the effect when the stock Effect Chain screen moves it (mv_swap),
+; Effect Chain screen (M3b: chain_keys.c, a C section at 0xC00F8000, which
+; also moves, adds and deletes through the hooks below). It
+; follows the effect when the Effect Chain screen moves it (mv_swap),
 ; or an effect is added (mv_add) or deleted (mv_delete): each wraps the stock
 ; function at its only call site and moves the buses just before stock moves
 ; the effects (docs/mixer-mode-m3-research.md, "M3a hooks").
@@ -68,8 +69,14 @@
         .equ    LIMHIT, BASE + 77           ; 1: the limiter cut the gain (poll clears)
         .equ    SHOWN, BASE + 78            ; LIMIT tag as last drawn
         .equ    HOLD, BASE + 80             ; polls left to show LIMIT
-        .equ    PAGE, BASE + 128            ; MIXER screen page 0-7
-        .equ    MAIL, BASE + 136            ; [8] unused (was the routing probe's MAIL)
+        .equ    PAGE, BASE + 128            ; MIXER screen page 0-5
+        .equ    UI, BASE + 136              ; [8] Effect Chain UI state (chain.h)
+        .equ    UI_CUR, 0
+        .equ    UI_ADDBUS, 4
+        .equ    UI_FROMCHAIN, 5             ; 1: the MIXER pages were opened from the chain
+        .equ    UI_PFIRST, 6                ; page range knob 1 walks
+        .equ    UI_PLAST, 7
+        .equ    CHAIN_POLL, 0xC00F8010      ; chain_vec.asm +16 (C section)
         .equ    LIVE, BASE + 144            ; [12] settings of the patch played
         .equ    LAYOUT, BASE + 156          ; [6] ... and the bus of each slot (setting 12-17)
         .equ    SAVED, BASE + 162           ; [12 + 6] ... as saved in flash
@@ -190,7 +197,7 @@ vectors:
 
 ; +128: data at fixed offsets (the .equ above), never executed
         .word   0, 0                        ; +128 PAGE
-        .byte   0, 0, 0, 0, 0, 0, 0, 0      ; +136 MAIL
+        .byte   0, 0, BUS_A, 0, NONE, 0, 0, 5 ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +144 LIVE
         .byte   PRE, PRE, PRE, PRE, PRE, PRE ; +156 LAYOUT
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +162 SAVED
@@ -205,16 +212,13 @@ vectors:
         .byte   3, 3, 3, 3, 3, 3
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +266 DEFAULTS
         .byte   PRE, PRE, PRE, PRE, PRE, PRE
-        ; +284 PAGES: IN, ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2, OUT, BUS 1/2,
-        ; BUS 2/2 (S1 = slot 0, the rightmost effect)
+        ; +284 PAGES: IN, ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2, OUT (buses:
+        ; the Effect Chain screen, chain_keys.c; no CC for them)
         .byte   S_IN, NONE, NONE, NONE
         .byte   S_SEND, NONE, S_MODE, NONE, S_RA, S_RB, NONE, NONE
         .byte   S_XF, NONE, S_CURVE, NONE, S_MA, S_MB, S_PHASE, NONE
         .byte   S_MASTER, NONE, NONE, NONE
-        ; ponytail: BUS 1/2 and 2/2 are a test UI until M3b's Effect Chain
-        ; screen sets buses; no CC for buses (M3b decides)
-        .byte   S_BUS, S_BUS + 1, S_BUS + 2, NONE, S_BUS + 3, S_BUS + 4, S_BUS + 5, NONE
-        .byte   0, 0, 0, 0                  ; to +320
+        .byte   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  ; to +320
 
 ; ---------------------------------------------------------------- engine
 
@@ -954,7 +958,8 @@ ms_stock:
 ; Effect add (0xC00A7BE0, screen 33 ENTER, A4 = effect id): stock inserts at
 ; slot ANCHOR + SIDE and moves the slots from there up one (the last is
 ; always empty: add needs fewer than six). The new effect gets the anchor's
-; bus.
+; bus, or UI_ADDBUS when the Effect Chain screen asked for one (then the
+; chain cursor goes on it).
 mv_add:
         ldw     .D2T1   *+b14(ANCHOR), a5
         ldw     .D2T1   *+b14(SIDE), a6
@@ -968,6 +973,16 @@ mv_add:
         mvkl    .S1     LAYOUT, a3
         mvkh    .S1     LAYOUT, a3
         ldbu    .D1T1   *+a3[a5], a7        ; the anchor's bus
+        mvkl    .S2     UI, b6
+        mvkh    .S2     UI, b6
+        ldbu    .D2T2   *+b6(UI_ADDBUS), b7
+        nop     4
+        cmpgtu  .L2     4, b7, b0           ; an add from the Effect Chain screen:
+  [b0]  mv      .L1X    b7, a7              ; the bus it asked for, the cursor on it
+  [b0]  mv      .L2X    a6, b8
+  [b0]  stb     .D2T2   b8, *+b6(UI_CUR)
+        mvk     .S2     NONE, b8
+  [b0]  stb     .D2T2   b8, *+b6(UI_ADDBUS)
         add     .L1     5, a3, a8           ; from the last slot down
         mvk     .L1     5, a0
         sub     .L1     a0, a6, a1          ; slots to move up
@@ -991,8 +1006,7 @@ ma_stock:
 ; Effect delete (0xC00A8294, screen 2 YES): stock deletes the slot under the
 ; cursor (its own lookup at 0xC00C2098: CURSOR_SLOTS[6 x VIEW + CURSOR]) and
 ; moves the slots above it down one; the last slot gets PRE. With one effect
-; stock only empties it (the shift moves the empty slots' buses, PRE unless
-; set on the BUS pages).
+; stock only empties it (the shift moves the empty slots' buses).
 mv_delete:
         mvkl    .S1     VIEW, a0
         mvkh    .S1     VIEW, a0
@@ -1064,6 +1078,17 @@ keys:
         nop     5
         mvk     .L1     0, a4               ; the menu
         mvk     .L2     3, b4
+        mvkl    .S1     UI, a0
+        mvkh    .S1     UI, a0
+        ldbu    .D1T1   *+a0(UI_FROMCHAIN), a1
+        nop     4
+  [a1]  mvk     .L1     3, a4               ; opened from the Effect Chain: back there,
+  [a1]  mvk     .L2     -2, b4              ; its UI kept (chain_keys.c enter)
+        mvk     .L1     0, a2
+        mvk     .S1     5, a3
+        stb     .D1T1   a2, *+a0(UI_FROMCHAIN)
+        stb     .D1T1   a2, *+a0(UI_PFIRST) ; every page again
+        stb     .D1T1   a3, *+a0(UI_PLAST)
         mvkl    .S2     SET_SCREEN, b5
         mvkh    .S2     SET_SCREEN, b5
         b       .S2     b5
@@ -1084,10 +1109,14 @@ k_page:
         mvkl    .S1     PAGE, a0
         mvkh    .S1     PAGE, a0
         ldw     .D1T1   *a0, a2
+        mvkl    .S1     UI, a3
+        mvkh    .S1     UI, a3
+        ldbu    .D1T1   *+a3(UI_PFIRST), a4
+        ldbu    .D1T1   *+a3(UI_PLAST), a5
         nop     4
         add     .L1     1, a2, a2
-        cmpgt   .L1     8, a2, a1
-  [!a1] mvk     .L1     0, a2
+        cmpgt   .L1     a2, a5, a1          ; past the last page of the range: its first
+  [a1]  mv      .L1     a4, a2
         stw     .D1T1   a2, *a0
         b       .S1     k_redraw
         nop     5
@@ -1287,7 +1316,7 @@ d_done:
 
 ; Every 16 ms round of Task_SwitchNrmlSpdRead, before midi_clock's poll (B3
 ; returns into the task). LIMHIT -> HOLD; a redraw when the LIMIT tag the OUT
-; page shows is out of date. Uses A0-A9, B0-B9.
+; page shows is out of date; then chain_poll (C: any caller-saved register).
 poll:
         addk    .S2     -16, b15
         stw     .D2T2   b3, *+b15(4)
@@ -1329,6 +1358,11 @@ poll:
         b       .S2     b5
         addkpc  .S2     pl_out, b3, 4
 pl_out:
+        mvkl    .S2     CHAIN_POLL, b5      ; the Effect Chain screen's (C, any caller-saved register)
+        mvkh    .S2     CHAIN_POLL, b5
+        b       .S2     b5
+        addkpc  .S2     pl_ret, b3, 4
+pl_ret:
         ldw     .D2T2   *+b15(4), b3
         nop     4
         addk    .S2     16, b15
@@ -1397,16 +1431,13 @@ cc_done:
 
 ; ---------------------------------------------------------------- tables
 
-titles: .word   s_in_t, s_route1, s_route2, s_mix1, s_mix2, s_out, s_bus1, s_bus2
+titles: .word   s_in_t, s_route1, s_route2, s_mix1, s_mix2, s_out
 names:  .word   s_mode, s_send, s_in, s_bus_a, s_bus_b, s_xfade
         .word   s_master, s_curve, s_bus_a, s_bus_b, s_phase, 0
-        .word   s_s1, s_s2, s_s3, s_s4, s_s5, s_s6
 enums:  .word   mode_names, 0, 0, 0, 0, 0, 0, curve_names, 0, 0, phase_names, 0
-        .word   bus_names, bus_names, bus_names, bus_names, bus_names, bus_names
 mode_names:  .word s_serial, s_parallel
 curve_names: .word s_smooth, s_dj, s_cut
 phase_names: .word s_normal, s_invert
-bus_names:   .word s_pre, s_a, s_b, s_post
 numbuf: .word   0, 0
 ; CC 85 Send, 86 Crossfade, 87 Master, 88 Input Level, 89 / 90 Route A / B,
 ; 91 / 92 Mix A / B, 93 Mode, 94 Curve, 95 Phase Invert B
@@ -1463,29 +1494,5 @@ s_normal:   .string "NORMAL"
 s_invert:   .string "INVERT"
             .byte 0
 s_page:     .string "PAGE"
-            .byte 0
-s_bus1:     .string "BUS 1/2"
-            .byte 0
-s_bus2:     .string "BUS 2/2"
-            .byte 0
-s_s1:       .string "S1"
-            .byte 0
-s_s2:       .string "S2"
-            .byte 0
-s_s3:       .string "S3"
-            .byte 0
-s_s4:       .string "S4"
-            .byte 0
-s_s5:       .string "S5"
-            .byte 0
-s_s6:       .string "S6"
-            .byte 0
-s_pre:      .string "PRE"
-            .byte 0
-s_a:        .string "A"
-            .byte 0
-s_b:        .string "B"
-            .byte 0
-s_post:     .string "POST"
             .byte 0
             .byte 0, 0, 0, 0

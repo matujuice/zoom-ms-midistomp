@@ -31,7 +31,7 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M2.2 | **Levels:** Input Level moves to an IN page and acts on the input in every mode (before Pre); Input, the four bus levels and Master go 0-150 (100 = unity, CCs scaled to 150); a `LIMIT` tag on the OUT page while the limiter reduces gain | boost a quiet chain; LIMIT shows when it bites | Sonnet |
 | M3 | Split in three: | | |
 | M3a | **A bus for every slot**, saved per patch (byte 17 of each packed slot block), that follows the effect when the stock Effect Chain screen moves it, or an effect is added or deleted; a temporary MIXER screen page pair BUS 1/2, BUS 2/2 sets it; old patches load as Serial, every effect Pre | stock effects on Bus A / B, kept across STORE and power-off, following moves | Opus |
-| M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages | the new screen | Sonnet, Opus review |
+| M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages. **Test build 2026-10-19, static checks only** (section "M3b test build") | the new screen | Sonnet, Opus review |
 | M3c | **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Split modes, Mono Serial, Output Mode, Mute / Solo, jack L / R levels (Input L / R, Master L / R) | the rest of the design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
@@ -164,3 +164,34 @@ without the Mixer magic loads Serial with every bus PRE.
 **Pedal results (Luca, MS-70CDR, 2026-10-18): works.** All test steps pass: buses save and
 reload, follow move / add / delete, survive AUTO SAVE. Luca's theory, unmeasured: past the
 DSP limit the audio cuts out.
+
+## M3b test build (2026-10-19)
+
+The stock Effect Chain screen (MENU > EFFECT CHAIN, screen 3) is replaced by the mockup's
+([`mixer-ui-mockup.html`](mixer-ui-mockup.html) v20): `asm/mixer/chain_keys.c` (model, keys,
+hooks) and `chain_draw.c` (pixels), C built with TI cl6x into a section at `0xC00F8000`
+(`py scripts/build_mixer_ui.py --write` regenerates both sections' hex). Addresses and evidence:
+[mixer-mode-m3-research.md, "M3b"](mixer-mode-m3-research.md#m3b-the-new-effect-chain-screen-2026-10-19-ti-dis6x-of-the-210-os).
+The MIXER screen's BUS pages are gone (6 pages again); buses are set here.
+
+- **Browse:** knob 1 walks IN, Pre, `[ROUTE]`, one bus row, `[MIX]`, Post, OUT; knob 3 jumps
+  to the other bus row (Parallel).
+- **Select** (knob 1 press, not on the jacks), then knob 1 moves it: an effect within its zone,
+  then across `[ROUTE]` / `[MIX]` (Pre ↔ A, A / B ↔ Post); a node takes the effect next to it.
+  Knob 3 on a selected effect: A ↔ B; on `[ROUTE]`: Mode Serial / Parallel.
+- **OPEN** (knob 3 press): an effect's stock knob pages, a node's or jack's MIXER pages (IN,
+  ROUTE 1-2, MIX 1-2, OUT only); EXIT comes back here.
+- **Add:** hold cursor left / right: stock's type list (screen 33), then back here with the
+  new effect on the zone the mockup gives it and the cursor on it. Cursor up / down: type.
+- **Delete:** select an effect, hold knob 2 (0.6 s): DELETE?, then press knob 2; anything
+  else cancels.
+- **EXIT** (knob 2, nothing selected): the menu, as stock.
+
+**Status: static checks only, not pedal-tested.** `py -m pytest -q` checks the hooks against
+the stock image, the C section's place and vectors, and that a fresh TI build (no RTS, no
+B14) equals the yaml hex. Not done: the footswitch on this screen (does nothing), DSP FULL
+popups, `[MIX]` Output Mode (M3c).
+
+Pedal checks: every key above; LIMIT tag over OUT; a long chain move (4 swaps) in Parallel
+for clicks; EXIT from knob pages / MIXER pages / the add list lands back on the chain with
+the same cursor.
