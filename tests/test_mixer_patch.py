@@ -1,4 +1,5 @@
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -22,8 +23,10 @@ M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: releas
 
 # mixer.S fixed offsets
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
-       "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "poll": 120}
-LAYOUT, MAIL, LIVE, SAVED, MENU6, MAXES, DEFAULTS, PAGES = 128, 136, 144, 156, 200, 224, 236, 248
+       "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "mv_swap": 96, "mv_add": 104,
+       "mv_delete": 112, "poll": 120}
+MAIL, LIVE, LAYOUT, SAVED, PREV, MENU6, MAXES, DEFAULTS, PAGES = 136, 144, 156, 162, 180, 200, 248, 266, 284
+CODE = 320                                                           # the code after the data block
 MAGIC = 0x4D
 
 
@@ -76,8 +79,8 @@ def test_vectors_point_at_their_handlers():
     for off in VEC.values():
         w = _word(data, off // 4)
         assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
-        assert BASE + 288 <= b_target(BASE + off, w) < BASE + len(data)   # into the code
-    assert data[72:120] == b"\0" * 48
+        assert BASE + CODE <= b_target(BASE + off, w) < BASE + len(data)  # into the code
+    assert data[72:96] == b"\0" * 24
 
 
 def test_callp_sites_reach_their_vectors():
@@ -89,6 +92,19 @@ def test_callp_sites_reach_their_vectors():
         assert callp_target(site, old) == stock.get(site, 0xC00B8534)
         assert callp_target(site, new) == BASE + VEC[name]
         assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
+
+
+def test_effect_move_add_delete_reach_their_vectors():
+    # the only callers of the stock swap, add and delete (dis6x of the 2.10 OS, research doc "M3a hooks")
+    sites = {0xC00B76A4: ("mv_swap", 0xC00B6BC4), 0xC00A7BE0: ("mv_add", 0xC00C22F4),
+             0xC00A8294: ("mv_delete", 0xC00C2030)}
+    src = (ROOT / "asm/mixer/mixer.S").read_text()
+    for site, (name, stock) in sites.items():
+        old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
+        assert callp_target(site, old) == stock
+        assert callp_target(site, new) == BASE + VEC[name]
+        assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
+        assert re.search(rf"\.equ\s+FX_\w+,\s*0x{stock:08X}\b", src)    # the wrapper goes on to stock
 
 
 def test_save_packet_jumps_to_rec_save():
@@ -137,15 +153,18 @@ def test_menu_writes_match_the_settings_section():
 
 def test_data_block():
     data = _data(SEC)
-    assert data[LAYOUT:LAYOUT + 8] == bytes(8) and data[MAIL:MAIL + 8] == bytes(8)
-    defaults = data[DEFAULTS:DEFAULTS + 12]
+    assert data[MAIL:MAIL + 8] == bytes(8)
+    assert LAYOUT == LIVE + 12 and SAVED >= LAYOUT + 6 and PREV >= SAVED + 18 and MENU6 >= PREV + 18
+    defaults = data[DEFAULTS:DEFAULTS + 18]                          # 12 settings + 6 buses
     assert defaults[0] == 0 and defaults[11] == MAGIC               # Serial, settings present
-    assert data[LIVE:LIVE + 12] == defaults == data[SAVED:SAVED + 12]
-    maxes = data[MAXES:MAXES + 12]
-    assert all(d <= m for d, m in zip(defaults[:11], maxes))
-    pages = data[PAGES:PAGES + 24]
+    assert defaults[12:] == bytes(6)                                 # every bus PRE
+    assert data[LIVE:LIVE + 18] == defaults == data[SAVED:SAVED + 18]
+    maxes = data[MAXES:MAXES + 18]
+    assert all(d <= m for d, m in zip(defaults, maxes)) and maxes[12:] == bytes([3] * 6)   # PRE A B POST
+    pages = data[PAGES:PAGES + 32]
     used = sorted(p for p in pages if p != 255)
-    assert used == list(range(11))                                   # every setting on exactly one knob
+    assert used == list(range(11)) + list(range(12, 18))             # every setting and bus on exactly one knob
+    assert PAGES + 32 <= CODE
 
 
 def test_m2_build_does_not_overlap():
@@ -172,16 +191,25 @@ def _spans(names):
             yield w["addr"], w["addr"] + len(bytes.fromhex(w["data"])), p + " write"
 
 
-def test_save_buf_is_the_stock_live_save_buffer():
+def _stock_image():
     # Needs Zoom's MS-70CDR 2.10 updater (never committed): MIDISTOMP_70CDR_UPDATER=path
     import os
-    import re
     from zoomms import ais, parts
     path = Path(os.environ.get("MIDISTOMP_70CDR_UPDATER", ROOT / "MS-70CDR_v2.10_Win_E/ZOOM MS-70CDR v2.10 Updater.exe"))
     if not path.is_file():
         pytest.skip("no MS-70CDR updater")
     os_part = next(p for p in parts.find_parts(path) if p.resource_id == 129)
-    img = ais.parse(parts.read_part(path, os_part))
+    return ais.parse(parts.read_part(path, os_part))
+
+
+def test_effect_hooks_expect_the_stock_image():
+    img = _stock_image()
+    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294):
+        assert img.read(site, 4).hex() == WRITES[site]["expect"]
+
+
+def test_save_buf_is_the_stock_live_save_buffer():
+    img = _stock_image()
     lo, hi = (int.from_bytes(img.read(a, 4), "little") >> 7 & 0xFFFF for a in (0xC00B84D8, 0xC00B84E0))
     stock = hi << 16 | lo                                            # 0xC00B84D0: mvk / mvkh of the buffer it packs into
     src = (ROOT / "asm/mixer/mixer.S").read_text()

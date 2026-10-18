@@ -29,7 +29,10 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M2 | **The nodes:** `[ROUTE]` and `[MIX]` with their knob pages on the MIXER menu screen (the Effect Chain screen opens them from M3; Send, Crossfade with the Smooth / DJ / Cut curves, levels, Mode, Output Mode), saved per patch, MIDI CCs. Tested with a **routing probe** ZDL (a sound source, a filter and a delay in one effect, with a BUS: PRE / A / B / POST knob, Luca 2026-10-15); stock effects keep their bus from M3 on | playing Send and Crossfade by knob and CC, patches remember them | Opus engine, Sonnet UI |
 | M2.1 | **Master at the end:** Master and the safety limiter move after Post, in Serial and Parallel (Master leaves the `[MIX]` gains); the MIXER screen gets an OUT page (Master) and `[MIX]` page 1 becomes Crossfade / Curve. Mixer-only edits are saved on a patch change with AUTO SAVE (now lost: the load routine's stock dirty check at `0xC00B892C` can't be hooked, so `unpack_live` sets up the same save when only the mixer settings differ: the load routine itself has no AUTO SAVE check, so mixer edits follow whatever stock does with its own edits); a MIXER screen knob edit marks the patch edited and starts the AUTO SAVE timer like a stock edit (the CC path already does). Saving follows stock in every case: STORE, AUTO SAVE timer, patch change with AUTO SAVE, nothing at power-off | Master turns down Post effects too; mixer-only edits survive a footswitch / MIDI PC patch change | Sonnet, Opus review |
 | M2.2 | **Levels:** Input Level moves to an IN page and acts on the input in every mode (before Pre); Input, the four bus levels and Master go 0-150 (100 = unity, CCs scaled to 150); a `LIMIT` tag on the OUT page while the limiter reduces gain | boost a quiet chain; LIMIT shows when it bites | Sonnet |
-| M3 | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL), **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Mono Serial mode, old patches load as Serial | the full design | Sonnet, Opus review |
+| M3 | Split in three: | | |
+| M3a | **A bus for every slot**, saved per patch (byte 17 of each packed slot block), that follows the effect when the stock Effect Chain screen moves it, or an effect is added or deleted; a temporary MIXER screen page pair BUS 1/2, BUS 2/2 sets it; old patches load as Serial, every effect Pre | stock effects on Bus A / B, kept across STORE and power-off, following moves | Opus |
+| M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages | the new screen | Sonnet, Opus review |
+| M3c | **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Split modes, Mono Serial, Output Mode, Mute / Solo, jack L / R levels (Input L / R, Master L / R) | the rest of the design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
@@ -140,3 +143,22 @@ four bus levels and Master go 0-150 (CCs scale 0-127 to 0-150, so unity is CC 84
 on the OUT page, redrawn by a poll chained in front of midi-clock's (its trampoline at
 `0xC00C82D0` now jumps to the mixer's vector +120, `asm/mixer/poll_trampoline.S`).
 **Pedal results (Luca, 2026-10-18): all steps pass.**
+
+## M3a test build (2026-10-18)
+
+Every slot has a bus (PRE / A / B / POST), saved per patch in byte 17 of its packed slot block
+(stock packs it as 0 and never unpacks it, research doc section 6); bits 2-7 stay 0 for M3c.
+It travels with the 12 setting bytes through every M2 save path (STORE, AUTO SAVE, the patch
+change's own save, editor dump / store), and a bus-only edit marks the patch edited. A patch
+without the Mixer magic loads Serial with every bus PRE.
+
+- **Set it:** MENU > MIXER, two more pages **BUS 1/2** (S1 S2 S3) and **BUS 2/2** (S4 S5 S6),
+  S1 = the rightmost effect. Temporary, until M3b; no CC (M3b decides).
+- **It follows the effect:** the stock Effect Chain screen's lift-and-move, add (hold the cursor,
+  pick a type: the new effect joins the bus of the effect it was added next to) and delete
+  (the effects above move down with their buses, the last slot gets PRE). Hooks and evidence:
+  [mixer-mode-m3-research.md, "M3a hooks"](mixer-mode-m3-research.md#m3a-hooks-2026-10-18-ti-dis6x-of-the-whole-210-os-image).
+- **RoutePrb** still sets its slot's bus every block; a slot without it keeps its saved bus
+  (before M3a it fell back to PRE).
+
+Static checks only (TI CGT build, tests, dis6x of every hook site): **not yet pedal-tested.**

@@ -1,4 +1,4 @@
-; Mixer Mode M2 (docs/mixer-mode-plan.md), MS-70CDR 2.10 OS. Test builds only.
+; Mixer Mode M3a (docs/mixer-mode-plan.md), MS-70CDR 2.10 OS. Test builds only.
 ;
 ; The bus engine of M1 plus the node settings, saved per patch:
 ;   IN      Input Level
@@ -7,6 +7,7 @@
 ;   [MIX]   Crossfade (A <-> B), Curve (Smooth / DJ / Cut),
 ;           Bus A Level, Bus B Level, Phase Invert B
 ;   OUT     Master, and a LIMIT tag while the limiter cuts (poll)
+;   BUS     the bus of each slot (PRE / A / B / POST), no CC
 ; on the MIXER screen (menu entry 5, screen 15) and on MIDI CC 85-95. Levels
 ; go 0-150, 100 = unity.
 ;
@@ -26,17 +27,23 @@
 ; F is swapped by content, never by pointer: two OS slot functions (mute,
 ; gain) hard-code 0x11F03738.
 ;
-; Bus of each slot (M2): the routing probe ZDL writes 0x80 | bus into
-; MAIL[slot] every block; at the end of the block the engine copies it into
-; LAYOUT and clears MAIL, so a slot without the probe is PRE one block later.
-; Stock effects stay in PRE until M3.
+; Bus of each slot (M3a): LAYOUT[slot], saved with the patch, set on the
+; MIXER screen's BUS pages (temporary, until M3b's Effect Chain screen). It
+; follows the effect when the stock Effect Chain screen moves it (mv_swap),
+; or an effect is added (mv_add) or deleted (mv_delete): each wraps the stock
+; function at its only call site and moves the buses just before stock moves
+; the effects (docs/mixer-mode-m3-research.md, "M3a hooks"). The routing
+; probe ZDL still writes 0x80 | bus into MAIL[slot] every block; at the end
+; of the block the engine copies it into LAYOUT and clears MAIL.
 ;
 ; Saving (route A, docs/mixer-mode-m0.md "M0b"): the 12 setting bytes (11 +
 ; MAGIC) ride in bytes 14 and 15 of the six 18-byte slot blocks of the packed
 ; 122-byte patch, the high bits of the 28-bit P8 field (knob 8 never goes
-; above 4095). LIVE holds the settings of the patch being played, SAVED the
-; ones stored in flash (IS_DIRTY compares them, as stock compares the
-; patch with its saved copy at 0xC009C07C).
+; above 4095); each slot's bus rides in byte 17 of its block (bits 0-1,
+; bits 2-7 kept 0 for M3c), which stock packs as 0 and never unpacks. LIVE
+; holds the 12 bytes of the patch being played and LAYOUT (right after it)
+; its buses, SAVED + its 6 buses the ones stored in flash (IS_DIRTY compares
+; them, as stock compares the patch with its saved copy at 0xC009C07C).
 ;   - unpack_live (patch load into 0xC009BF58) / unpack_saved (the saved
 ;     copy, 0xC009C07C): stock unpack, take the bytes, mask P8 to 12 bits.
 ;   - rec_save (every patch record save, 0xC00B84C0): when the buffer is the
@@ -48,7 +55,9 @@
 ;     sets that save up for mixer-only edits too.
 ;   - pack_dump (the patch sent to an editor): stock pack, put LIVE in.
 ;   - dirty (IS_DIRTY): stock, or LIVE differs from SAVED.
-; A patch without MAGIC (stock, v1.x, factory) loads the defaults: Serial.
+; The 18 bytes (12 + 6 buses) travel together through all of these.
+; A patch without MAGIC (stock, v1.x, factory) loads the defaults: Serial,
+; every slot PRE.
 ;
 ; Registers in the engine: the block's register save (0xC00E14C0) ran
 ; before this, so A10-A15 / B10-B13 are free (effects keep them, C ABI).
@@ -56,22 +65,22 @@
 ;   (0 in Serial: every slot matches PRE), A13-A15 / B11 in gains_update.
 
         .equ    BASE, 0xC00F6000
-        .equ    LAYOUT, BASE + 128          ; [6] bus of each slot
-        .equ    MAIL, BASE + 136            ; [6] routing probe ZDL: 0x80 | bus
         .equ    MASTER, BASE + 72           ; Master, smoothed (float)
-        .equ    PREV, BASE + 76             ; [12] LIVE before a patch load
-        .equ    PEND, BASE + 88             ; 1: the load's auto save gets PREV
-        .equ    LIMHIT, BASE + 89           ; 1: the limiter cut the gain (poll clears)
-        .equ    SHOWN, BASE + 90            ; LIMIT tag as last drawn
-        .equ    HOLD, BASE + 92             ; polls left to show LIMIT
+        .equ    PEND, BASE + 76             ; 1: the load's auto save gets PREV
+        .equ    LIMHIT, BASE + 77           ; 1: the limiter cut the gain (poll clears)
+        .equ    SHOWN, BASE + 78            ; LIMIT tag as last drawn
+        .equ    HOLD, BASE + 80             ; polls left to show LIMIT
+        .equ    PAGE, BASE + 128            ; MIXER screen page 0-7
+        .equ    MAIL, BASE + 136            ; [6] routing probe ZDL: 0x80 | bus
         .equ    LIVE, BASE + 144            ; [12] settings of the patch played
-        .equ    SAVED, BASE + 156           ; [12] ... as saved in flash
-        .equ    PAGE, BASE + 168            ; MIXER screen page 0-5
-        .equ    GAINS, BASE + 176           ; In, SendA, SendB, cA, cB, limiter
+        .equ    LAYOUT, BASE + 156          ; [6] ... and the bus of each slot (setting 12-17)
+        .equ    SAVED, BASE + 162           ; [12 + 6] ... as saved in flash
+        .equ    PREV, BASE + 180            ; [12 + 6] LIVE before a patch load
         .equ    MENU6, BASE + 200           ; menu entry names
-        .equ    MAXES, BASE + 224           ; [12] maximum of each setting
-        .equ    DEFAULTS, BASE + 236        ; [12]
-        .equ    PAGES, BASE + 248           ; [6][4] setting under knob 1-3
+        .equ    GAINS, BASE + 224           ; In, SendA, SendB, cA, cB, limiter
+        .equ    MAXES, BASE + 248           ; [18] maximum of each setting
+        .equ    DEFAULTS, BASE + 266        ; [18]
+        .equ    PAGES, BASE + 284           ; [8][4] setting under knob 1-3
 
         .equ    AFTER_LOOP, 0x1181BE48      ; stock: callp 0x1181B090 (post mix)
         .equ    FX_TABLE, 0xC00EE930        ; audio function of each slot
@@ -92,6 +101,15 @@
         .equ    SAVE_BUF, 0xC009C2A8        ; live patch, packed for saving
         .equ    LIVE_PATCH, 0xC009BF58      ; the patch played, unpacked
         .equ    MEMCPY, 0xC00E09C0          ; (dst, src, n)
+        .equ    FX_SWAP, 0xC00B6BC4         ; (row, row) Effect Chain move
+        .equ    FX_ADD, 0xC00C22F4          ; (effect id) insert at ANCHOR + SIDE
+        .equ    FX_DELETE, 0xC00C2030       ; delete the slot under the cursor
+        .equ    COUNT, 0xC009C068           ; number of effects in the patch
+        .equ    VIEW, 0xC009D8F8            ; play-mode view (word)
+        .equ    CURSOR, 0xC009C064          ; play-mode cursor (signed byte)
+        .equ    CURSOR_SLOTS, 0xC00EE748    ; [view][6] slot under each cursor position
+        .equ    ANCHOR, 128                 ; B14 offsets: the slot an add goes next to,
+        .equ    SIDE, 132                   ; 1: on its left (slot + 1)
         .equ    SET_SCREEN, 0xC00A75E0      ; (screen, row)
         .equ    KEY_DONE, 0xC00A83C0        ; key dispatcher epilogue, A4 = redraw
         .equ    DRAW_DONE, 0xC00A9404       ; draw dispatcher epilogue
@@ -126,6 +144,8 @@
         .equ    S_MB, 9
         .equ    S_PHASE, 10
         .equ    MAGIC, 0x4D                 ; byte 11: settings are present
+        .equ    S_BUS, 12                   ; 12-17: LAYOUT, the bus of slot 0-5
+        .equ    S_LAST, 17
         .equ    NONE, 255
 
         .equ    F_001, 0x3C23D70A           ; 0.01f
@@ -159,30 +179,44 @@ vectors:
         nop     5
         b       .S2     cc                  ; +64 midi_cc handler.S: CCs not 14-73
         nop     5
-        .word   0, 0, 0, 0, 0, 0            ; +72 MASTER, PREV, PEND, LIMHIT, SHOWN, HOLD
-        .word   0, 0, 0, 0, 0, 0            ; +96
+        .word   0, 0, 0                     ; +72 MASTER, PEND / LIMHIT / SHOWN, HOLD
+        .word   0, 0, 0
+        b       .S2     mv_swap             ; +96  callp at 0xC00B76A4 (FX_SWAP)
+        nop     5
+        b       .S2     mv_add              ; +104 callp at 0xC00A7BE0 (FX_ADD)
+        nop     5
+        b       .S2     mv_delete           ; +112 callp at 0xC00A8294 (FX_DELETE)
+        nop     5
         b       .S2     poll                ; +120 jump from midi-clock's poll trampoline
         nop     5
 
 ; +128: data at fixed offsets (the .equ above), never executed
-        .byte   0, 0, 0, 0, 0, 0, 0, 0      ; +128 LAYOUT
+        .word   0, 0                        ; +128 PAGE
         .byte   0, 0, 0, 0, 0, 0, 0, 0      ; +136 MAIL
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +144 LIVE
-        .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +156 SAVED
-        .word   0                           ; +168 PAGE
-        .word   0
-        .word   0, 0, 0, 0, 0, F_ONE        ; +176 GAINS
+        .byte   PRE, PRE, PRE, PRE, PRE, PRE ; +156 LAYOUT
+        .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +162 SAVED
+        .byte   PRE, PRE, PRE, PRE, PRE, PRE
+        .byte   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ; +180 PREV
+        .byte   0, 0
         ; +200 MENU6: the five menu entries (midi_settings.S) with MIXER
         ; before the version entry
         .word   0xC00E8FE4, 0xC00E8FF7, 0xC00E9004, 0x1181EC63, s_mixer, 0xC00E900D
-        .byte   1, 100, 150, 150, 150, 100, 150, 2, 150, 150, 1, 255 ; +224 MAXES
-        .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +236 DEFAULTS
-        ; +248 PAGES: IN, ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2, OUT
+        .word   0, 0, 0, 0, 0, F_ONE        ; +224 GAINS
+        .byte   1, 100, 150, 150, 150, 100, 150, 2, 150, 150, 1, 255 ; +248 MAXES
+        .byte   3, 3, 3, 3, 3, 3
+        .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +266 DEFAULTS
+        .byte   PRE, PRE, PRE, PRE, PRE, PRE
+        ; +284 PAGES: IN, ROUTE 1/2, ROUTE 2/2, MIX 1/2, MIX 2/2, OUT, BUS 1/2,
+        ; BUS 2/2 (S1 = slot 0, the rightmost effect)
         .byte   S_IN, NONE, NONE, NONE
         .byte   S_SEND, NONE, S_MODE, NONE, S_RA, S_RB, NONE, NONE
         .byte   S_XF, NONE, S_CURVE, NONE, S_MA, S_MB, S_PHASE, NONE
         .byte   S_MASTER, NONE, NONE, NONE
-        .word   0, 0, 0, 0                  ; to +288
+        ; ponytail: BUS 1/2 and 2/2 are a test UI until M3b's Effect Chain
+        ; screen sets buses; no CC for buses (M3b decides)
+        .byte   S_BUS, S_BUS + 1, S_BUS + 2, NONE, S_BUS + 3, S_BUS + 4, S_BUS + 5, NONE
+        .byte   0, 0, 0, 0                  ; to +320
 
 ; ---------------------------------------------------------------- engine
 
@@ -321,7 +355,8 @@ rb_next:
         b       .S2     b10
         nop     5
 
-; MAIL -> LAYOUT (0x80 | bus, else PRE), then clear MAIL. Uses A0-A5.
+; MAIL -> LAYOUT where the routing probe ran (0x80 | bus); other slots keep
+; their saved bus. Then clear MAIL. Uses A0-A5.
 latch:
         mvkl    .S1     MAIL, a4
         mvkh    .S1     MAIL, a4
@@ -334,8 +369,8 @@ lt_slot:
         nop     4
         extu    .S1     a2, 24, 31, a0      ; bit 7: the probe ran
         and     .L1     3, a2, a2
-  [!a0] mvk     .L1     PRE, a2
-        stb     .D1T1   a2, *a5++
+  [a0]  stb     .D1T1   a2, *a5
+        add     .L1     1, a5, a5
         stb     .D1T1   a3, *a4++
         sub     .L1     a1, 1, a1
   [a1]  b       .S1     lt_slot
@@ -629,7 +664,7 @@ unpack_live:
         stw     .D2T2   b3, *+b15(4)
         stw     .D2T1   a4, *+b15(8)
         stw     .D2T2   b4, *+b15(12)
-        callp   .S2     dirty, b3           ; here only the settings can differ
+        callp   .S2     dirty, b3           ; here only the settings or buses can differ
         mv      .L1     a4, a1
   [!a1] b       .S1     ul_pop
         nop     5
@@ -679,7 +714,7 @@ uh_bytes:
         mvkh    .S1     LIVE, a4
         mvkl    .S2     PREV, b4
         mvkh    .S2     PREV, b4
-        callp   .S2     copy12, b3
+        callp   .S2     copy18, b3
         mvkl    .S1     PEND, a0
         mvkh    .S1     PEND, a0
         mvk     .L1     1, a1
@@ -700,7 +735,7 @@ uh_get:
         mvkh    .S1     LIVE, a4
         mvkl    .S2     SAVED, b4
         mvkh    .S2     SAVED, b4
-        callp   .S2     copy12, b3
+        callp   .S2     copy18, b3
 uh_mask:
         mv      .L1     a10, a4
         callp   .S2     mask_p8, b3
@@ -765,7 +800,7 @@ rec_save:
         mvkh    .S1     LIVE, a4
         mvkl    .S2     SAVED, b4
         mvkh    .S2     SAVED, b4
-        callp   .S2     copy12, b3          ; saved = live
+        callp   .S2     copy18, b3          ; saved = live
 rs_stock:
         ldw     .D2T1   *+b15(8), a4
         ldw     .D2T2   *+b15(12), b4
@@ -782,7 +817,7 @@ rs_done:
         b       .S2     b3
         nop     5
 
-; IS_DIRTY, or the settings differ from the saved ones. B3 = return.
+; IS_DIRTY, or the settings or buses differ from the saved ones. B3 = return.
 dirty:
         addk    .S2     -16, b15
         stw     .D2T2   b3, *+b15(4)
@@ -796,7 +831,7 @@ dt_cmp:
         mvkh    .S1     LIVE, a5
         mvkl    .S1     SAVED, a6
         mvkh    .S1     SAVED, a6
-        mvk     .L1     12, a1
+        mvk     .S1     18, a1
 dt_loop:
         ldbu    .D1T1   *a5++, a2
         ldbu    .D1T1   *a6++, a3
@@ -810,18 +845,23 @@ dt_loop:
         b       .S2     b3
         nop     5
 
-; Bytes 14, 15 of the six packed slot blocks (A4) -> 12 bytes at B4; without
-; MAGIC the defaults. Uses A0-A5.
+; Bytes 14, 15 of the six packed slot blocks (A4) -> 12 bytes at B4, byte 17
+; (bits 0-1) -> the 6 buses after them; without MAGIC the defaults (every bus
+; PRE). Uses A0-A6.
 get_bytes:
         mv      .L1X    b4, a5
+        add     .L1X    12, b4, a6
         addk    .S1     14, a4
         mvk     .L1     6, a1
 gb_loop:
         ldbu    .D1T1   *a4, a2
         ldbu    .D1T1   *+a4(1), a3
+        ldbu    .D1T1   *+a4(3), a0
         nop     4
         stb     .D1T1   a2, *a5++
         stb     .D1T1   a3, *a5++
+        and     .L1     3, a0, a0
+        stb     .D1T1   a0, *a6++
         addk    .S1     18, a4
         sub     .L1     a1, 1, a1
   [a1]  b       .S1     gb_loop
@@ -835,13 +875,14 @@ gb_loop:
         mvkl    .S1     DEFAULTS, a4        ; no settings in this patch
         mvkh    .S1     DEFAULTS, a4
         sub     .L1     a5, 12, a5
-        b       .S1     copy12a
+        b       .S1     copy18a
         nop     5
 
-; 12 bytes at B4 -> bytes 14, 15 of the six packed slot blocks (A4). Uses
-; A1-A5.
+; 12 bytes at B4 -> bytes 14, 15 of the six packed slot blocks (A4), the 6
+; buses after them -> byte 17. Uses A1-A6.
 put_bytes:
         mv      .L1X    b4, a5
+        add     .L1X    12, b4, a6
         addk    .S1     14, a4
         mvk     .L1     6, a1
 pb_loop:
@@ -850,6 +891,9 @@ pb_loop:
         nop     4
         stb     .D1T1   a2, *a4
         stb     .D1T1   a3, *+a4(1)
+        ldbu    .D1T1   *a6++, a2
+        nop     4
+        stb     .D1T1   a2, *+a4(3)
         addk    .S1     18, a4
         sub     .L1     a1, 1, a1
   [a1]  b       .S1     pb_loop
@@ -857,17 +901,18 @@ pb_loop:
         b       .S2     b3
         nop     5
 
-; 12 bytes from A4 to B4 (copy12) or A5 (copy12a). Uses A1, A2, A5.
-copy12:
+; 18 bytes (12 + 6 buses) from A4 to B4 (copy18) or A5 (copy18a). Uses A1, A2,
+; A5.
+copy18:
         mv      .L1X    b4, a5
-copy12a:
-        mvk     .L1     12, a1
-c12_loop:
+copy18a:
+        mvk     .S1     18, a1
+c18_loop:
         ldbu    .D1T1   *a4++, a2
         nop     4
         stb     .D1T1   a2, *a5++
         sub     .L1     a1, 1, a1
-  [a1]  b       .S1     c12_loop
+  [a1]  b       .S1     c18_loop
         nop     5
         b       .S2     b3
         nop     5
@@ -887,6 +932,133 @@ mp_loop:
   [a1]  b       .S1     mp_loop
         nop     5
         b       .S2     b3
+        nop     5
+
+; ---------------------------------------------------------------- bus follows the effect
+
+; Each wraps a stock function at its only call site (arguments in A4 / B4,
+; B3 = return, all three untouched): it moves LAYOUT as stock is about to
+; move the effects, then jumps to stock. Before stock, not after: stock
+; mutes the slots within microseconds of its start (fade, then the slot
+; mutes), while after it come the slow parts with the slots playing again
+; (the swap's delay memory copy, the add / delete type change). Edited mark:
+; stock's own (the records move), and LAYOUT now differs from SAVED's buses.
+; Uses A0-A8, B5-B8.
+
+; Effect Chain move (0xC00B76A4, lifted effect turned): the effects at rows
+; A4 and B4 trade places (slot = count - 1 - row, 0xC00B6BAC). Both bytes in
+; one execute packet: the audio never runs half a swap.
+mv_swap:
+        mvkl    .S1     COUNT, a0
+        mvkh    .S1     COUNT, a0
+        ldw     .D1T1   *a0, a0
+        nop     4
+        sub     .L1     a0, 1, a0
+        sub     .L1     a0, a4, a5          ; slot A
+        sub     .L1X    a0, b4, a6          ; slot B
+        cmpgtu  .L1     6, a5, a1
+        cmpgtu  .L1     6, a6, a2
+        and     .L1     a1, a2, a1
+  [!a1] b       .S1     ms_stock
+        nop     5
+        mvkl    .S1     LAYOUT, a3
+        mvkh    .S1     LAYOUT, a3
+        ldbu    .D1T1   *+a3[a5], a7
+        ldbu    .D1T1   *+a3[a6], a8
+        mv      .L2X    a3, b6
+        mv      .L2X    a6, b7
+        nop     2
+        mv      .L2X    a7, b8
+        stb     .D1T1   a8, *+a3[a5]
+||      stb     .D2T2   b8, *+b6[b7]
+ms_stock:
+        mvkl    .S2     FX_SWAP, b5
+        mvkh    .S2     FX_SWAP, b5
+        b       .S2     b5
+        nop     5
+
+; Effect add (0xC00A7BE0, screen 33 ENTER, A4 = effect id): stock inserts at
+; slot ANCHOR + SIDE and moves the slots from there up one (the last is
+; always empty: add needs fewer than six). The new effect gets the anchor's
+; bus.
+mv_add:
+        ldw     .D2T1   *+b14(ANCHOR), a5
+        ldw     .D2T1   *+b14(SIDE), a6
+        nop     4
+        add     .L1     a5, a6, a6          ; the new effect's slot
+        cmpgtu  .L1     6, a5, a1
+        cmpgtu  .L1     6, a6, a2
+        and     .L1     a1, a2, a1
+  [!a1] b       .S1     ma_stock
+        nop     5
+        mvkl    .S1     LAYOUT, a3
+        mvkh    .S1     LAYOUT, a3
+        ldbu    .D1T1   *+a3[a5], a7        ; the anchor's bus
+        add     .L1     5, a3, a8           ; from the last slot down
+        mvk     .L1     5, a0
+        sub     .L1     a0, a6, a1          ; slots to move up
+ma_loop:
+  [!a1] b       .S1     ma_new
+        nop     5
+        ldbu    .D1T1   *-a8(1), a0
+        nop     4
+        stb     .D1T1   a0, *a8--
+        sub     .L1     a1, 1, a1
+        b       .S1     ma_loop
+        nop     5
+ma_new:
+        stb     .D1T1   a7, *+a3[a6]
+ma_stock:
+        mvkl    .S2     FX_ADD, b5
+        mvkh    .S2     FX_ADD, b5
+        b       .S2     b5
+        nop     5
+
+; Effect delete (0xC00A8294, screen 2 YES): stock deletes the slot under the
+; cursor (its own lookup at 0xC00C2098: CURSOR_SLOTS[6 x VIEW + CURSOR]) and
+; moves the slots above it down one; the last slot gets PRE. With one effect
+; stock only empties it (the shift moves the empty slots' buses, PRE unless
+; set on the BUS pages).
+mv_delete:
+        mvkl    .S1     VIEW, a0
+        mvkh    .S1     VIEW, a0
+        ldw     .D1T1   *a0, a0
+        mvkl    .S1     CURSOR, a1
+        mvkh    .S1     CURSOR, a1
+        ldb     .D1T1   *a1, a1
+        nop     4
+        mvk     .S1     6, a2
+        mpy     .M1     a0, a2, a0
+        nop     1
+        add     .L1     a0, a1, a0
+        mvkl    .S1     CURSOR_SLOTS, a2
+        mvkh    .S1     CURSOR_SLOTS, a2
+        ldw     .D1T1   *+a2[a0], a5        ; the slot deleted
+        nop     4
+        cmpgtu  .L1     6, a5, a1
+  [!a1] b       .S1     md_stock
+        nop     5
+        mvkl    .S1     LAYOUT, a3
+        mvkh    .S1     LAYOUT, a3
+        add     .L1     a3, a5, a8
+        mvk     .L1     5, a0
+        sub     .L1     a0, a5, a1          ; slots to move down
+md_loop:
+  [!a1] b       .S1     md_last
+        nop     5
+        ldbu    .D1T1   *+a8(1), a0
+        nop     4
+        stb     .D1T1   a0, *a8++
+        sub     .L1     a1, 1, a1
+        b       .S1     md_loop
+        nop     5
+md_last:
+        mvk     .L1     PRE, a0
+        stb     .D1T1   a0, *+a3(5)
+md_stock:
+        mvkl    .S2     FX_DELETE, b5
+        mvkh    .S2     FX_DELETE, b5
+        b       .S2     b5
         nop     5
 
 ; ---------------------------------------------------------------- MIXER screen
@@ -940,7 +1112,7 @@ k_page:
         ldw     .D1T1   *a0, a2
         nop     4
         add     .L1     1, a2, a2
-        cmpgt   .L1     6, a2, a1
+        cmpgt   .L1     8, a2, a1
   [!a1] mvk     .L1     0, a2
         stw     .D1T1   a2, *a0
         b       .S1     k_redraw
@@ -956,7 +1128,7 @@ k_turn:
         mvkh    .S1     PAGES, a0
         ldbu    .D1T1   *+a0[a2], a2        ; setting
         nop     4
-        mvk     .S1     10, a0
+        mvk     .S1     S_LAST, a0
         cmpgtu  .L1     a2, a0, a1
   [a1]  b       .S1     k_none              ; no setting under this knob
         nop     5
@@ -1020,7 +1192,7 @@ d_row:
         mvkh    .S1     PAGES, a1
         ldbu    .D1T1   *+a1[a0], a12       ; setting
         nop     4
-        mvk     .S1     10, a0
+        mvk     .S1     S_LAST, a0
         cmpgtu  .L1     a12, a0, a1
   [a1]  b       .S1     d_next
         nop     5
@@ -1251,13 +1423,16 @@ cc_done:
 
 ; ---------------------------------------------------------------- tables
 
-titles: .word   s_in_t, s_route1, s_route2, s_mix1, s_mix2, s_out
+titles: .word   s_in_t, s_route1, s_route2, s_mix1, s_mix2, s_out, s_bus1, s_bus2
 names:  .word   s_mode, s_send, s_in, s_bus_a, s_bus_b, s_xfade
-        .word   s_master, s_curve, s_bus_a, s_bus_b, s_phase
-enums:  .word   mode_names, 0, 0, 0, 0, 0, 0, curve_names, 0, 0, phase_names
+        .word   s_master, s_curve, s_bus_a, s_bus_b, s_phase, 0
+        .word   s_s1, s_s2, s_s3, s_s4, s_s5, s_s6
+enums:  .word   mode_names, 0, 0, 0, 0, 0, 0, curve_names, 0, 0, phase_names, 0
+        .word   bus_names, bus_names, bus_names, bus_names, bus_names, bus_names
 mode_names:  .word s_serial, s_parallel
 curve_names: .word s_smooth, s_dj, s_cut
 phase_names: .word s_normal, s_invert
+bus_names:   .word s_pre, s_a, s_b, s_post
 numbuf: .word   0, 0
 ; CC 85 Send, 86 Crossfade, 87 Master, 88 Input Level, 89 / 90 Route A / B,
 ; 91 / 92 Mix A / B, 93 Mode, 94 Curve, 95 Phase Invert B
@@ -1314,5 +1489,29 @@ s_normal:   .string "NORMAL"
 s_invert:   .string "INVERT"
             .byte 0
 s_page:     .string "PAGE"
+            .byte 0
+s_bus1:     .string "BUS 1/2"
+            .byte 0
+s_bus2:     .string "BUS 2/2"
+            .byte 0
+s_s1:       .string "S1"
+            .byte 0
+s_s2:       .string "S2"
+            .byte 0
+s_s3:       .string "S3"
+            .byte 0
+s_s4:       .string "S4"
+            .byte 0
+s_s5:       .string "S5"
+            .byte 0
+s_s6:       .string "S6"
+            .byte 0
+s_pre:      .string "PRE"
+            .byte 0
+s_a:        .string "A"
+            .byte 0
+s_b:        .string "B"
+            .byte 0
+s_post:     .string "POST"
             .byte 0
             .byte 0, 0, 0, 0

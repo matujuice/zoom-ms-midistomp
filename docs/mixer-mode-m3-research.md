@@ -94,12 +94,43 @@ place (e.g. a hook near `0xC00B6CF4`, after the record swap), and shifted by add
 | Others | IS_DIRTY compares the unpacked patch; SysEx and flash move the 122 bytes as they are | medium | |
 | Caveat | block 5 pack stores up to byte 110, harmless. A byte 17 written after pack (as `rec_save` / `pack_dump` do) is never cleared before the flash write | high | |
 
+## M3a hooks (2026-10-18, TI dis6x of the whole 2.10 OS image)
+
+Grep of every decoded `CALLP`/`B` target, plus a search for the three addresses as literal
+words and as `MVK`/`MVKH` halves: **each function has exactly one caller**, a 32-bit `callp`
+(its 21-bit displacement is retargeted; the op, the p-bit and any parallel instructions stay).
+Each wrapper (`asm/mixer/mixer.S`, vectors +96 / +104 / +112) moves `LAYOUT` and then jumps to
+stock with A4 / B4 / B3 untouched.
+
+| hook | call site | stock target, arguments | slot(s) it acts on | wrapper |
+|---|---|---|---|---|
+| Move | `0xC00B76A4` `callp 0xC00B6BC4 \|\| mv A12,A4 \|\| mv A11,B4` (screen-3 key handler, knob 1 turn while lifted; header packet, p-bit 1) | swap(A4 = old row, B4 = new row) | rows -> slots with `0xC00B6BAC`: count - 1 - row, count = `0xC00B6BA0` -> `0xC00C0818` = word `0xC009C068` | swaps `LAYOUT[a]`, `LAYOUT[b]` (both stores in one execute packet) |
+| Add | `0xC00A7BE0` `callp 0xC00C22F4 \|\| ldw *B5[B4],A4` (screen-33 keys `0xC00A7A6C`, ENTER, only when `B14[88]` = 33; A4 = id from `0xC00ECAC8[row]`) | add(A4 = effect id) | insert slot A11 = `B14[32]` + `B14[33]` (`0xC00C2310`; set by `0xC00C1FE0`: anchor slot, side 1 = left); slots insert..count-1 move up one (`0xC00C2394`-`0xC00C2460`); no early exit; count < 6 is checked before screen 33 opens (`0xC00C2018`) | bus = `LAYOUT[anchor]`; `LAYOUT[5..ins+1]` = `LAYOUT[4..ins]`; `LAYOUT[ins]` = bus |
+| Delete | `0xC00A8294` `callp 0xC00C2030`, plain (p-bit 0; screen-2 keys `0xC00A8238`, event 34 with row != 0) | delete(), no arguments | slot under the cursor: `0xC00C2098`-`0xC00C20C6` = word `0xC00EE748[6 * view + cursor]`, view = word `0xC009D8F8` (`0xC00BA34C`), cursor = signed byte `0xC009C064` (`0xC00C0834(0)`); slots d+1..count-1 move down one, the last is emptied. **count = 1**: no shift, `0xC00ABACC(0, 0)` empties slot 0 (`0xC00C22D4`) | same lookup; `LAYOUT[d..4]` = `LAYOUT[d+1..5]`, `LAYOUT[5]` = PRE (count 1: moves the empty slots' buses) |
+
+**Before or after stock.** Each stock function starts with the effect semaphore `B14[191]`, the
+fade-out `0xC00DF724` (a ramp, not a wait), `B14[98]` = 1 and the slot mutes `0xC00D7B4C`
+(both slots for a move, all six for add / delete): microseconds after entry. The slow parts
+run with the slots playing again: the move's per-slot delay memory swap `0xC00CB300` after the
+fade-in, the add / delete type change `0xC00ABACC` after the semaphore post. So `LAYOUT` moves
+**before** stock: the effects play on the wrong bus only for that short stretch at the start
+(at most one 8-sample block, longer only if another task holds `B14[191]`). The move's two
+bytes go in one execute packet, so the audio never sees a duplicated bus; the shifts are
+byte by byte, which can't matter because no effect has moved yet.
+
+**Edited mark.** Stock already marks the patch edited (the records move); with `dirty`
+comparing 18 bytes, `LAYOUT` vs the saved buses reads dirty too. No extra call.
+
+Considered and not used: the `0xC00B86E4` (apply) calls inside the move (`0xC00B6D40`) and
+add (`0xC00C24C4`) run while the slots are muted, with the slots in A11 / A13; but delete's
+slot is gone from the registers there, and the call-site wrappers keep the three alike.
+
 ## Open questions and pedal probes
 
 1. **Cover width 38 vs 33**: photo the stock screen; decide whether M3 reuses the 38-px bitmaps.
 2. **Side scroll arrows**: not found; photo with 4+ effects.
 3. **FX_TABLE after a swap**: read `0xC00EE930[0..5]` after a stock lift-and-move; if a slot stays `0xC00E0784` (mute), our hook must call `0xC00D7B20(state)`.
-4. **Bus layout during a move**: swap `LAYOUT[a]` / `LAYOUT[b]` after the record swap in `0xC00B6BC4` (near `0xC00B6CF4`); shift it in delete (`0xC00C2030`) and add (`0xC00C22F4`) too. Probe with the routing probe ZDL.
+4. **Bus layout during a move**: done in M3a (section "M3a hooks", before stock, not near `0xC00B6CF4`). Pedal check: no click when moving / adding / deleting in Parallel.
 5. **New screen hooks**: overwrite `0xC00EEFA8` and `0xC00EEBBC` with our stubs; reuse the cover drawer `0xC00A89B4`, the swap `0xC00B6BC4`, refresh `0xC00B6D94`, and the crane `0xC00B74F4` / `0xC00B7428` if kept.
 6. **Free screen ids**: 11 is unused (13, 14 MIDI, 15 MIXER).
 7. **Not examined**: `0xC00AA3D8` (play-mode cover view), `0xC00BB284`, `0xC00BB1A0(slot, mask)`, `0xC00C3A60` / `0xC00C3A78`, `0xC00D2E20` / `0xC00D2DEC`, footswitches on screen 3.
