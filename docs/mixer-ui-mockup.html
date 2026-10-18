@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v13 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v14 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -80,7 +80,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <tr><td>Knob 1 press</td><td>SELECT</td><td>DROP</td></tr>
           <tr><td>Knob 2 press</td><td>EXIT</td><td>- (effects: hold for DELETE)</td></tr>
           <tr><td>Knob 2 long press</td><td>-</td><td>DELETE?, then knob 2 press deletes the effect; anything else cancels</td></tr>
-          <tr><td>Knob 3 turn</td><td>-</td><td>Bus A ↔ Bus B; on [ROUTE] Mode, on [MIX] Output</td></tr>
+          <tr><td>Knob 3 turn</td><td>-</td><td>Bus A ↔ Bus B; on [ROUTE] Mode</td></tr>
           <tr><td>Cursor ◄ ► hold</td><td colspan="2">add an effect on that side, in the same zone (6 max); a short press does nothing</td></tr>
           <tr><td>Cursor ▲ ▼</td><td colspan="2">change the type of the effect under the cursor</td></tr>
           <tr><td>Knob 3 press</td><td>OPEN (knob pages)</td><td>OPEN (knob pages)</td></tr>
@@ -98,7 +98,8 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <li>Hold knob 2's ● for a moment: DELETE? appears. Press it again to delete the effect, or anything else to cancel.</li>
           <li>[ROUTE] Send 0 and [MIX] XFade 100: the <b>!</b> badge says the output is silent.</li>
           <li>PEDAL INPUT: STEREO, then [ROUTE] Mode Split: L goes only to Bus A, R only to Bus B.</li>
-          <li>[MIX] page 3, Output: Stereo, Mono or Split. The lines inside [MIX] and the OUT plugs follow.</li>
+          <li>Cursor onto OUT (knob 1 to the far left), OPEN: Master Level and Output Mode (Stereo, Mono or Split). The lines inside [MIX] and the OUT plugs follow. IN opens Input Level.</li>
+          <li>Raise Input Level, a bus level or Master Level above 100: a LIMIT tag shows over the OUT plugs. [MIX] page 3: Mute A / Mute B / Solo; the muted bus is dotted after its last effect.</li>
         </ol>
       </div>
       <div>
@@ -120,6 +121,14 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
           <li>Covers are 18 rows instead of 19 (no top padding above the name) so the cursor border never touches the title bar or the cover above or below.</li>
           <li>Scrolling is stock: 3 columns, the cursor's column always in the middle. A bus column holds its Bus A and Bus B effect one above the other.</li>
           <li>The knob pages show the bus as a filled tag at the right of the tab row.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Levels, Mute / Solo and LIMIT</h2>
+        <ul>
+          <li>Every level (Input, Bus A / B in [ROUTE] and [MIX], Master) goes 0-150, 100 = unity.</li>
+          <li>[ROUTE] page 1: Send, Mode. [MIX] page 1: Crossfade, Curve. Page 2: Bus A Level, Bus B Level, Phase Invert (Bus B). Page 3: Mute A, Mute B, Solo (Off / A / B). Solo overrides Mute.</li>
+          <li>The LIMIT tag here is a simulation: it shows when the product of the gains on the path to OUT is above 1.0 (Serial: Input x Master; Parallel: Input x bus levels x Master, on any bus that is not muted). The real tag follows the safety limiter.</li>
         </ul>
       </div>
       <div>
@@ -187,25 +196,30 @@ function mk(name, on = true) {
   return { name: n, ch, cost, on, full: false, vals: { ...vals }, pages: [labels.map((l, k) => ({ l, k, max }))] };
 }
 const ROUTE = { node: "ROUTE", name: "ROUTE", on: true, vals: {}, pages: [
-  [{ l: "Send", k: "send" }, { l: "InLvl", k: "inl" }, { l: "Mode", k: "mode", opts: ["Serial", "Paral", "Split", "MonoSer"] }],
-  [{ l: "BusA", k: "al" }, { l: "BusB", k: "bl" }, null]] };
+  [{ l: "Send", k: "send" }, null, { l: "Mode", k: "mode", opts: ["Serial", "Paral", "Split", "MonoSer"] }],
+  [{ l: "BusA", k: "al", max: 150 }, { l: "BusB", k: "bl", max: 150 }, null]] };
 const MIX = { node: "MIX", name: "MIX", on: true, vals: {}, pages: [
-  [{ l: "XFade", k: "xf" }, { l: "Mastr", k: "master" }, { l: "Curve", k: "curve", opts: ["Smooth", "DJ", "Cut"] }],
-  [{ l: "MixA", k: "al" }, { l: "MixB", k: "bl" }, { l: "PhaseB", k: "ph", opts: ["Normal", "Invert"] }],
-  [{ l: "Output", k: "out", opts: ["Stereo", "Mono", "Split"] }, null, null]] };
+  [{ l: "XFade", k: "xf" }, null, { l: "Curve", k: "curve", opts: ["Smooth", "DJ", "Cut"] }],
+  [{ l: "MixA", k: "al", max: 150 }, { l: "MixB", k: "bl", max: 150 }, { l: "PhaseB", k: "ph", opts: ["Normal", "Invert"] }],
+  [{ l: "MuteA", k: "ma", opts: ["Off", "On"] }, { l: "MuteB", k: "mb", opts: ["Off", "On"] }, { l: "Solo", k: "solo", opts: ["Off", "A", "B"] }]] };
+// The jacks open knob pages like nodes but never move or get selected.
+const IN = { node: "IN", jack: true, name: "IN", on: true, vals: {}, pages: [[{ l: "InLvl", k: "inl", max: 150 }, null, null]] };
+const OUT = { node: "OUT", jack: true, name: "OUT", on: true, vals: {}, pages: [[{ l: "Mastr", k: "master", max: 150 }, { l: "Output", k: "out", opts: ["Stereo", "Mono", "Split"] }, null]] };
 let Z, S;
 function reset() {
-  Object.assign(ROUTE.vals, { send: 50, inl: 100, mode: 1, al: 100, bl: 100 });
-  Object.assign(MIX.vals, { xf: 50, master: 100, curve: 1, al: 100, bl: 100, ph: 0, out: 0 });
+  Object.assign(ROUTE.vals, { send: 50, mode: 1, al: 100, bl: 100 });
+  Object.assign(MIX.vals, { xf: 50, curve: 1, al: 100, bl: 100, ph: 0, ma: 0, mb: 0, solo: 0 });
+  Object.assign(IN.vals, { inl: 100 });
+  Object.assign(OUT.vals, { master: 100, out: 0 });
   Z = { PRE: [mk("DirtBox")], A: [mk("GridDly")], B: [mk("Breather"), mk("Sweep", false)], POST: [mk("EuGate")] };   // 5 of 6, so one can be added
   S = { screen: "chain", cur: Z.A[0], sel: false, page: 0, msg: "", stereo: false, popup: "" };
 }
 const serial = () => ROUTE.vals.mode === 0 || ROUTE.vals.mode === 3;
 const monoSer = () => ROUTE.vals.mode === 3;
-const order = () => serial() ? [...Z.PRE, ROUTE, ...Z.A, ...Z.B, ...Z.POST] : [...Z.PRE, ROUTE, ...Z.A, ...Z.B, MIX, ...Z.POST];
+const order = () => [IN, ...Z.PRE, ROUTE, ...Z.A, ...Z.B, ...(serial() ? [] : [MIX]), ...Z.POST, OUT];
 const zoneOf = e => Object.keys(Z).find(z => Z[z].includes(e));
 const onBus = e => !e.node && (zoneOf(e) === "A" || zoneOf(e) === "B");
-const silent = () => ROUTE.vals.mode === 1 && MIX.vals.out !== 2 && ((ROUTE.vals.send === 0 && MIX.vals.xf === 100) || (ROUTE.vals.send === 100 && MIX.vals.xf === 0));
+const silent = () => ROUTE.vals.mode === 1 && OUT.vals.out !== 2 && ((ROUTE.vals.send === 0 && MIX.vals.xf === 100) || (ROUTE.vals.send === 100 && MIX.vals.xf === 0));
 
 // dir -1 = left on screen = later in the signal
 function moveEffect(e, dir) {
@@ -231,7 +245,14 @@ function swapBus(e) {
   const z = zoneOf(e), i = Z[z].indexOf(e), o = z === "A" ? "B" : "A";
   Z[z].splice(i, 1); Z[o].splice(Math.min(i, Z[o].length), 0, e);
 }
-const nodeMode = n => n === ROUTE ? { p: ROUTE.pages[0][2], max: S.stereo ? 3 : 1 } : { p: MIX.pages[2][0], max: 2 };   // Split input needs a stereo input
+const nodeMode = n => n === ROUTE ? { p: ROUTE.pages[0][2], max: S.stereo ? 3 : 1 } : null;   // Split input needs a stereo input
+// Mute / Solo (Parallel): Solo overrides Mute. A muted bus is drawn dotted after its last effect.
+const muted = k => { const s = MIX.vals.solo; return serial() ? false : s ? s === (k === "A" ? 2 : 1) : !!MIX.vals[k === "A" ? "ma" : "mb"]; };
+// Simulated LIMIT: the real tag follows the limiter. Gain on the path to OUT above 1.0 (levels are 0-150, 100 = unity).
+const limiting = () => {
+  const g = IN.vals.inl / 100 * OUT.vals.master / 100;
+  return serial() ? g > 1 : ["A", "B"].some(k => !muted(k) && g * ROUTE.vals[k === "A" ? "al" : "bl"] / 100 * MIX.vals[k === "A" ? "al" : "bl"] / 100 > 1);
+};
 const all = () => [...Z.PRE, ...Z.A, ...Z.B, ...Z.POST];
 const load = ex => all().filter(e => e !== ex && !e.full).reduce((t, e) => t + e.cost, 0);
 function fit(e) {   // stock: an effect that doesn't fit the DSP is bypassed and DSP FULL shows
@@ -241,7 +262,8 @@ function fit(e) {   // stock: an effect that doesn't fit the DSP is bypassed and
 function addEffect(dir) {   // hold cursor left (dir -1) = left of the cursor = later in the signal, same zone
   if (all().length >= 6) { S.msg = "6 effects max, as on stock"; return; }
   const e = mk(TYPES[0][0]), c = S.cur;
-  if (c === ROUTE) dir < 0 ? Z.A.unshift(e) : Z.PRE.push(e);
+  if (c.jack) { if (c === IN ? dir > 0 : dir < 0) { S.msg = "Nothing to add on that side"; return; } c === IN ? Z.PRE.unshift(e) : Z.POST.push(e); }
+  else if (c === ROUTE) dir < 0 ? Z.A.unshift(e) : Z.PRE.push(e);
   else if (c === MIX) dir < 0 ? Z.POST.unshift(e) : Z.A.push(e);
   else { const a = Z[zoneOf(c)]; a.splice(a.indexOf(c) + (dir < 0 ? 1 : 0), 0, e); }
   S.cur = e; S.sel = false; S.page = 0; S.msg = "Added " + e.name + ", cursor up/down change its type";
@@ -257,7 +279,7 @@ function warn(e) {   // Smart Warning (maybe): the effect's channel type breaks 
   if (e.node) return "";
   const z = zoneOf(e), par = !serial();
   if (z === "PRE" && splitIn() && e.ch !== "dual") return "MIXES L INTO R";
-  if (z === "POST" && par && MIX.vals.out === 2 && e.ch !== "dual") return "MIXES A INTO B";
+  if (z === "POST" && par && OUT.vals.out === 2 && e.ch !== "dual") return "MIXES A INTO B";
   const st = z === "POST" ? outLanes().length > 1 : par && z !== "PRE" ? bus(YA).length > 1 : S.stereo && (z === "PRE" || !monoSer());
   return st && e.ch === "mono" ? "MONO FX ON STEREO" : "";
 }
@@ -278,13 +300,13 @@ const lane = (y, st) => st ? [y - 1, y + 1] : [y];
 const splitIn = () => ROUTE.vals.mode === 2;
 const bus = y => splitIn() ? [y] : lane(y, S.stereo);   // Split input: L alone on Bus A, R alone on Bus B
 function outLanes() {   // the lines after [MIX]: Mono 1, Split always 2 (A to L, B to R), Stereo as the input
-  const o = MIX.vals.out;
+  const o = OUT.vals.out;
   return o === 1 || monoSer() ? [YC] : o === 2 && !serial() ? [YC - 1, YC + 1] : lane(YC, S.stereo);
 }
 // split: [line, lines it forks into] in the gap before [ROUTE]; join: [line, lines that join into it] in the gap after.
 function columns() {   // signal order, right to left; left = the rows the signal leaves on
   const M = lane(YC, S.stereo), P = outLanes(), AB = [...bus(YA), ...bus(YB)];
-  const cols = [{ jack: "IN", left: M }];
+  const cols = [{ jack: "IN", e: IN, left: M }];
   Z.PRE.forEach(e => cols.push({ e, y: YC, left: M }));
   if (serial()) {
     const L = monoSer() ? [YC] : M;   // Mono Serial: L and R join before [ROUTE], where its splits are drawn
@@ -294,12 +316,12 @@ function columns() {   // signal order, right to left; left = the rows the signa
   } else {
     const n = Math.max(1, Z.A.length, Z.B.length);
     cols.push({ e: ROUTE, left: AB, split: M.map((y, i) => [y, splitIn() ? [i ? YB : YA] : [y - YC + YA, y - YC + YB]]) });
-    for (let i = 0; i < n; i++) cols.push({ a: Z.A[i], b: Z.B[i], left: AB });
+    for (let i = 0; i < n; i++) cols.push({ a: Z.A[i], b: Z.B[i], left: AB, bi: i });
     cols.push({ e: MIX, left: AB, join: P.map(y => [y, [YA, YB].flatMap(m => bus(m).filter(b =>
-      MIX.vals.out === 2 ? m === (y < YC ? YA : YB) : P.length < 2 || bus(m).length < 2 || b - m === y - YC))]) });
+      OUT.vals.out === 2 ? m === (y < YC ? YA : YB) : P.length < 2 || bus(m).length < 2 || b - m === y - YC))]) });
   }
   Z.POST.forEach(e => cols.push({ e, y: YC, left: P }));
-  cols.push({ jack: "OUT", left: [] });
+  cols.push({ jack: "OUT", e: OUT, left: [] });
   return cols;
 }
 const gapFan = (cols, j) => cols[j + 1].split ? { g: cols[j + 1].split, split: true } : cols[j + 1].sum ? { g: cols[j + 1].sum, split: false } : cols[j].join ? { g: cols[j].join, split: false } : null;
@@ -325,6 +347,8 @@ function fan(g, w, groups, split) {   // one riser per group inside the gap g ..
   });
   wires(H, V);
 }
+const hline = (x, y, w, dot) => { if (!dot) return fill(x, y, w, 1); for (let i = 0; i < w; i += 2) fill(x + i, y, 1, 1); };
+const dead = (c, y) => { const k = y < YC ? "A" : "B"; return c.bi !== undefined && muted(k) && c.bi >= Z[k].length - 1; };   // a muted bus after its last effect
 function checker(x, y, w, h) {
   for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
     const edge = j < 1 || j >= h - 2 || i === 0 || i === w - 1;
@@ -362,7 +386,7 @@ const PLUG = [[0, 3, 4, 4], [3, 7, 1, 1], [4, 1, 1, 2], [4, 7, 1, 2],   // cable
   [24, 3, 1, 1], [24, 6, 1, 1], [25, 2, 2, 1], [25, 7, 2, 1], [27, 3, 1, 4]];   // rounded tip
 function drawJack(kind, l, lanes) {   // one plug per channel; L is the upper one, as printed on the case
   const out = kind === "OUT", H = [], V = [];
-  const ys = lanes.length > 1 || (out && MIX.vals.out === 0) ? [YA, YB] : [YC];   // Output Stereo: both jacks, even from one line
+  const ys = lanes.length > 1 || (out && OUT.vals.out === 0) ? [YA, YB] : [YC];   // Output Stereo: both jacks, even from one line
   lanes = ys.map((_, i) => lanes[i] ?? lanes[0]);
   const px = (x, w = 1) => out ? l + CW - 1 - (x - l) - (w - 1) : x;   // mirror for OUT
   ys.forEach((y, i) => {
@@ -373,6 +397,8 @@ function drawJack(kind, l, lanes) {   // one plug per channel; L is the upper on
     H.push([y, x, px(x0)], [lanes[i], px(l), x]); V.push([x, Math.min(y, lanes[i]), Math.max(y, lanes[i])]);
   });
   wires(H, V);
+  if (S.cur === (out ? OUT : IN)) rect(l - 1, ys[0] - 5, CW + 2, ys[ys.length - 1] - ys[0] + 12);
+  if (out && limiting()) { fill(l + 9, 10, w3("LIMIT") + 2, 7); t3("LIMIT", l + 10, 11, BG); }
 }
 function drawChain() {
   const cols = columns(), k = cols.findIndex(c => c.e === S.cur || c.a === S.cur || c.b === S.cur);
@@ -383,7 +409,7 @@ function drawChain() {
   for (let j = k - 2; j <= k + 1; j++) {   // lines in the gap between column j and j + 1, out to the edges
     if (!cols[j] || !cols[j + 1]) continue;
     const g = X[j + 1] + CW, w = X[j] - g, f = gapFan(cols, j);
-    f ? fan(g, w, f.g, f.split) : cols[j].left.forEach(y => fill(g, y, w, 1));
+    f ? fan(g, w, f.g, f.split) : cols[j].left.forEach(y => hline(g, y, w, dead(cols[j], y)));
   }
   for (let i = k - 1; i <= k + 1; i++) {
     const c = cols[i]; if (!c) continue;
@@ -393,7 +419,7 @@ function drawChain() {
     else if (c.e) {
       drawCover(c.e, l, c.y);
     } else {
-      [[c.a, YA], [c.b, YB]].forEach(([e, y]) => e ? drawCover(e, l, y) : bus(y).forEach(r => fill(l, r, CW, 1)));
+      [[c.a, YA], [c.b, YB]].forEach(([e, y]) => e ? drawCover(e, l, y) : bus(y).forEach(r => hline(l, r, CW, muted(y < YC ? "A" : "B"))));
     }
   }
   fill(0, 0, 128, 9); t5("EFFECT CHAIN", 64 - Math.floor(w5("EFFECT CHAIN", true) / 2), 1, BG, true);
@@ -405,9 +431,9 @@ function drawChain() {
     [0, 1, 2].forEach(r => { fill(103 - r, 51 + r, 2 * r + 1, 1); fill(109 - r, 53 - r, 2 * r + 1, 1); });
   if (fx && !S.del) t3("HOLD", 56, 50);   // DELETE needs a long press
   const wt = !S.sel && warn(S.cur); if (wt) t3(wt, 64 - Math.floor(w3(wt) / 2), 50);
-  const nm = S.sel && S.cur.node ? nodeMode(S.cur) : null;
+  const nm = S.sel ? nodeMode(S.cur) : null;
   if (nm) t3("{}", 103, 50);
-  softkeys(S.del ? ["", "DELETE?", ""] : S.sel ? ["DROP", fx ? "DELETE" : "", nm ? nm.p.opts[S.cur.vals[nm.p.k]].toUpperCase() : onBus(S.cur) && !serial() ? "A/B" : ""] : ["SELECT", "EXIT", "OPEN"]);
+  softkeys(S.del ? ["", "DELETE?", ""] : S.sel ? ["DROP", fx ? "DELETE" : "", nm ? nm.p.opts[S.cur.vals[nm.p.k]].toUpperCase() : onBus(S.cur) && !serial() ? "A/B" : ""] : [S.cur.jack ? "" : "SELECT", "EXIT", "OPEN"]);
 }
 function softkeys(labels) {
   [[0, 41], [43, 41], [86, 42]].forEach(([x, w], i) => {
@@ -426,14 +452,14 @@ function knobArc(cx, cy, v, hollow) {   // the stock knob: 270 degree arc, open 
   for (let t = 0; t <= 1; t += 0.1) { const k = Math.PI / 4; fill(Math.round(cx + Math.sin(k) * rx * t), Math.round(cy + Math.cos(k) * ry * t), 1, 1); fill(Math.round(cx - Math.sin(k) * rx * t), Math.round(cy + Math.cos(k) * ry * t), 1, 1); }
 }
 function valueText(it, p) {
-  if (it === MIX && p.k === "xf" && MIX.vals.out === 2) return "-";   // Crossfade does nothing with Split output
+  if (it === MIX && p.k === "xf" && OUT.vals.out === 2) return "-";   // Crossfade does nothing with Split output
   if (it === ROUTE && p.k === "send" && splitIn()) return "-";   // Split input: L and R already pick the bus
   return p.opts ? p.opts[it.vals[p.k]] : String(it.vals[p.k]);
 }
 function drawView() {
   const it = S.cur, page = it.pages[S.page] || it.pages[0];
   // tab row: name, bus tag, page tabs
-  const name = it.node ? "[" + it.name + "]" : it.name.slice(0, 8), nw = w5(name) + 5;
+  const name = it.node && !it.jack ? "[" + it.name + "]" : it.name.slice(0, 8), nw = w5(name) + 5;
   fill(0, 0, nw, 9); t5(name, 2, 1, BG);
   let x = nw + 1;
   if ((it === MIX && silent()) || warn(it)) { fill(x, 0, 7, 9); t5("!", x + 1, 1, BG); x += 8; }
@@ -476,10 +502,10 @@ function knob(k, a, hold) {
       return render();
     }
     if (k === 1 && a) S.sel ? (S.cur.node ? moveNode(S.cur, a) : moveEffect(S.cur, a)) : step(a);
-    else if (k === 1) S.sel = !S.sel;
+    else if (k === 1) { if (S.cur.jack) S.msg = "IN and OUT never move or get selected, OPEN shows their knobs"; else S.sel = !S.sel; }
     else if (k === 2 && !a && S.sel && !S.cur.node) S.msg = "Hold knob 2 to delete " + S.cur.name;
     else if (k === 2 && !a && !S.sel) S.msg = "EXIT leaves the Effect Chain screen";   // selected [ROUTE]/[MIX]: blank, does nothing
-    else if (k === 3 && a && S.sel && S.cur.node) {   // [ROUTE] Mode / [MIX] Output, straight from the chain
+    else if (k === 3 && a && S.sel && nodeMode(S.cur)) {   // [ROUTE] Mode, straight from the chain
       const { p, max } = nodeMode(S.cur); S.cur.vals[p.k] = Math.max(0, Math.min(max, S.cur.vals[p.k] + a));
     }
     else if (k === 3 && a && S.sel && onBus(S.cur) && !serial()) swapBus(S.cur);
