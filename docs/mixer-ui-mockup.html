@@ -50,7 +50,7 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 <main>
   <header>
     <h1>Mixer Mode Screens</h1>
-    <p class="sub">Mockup v16 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
+    <p class="sub">Mockup v17 of the M3 screens, drawn at the pedal's 128 × 64 pixels with the stock cover size, font and frames from Luca's photos. Use the knobs under the screen. The patch is an example.</p>
   </header>
 
   <div class="layout">
@@ -114,8 +114,8 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
         <h2>Changed from stock</h2>
         <ul>
           <li>The crane and the lift space are gone. Bus A sits where the lifted cover used to go, and Bus B in the stock row. Pre and Post sit between them, on the line where the fork splits.</li>
-          <li>Cursor: a thick border. Selected: a filled cover.</li>
-          <li>[ROUTE] and [MIX] are boxes as wide as a cover and as tall as both bus rows, with their names spelled out.</li>
+          <li>Cursor: a thin 1-px border. Selected: like stock CHO, the cover filled plus a separate thin square frame with a 1-px gap.</li>
+          <li>[ROUTE] and [MIX] are square boxes (stock EXIT style: 1-px line, no rounding, no thick bottom) as wide as a cover and as tall as both bus rows, with their names spelled out.</li>
           <li>IN and OUT are the stock plug icons copied pixel for pixel (body, ridges, ring and rounded tip), one per channel (the upper one is L, as printed on the case). Only the cable is thinner. Mono: one plug, one line. Stereo: two plugs and double lines.</li>
           <li>The lines split in the gap before [ROUTE] and join in the gap after [MIX]; those two gaps are 8 pixels instead of 4. Where two lines cross without joining, one hops over the other.</li>
           <li>Covers are 18 rows instead of 19 (no top padding above the name) so the cursor border never touches the title bar or the cover above or below.</li>
@@ -176,6 +176,7 @@ const t5 = (s, x, y, c = INK, bold = false) => draw(F5, 5, s, x, y, c, bold);
 const t3 = (s, x, y, c = INK) => draw(F3, 3, s, x, y, c, false);
 const w5 = (s, bold = false) => s.length * (bold ? 7 : 6) - 1;
 const w3 = s => s.length * 4 - 1;
+const sq = (x, y, w, h) => { fill(x, y, w, 1); fill(x, y + h - 1, w, 1); fill(x, y + 1, 1, h - 2); fill(x + w - 1, y + 1, 1, h - 2); };   // square 1-px frame
 const rect = (x, y, w, h, c = INK) => { fill(x + 1, y, w - 2, 1, c); fill(x + 1, y + h - 1, w - 2, 1, c); fill(x, y + 1, 1, h - 2, c); fill(x + w - 1, y + 1, 1, h - 2, c); };
 
 // ---- patch model ---------------------------------------------------------------
@@ -364,6 +365,7 @@ function drawCover(e, l, cy) {
   }
   else checker(l, y, CW, CH);   // OFF, or bypassed by DSP FULL
   if (cur && !inv) rect(l - 1, y - 1, CW + 2, CH + 2);
+  if (inv) sq(l - 2, y - 2, CW + 4, CH + 4);   // stock CHO: thin square frame, 1-px gap
   const c = inv ? BG : INK, a = e.name.slice(0, 5), z = e.full ? "FULL" : e.name.slice(5, 10), wt = warn(e);
   if (wt && cy === YC) { fill(l + 12, 10, 9, 8); t5("!", l + 14, 10, BG); }   // Smart Warning tag, where the A/B tags were
   const tab = wt && cy !== YC ? 5 : 0;   // bus rows have no room above: the tag sits in the cover's top-left corner
@@ -373,8 +375,9 @@ function drawCover(e, l, cy) {
 }
 function drawNode(n, l) {   // as wide as a cover, as tall as both bus rows
   const top = YA - 4, h = YB - YA + 9, cur = S.cur === n, inv = cur && S.sel;
-  fill(l, top, CW, h, inv ? INK : BG); rect(l, top, CW, h); fill(l + 1, top + h - 2, CW - 2, 1, inv ? BG : INK);
-  if (cur && !inv) rect(l - 1, top - 1, CW + 2, h + 2);
+  fill(l, top, CW, h, inv ? INK : BG); sq(l, top, CW, h);   // stock EXIT box: square, 1 px, no thick bottom
+  if (cur && !inv) sq(l - 1, top - 1, CW + 2, h + 2);
+  if (inv) sq(l - 2, top - 2, CW + 4, h + 4);
   t5(n.node, l + Math.floor((CW - w5(n.node)) / 2), YC - 3, inv ? BG : INK);
   if (n === MIX && silent()) t5("!", l + 14, YC + 6, inv ? BG : INK);
 }
