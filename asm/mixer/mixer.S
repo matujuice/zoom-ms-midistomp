@@ -32,9 +32,7 @@
 ; follows the effect when the stock Effect Chain screen moves it (mv_swap),
 ; or an effect is added (mv_add) or deleted (mv_delete): each wraps the stock
 ; function at its only call site and moves the buses just before stock moves
-; the effects (docs/mixer-mode-m3-research.md, "M3a hooks"). The routing
-; probe ZDL still writes 0x80 | bus into MAIL[slot] every block; at the end
-; of the block the engine copies it into LAYOUT and clears MAIL.
+; the effects (docs/mixer-mode-m3-research.md, "M3a hooks").
 ;
 ; Saving (route A, docs/mixer-mode-m0.md "M0b"): the 12 setting bytes (11 +
 ; MAGIC) ride in bytes 14 and 15 of the six 18-byte slot blocks of the packed
@@ -71,7 +69,7 @@
         .equ    SHOWN, BASE + 78            ; LIMIT tag as last drawn
         .equ    HOLD, BASE + 80             ; polls left to show LIMIT
         .equ    PAGE, BASE + 128            ; MIXER screen page 0-7
-        .equ    MAIL, BASE + 136            ; [6] routing probe ZDL: 0x80 | bus
+        .equ    MAIL, BASE + 136            ; [8] unused (was the routing probe's MAIL)
         .equ    LIVE, BASE + 144            ; [12] settings of the patch played
         .equ    LAYOUT, BASE + 156          ; [6] ... and the bus of each slot (setting 12-17)
         .equ    SAVED, BASE + 162           ; [12 + 6] ... as saved in flash
@@ -312,7 +310,6 @@ e_master:
         mv      .L1     a4, a5
         callp   .S2     scale16, b3         ; A6 = its gain
 e_out:
-        callp   .S2     latch, b3
         mvk     .L2     6, b0
         stw     .D2T2   b0, *+b14(SLOT_VAR) ; as the stock loop leaves it
         mvkl    .S2     AFTER_LOOP, b0
@@ -353,29 +350,6 @@ rb_next:
   [a0]  b       .S1     rb_slot
         nop     5
         b       .S2     b10
-        nop     5
-
-; MAIL -> LAYOUT where the routing probe ran (0x80 | bus); other slots keep
-; their saved bus. Then clear MAIL. Uses A0-A5.
-latch:
-        mvkl    .S1     MAIL, a4
-        mvkh    .S1     MAIL, a4
-        mvkl    .S1     LAYOUT, a5
-        mvkh    .S1     LAYOUT, a5
-        mvk     .L1     6, a1
-        mvk     .L1     0, a3
-lt_slot:
-        ldbu    .D1T1   *a4, a2
-        nop     4
-        extu    .S1     a2, 24, 31, a0      ; bit 7: the probe ran
-        and     .L1     3, a2, a2
-  [a0]  stb     .D1T1   a2, *a5
-        add     .L1     1, a5, a5
-        stb     .D1T1   a3, *a4++
-        sub     .L1     a1, 1, a1
-  [a1]  b       .S1     lt_slot
-        nop     5
-        b       .S2     b3
         nop     5
 
 ; Targets from the settings, smoothed into GAINS. Uses A0-A9, A13-A15, B3,

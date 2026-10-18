@@ -115,7 +115,7 @@ of the patch it leaves (`0xC00B89F4`, now gets PREV); all six round 2 steps pass
   per block; a block-rate limiter (0.98 ceiling) sits after MIX.
 - **Buses** come from `RoutePrb` (effects pack, `src/probes/routeprb`): its Bus knob writes
   `0x80 | bus` into MAIL[slot] (`0xC00F6088`) every block; the engine latches it and clears
-  MAIL, so a removed probe falls back to Pre. Stock effects stay in Pre until M3.
+  MAIL, so a removed probe falls back to Pre. Stock effects stay in Pre until M3. (M2 only: M3a sets buses on the MIXER screen and drops RoutePrb.)
 - **Saved per patch (route A):** the bytes ride in bytes 14/15 of the six 18-byte slot blocks
   of the packed patch (the high bits of P8, which `w9 &= 0xFFF` clears after unpack). Hooks:
   the live and saved-copy unpacks, the editor dump pack, REC_SAVE (`0xC00B84C0`, every save) and
@@ -158,7 +158,9 @@ without the Mixer magic loads Serial with every bus PRE.
   pick a type: the new effect joins the bus of the effect it was added next to) and delete
   (the effects above move down with their buses, the last slot gets PRE). Hooks and evidence:
   [mixer-mode-m3-research.md, "M3a hooks"](mixer-mode-m3-research.md#m3a-hooks-2026-10-18-ti-dis6x-of-the-whole-210-os-image).
-- **RoutePrb** still sets its slot's bus every block; a slot without it keeps its saved bus
-  (before M3a it fell back to PRE).
+- **RoutePrb** is no longer read (dropped after M3a, 2026-10-18): the engine's MAIL latch is
+  gone and the 8 MAIL bytes at +136 are unused.
 
-Static checks only (TI CGT build, tests, dis6x of every hook site): **not yet pedal-tested.**
+**Pedal results (Luca, MS-70CDR, 2026-10-18): works.** All test steps pass: buses save and
+reload, follow move / add / delete, survive AUTO SAVE. Luca's theory, unmeasured: past the
+DSP limit the audio cuts out.
