@@ -27,7 +27,7 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M0 | **Research, no build:** find the chain runner, the per-slot buffers, the DSP budget and spare bytes in the patch format on the 70CDR OS. Ends with a go / no-go and the hook points | nothing (a report) | Opus, Sonnet for the address work |
 | M1 | **Engine with fixed test layouts:** the firmware runs Pre → Bus A + Bus B → sum → Post from a layout picked by a test build (e.g. slots 1-2 Pre, 3 on A, 4 on B, 5-6 Post), 50/50 sum, the safety limiter on the output | parallel effects really in parallel; no clicks; what happens at DSP Full | Opus |
 | M2 | **The nodes:** `[ROUTE]` and `[MIX]` with their knob pages in Effect View (Send, Crossfade with the Smooth / DJ / Cut curves, levels, Mode, Output Mode), saved per patch, MIDI CCs. Tested with a **routing probe** ZDL (a sound source, a filter and a delay in one effect, with a BUS: PRE / A / B / POST knob, Luca 2026-10-15); stock effects keep their bus from M3 on | playing Send and Crossfade by knob and CC, patches remember them | Opus engine, Sonnet UI |
-| M3 | **Effect Chain screen** rebuilt (two rows, nodes, signal lines, A/B tags in Effect View), **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and draws one IN), old patches load as Serial | the full design | Sonnet, Opus review |
+| M3 | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL), **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Mono Serial mode, old patches load as Serial | the full design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
@@ -75,3 +75,35 @@ clicks.
   conservative. The final limit is still open (handoff "Later").
 - Not checked yet: effects that did not write F in probe v1 (ICE Delay, AnalogDly, Gyre) on
   Bus A or B. If their output does not land in F, copying F cannot route them.
+
+## M2 test build (2026-10-16)
+
+`patches/mixer-m2.yaml` replaces mixer-m1 (source `asm/mixer/`, the vectors and data offsets
+are at the top of `mixer.S`).
+
+**Pedal results (Luca, MS-70CDR, 2026-10-18): works.** Round 1 had two bugs: saving (the
+live-save buffer is `0xC009C2A8`, not `0xC008C2A8`, so STORE wrote no settings and its reload
+showed the defaults) and Master in Serial. Round 2 fixed both, plus the load routine's auto save
+of the patch it leaves (`0xC00B89F4`, now gets PREV); all six round 2 steps pass.
+
+- **Settings** (11 bytes + a magic byte): Mode (Serial / Parallel), Send, Input Level, Route A
+  and B levels, Crossfade, Master, Curve (Smooth = equal power, DJ = Send law, Cut), Mix A and
+  B levels, Phase Invert B. Serial runs the six slots in order, like stock, then
+  Master. Gains are smoothed
+  per block; a block-rate limiter (0.98 ceiling) sits after MIX.
+- **Buses** come from `RoutePrb` (effects pack, `src/probes/routeprb`): its Bus knob writes
+  `0x80 | bus` into MAIL[slot] (`0xC00F6088`) every block; the engine latches it and clears
+  MAIL, so a removed probe falls back to Pre. Stock effects stay in Pre until M3.
+- **Saved per patch (route A):** the bytes ride in bytes 14/15 of the six 18-byte slot blocks
+  of the packed patch (the high bits of P8, which `w9 &= 0xFFF` clears after unpack). Hooks:
+  the live and saved-copy unpacks, the editor dump pack, REC_SAVE (`0xC00B84C0`, every save) and
+  IS_DIRTY (four call sites; AUTO SAVE's goes through tempo-hold's `dirty_hook`). A patch
+  without the magic loads the defaults (Serial). Not hooked: the compact IS_DIRTY call in patch
+  load (`0xC00B892C`), so a patch change with only mixer edits pending skips that save prompt;
+  AUTO SAVE still saves them.
+- **Screen:** MENU > MIXER (stock-unused screen 15), 4 pages of 3 knobs, knob 1 press = page.
+- **CCs** (follow CC RECEIVE and MIDI CHANNEL, 0-127 scaled to the range): 85 Send,
+  86 Crossfade, 87 Master, 88 Input Level, 89 Route A, 90 Route B, 91 Mix A, 92 Mix B, 93 Mode,
+  94 Curve, 95 Phase Invert B. Go in `docs/user-guide.md` section 5 when the mixer ships.
+
+Build: as M1 with `--patch patches/mixer-m2.yaml --stamp "label=M2 MIXER"`.

@@ -1,7 +1,7 @@
 # M0 probe's slot-loop hook (asm/m0_probe/chain_jump.S): the probe's chain
 # (vector +16 of m0-probe.yaml) runs the stock loop with per-slot timing and bus
 # checks (P1 FX row, P3, P6). Applied after m0-probe.yaml in the probe build.
-# Left out when the Mixer engine (mixer-m1.yaml) owns that packet: then P1's
+# Left out when the Mixer engine (mixer-m1/m2.yaml) owns that packet: then P1's
 # BLK / LOAD still measure the whole block, the per-slot rows read 0.
 name: m0-probe-chain
 description: M0 probe slot-loop hook (per-slot CPU and bus checks)
