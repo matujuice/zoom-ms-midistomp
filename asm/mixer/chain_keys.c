@@ -11,11 +11,14 @@
 #include "chain.h"
 #include "stock.h"
 
-#define EV_KNOB2_LONG 225   /* posted by chain_poll (stock leaves 225 unused) */
+#define EV_KNOB2_LONG 225   /* key event chain_poll posts (stock: footswitch hold timer 1, play mode only) */
 #define LONG_POLLS 38       /* 16 ms polls: about 0.6 s, the mockup's long press */
 
-static int held;            /* polls knob 2 has been down (chain_poll) */
-static int skip65;          /* the release after a long press is not EXIT */
+static int held;            /* polls knob 2 has been down since its press here (chain_poll) */
+static int down;            /* 1: knob 2's press (64) came on this screen, its release (65) not yet */
+/* ponytail: a knob 2 release that lands off screen 3 leaves down = 1; harmless (the poll
+ * also needs the switch down, and the next 64 / 65 resets it); add a SW_STATE check if not. */
+static int skip65;          /* the release of a hold that went long is not EXIT */
 
 #define FX(it) ((it) < 6)
 #define ZONE(s) (LAYOUT[s] & 3)
@@ -69,7 +72,7 @@ static void enter(void)
     UI[UI_FROMCHAIN] = 0;
     UI[UI_PFIRST] = 0;
     UI[UI_PLAST] = 5;
-    skip65 = 0;
+    down = skip65 = 0;
     ROW = -2;
 }
 
@@ -228,8 +231,7 @@ static int open(Chain *c)                    /* OPEN: an effect's knob pages, a 
     if (FX(c->cur)) {
         p = play_cursor(c->cur);
         if (p < 0) return 1;
-        CURSOR = p;
-        VIEW_KNOBS = 1;
+        CURSOR = p;                          /* play view on it (stock's mode change clears VIEW_KNOBS) */
         MODE = 0;
     } else {
         UI[UI_PFIRST] = first[c->cur - IT_ROUTE];
@@ -237,7 +239,7 @@ static int open(Chain *c)                    /* OPEN: an effect's knob pages, a 
         PAGE = UI[UI_PFIRST];
         SET_SCREEN(15, 0);
     }
-    UI[UI_FROMCHAIN] = 1;                    /* kp_exit / the MIXER EXIT come back here */
+    UI[UI_FROMCHAIN] = 1;                    /* menu_exit / kp_exit / the MIXER EXIT come back here */
     return 1;
 }
 
@@ -257,11 +259,17 @@ int chain_key(int ev, int steps)
     int sure, n, dir = steps < 0 ? -1 : 1, r = 1;
     enter();
     chain_build(&c);
-    if (ev == 65 && skip65) { skip65 = 0; return 0; }
+    if (ev == 64) { down = 1; skip65 = 0; return 0; }       /* knob 2 press: chain_poll times the hold */
+    if (ev == 65) {
+        n = skip65;
+        down = skip65 = 0;
+        if (n) return 0;                     /* the release of a long press */
+    }
     if (ev == 72 || ev == 73) TIMER6(ev == 72);      /* cursor hold: stock starts these only in play mode */
     if (ev == 74 || ev == 75) TIMER7(ev == 74);
-    if (ev == 64 || ev == 72 || ev == 74) return ev == 64;   /* 64: redraw requests and the knob 2 press */
+    if (ev == 72 || ev == 74) return 0;
     if (ev == EV_KNOB2_LONG) {
+        if (!down) return 0;                 /* only a hold that began with a knob 2 press here */
         skip65 = 1;
         if (c.sel && FX(c.cur)) c.delp = 1;
         save(&c);
@@ -325,13 +333,14 @@ void chain_draw_h(void)
     SHOWN = c.limit;
 }
 
-/* Every 16 ms (mixer.S poll): knob 2 long press, and a redraw when LIMIT changes. */
+/* Every 16 ms (mixer.S poll, the switch task): the knob 2 long press as a key
+ * event, and a display redraw (Event flag 0x40) when LIMIT changes. */
 void chain_poll(void)
 {
     if (MODE != 11 || SCREEN != 3) { held = 0; return; }
-    if (SW_STATE & SW_KNOB2) held = 0;
-    else if (++held == LONG_POLLS) EVENT_POST(MAILBOX, EV_KNOB2_LONG);
-    if ((HOLD != 0) != SHOWN) EVENT_POST(MAILBOX, 64);
+    if (!down || SW_STATE & SW_KNOB2) held = 0;
+    else if (++held == LONG_POLLS) KEY_POST(EV_KNOB2_LONG);
+    if ((HOLD != 0) != SHOWN) EVENT_POST(MAILBOX, 0x40);
 }
 
 /* Knob pages EXIT (callp at 0xC00AC804): stock, then back to the chain if opened from it. */
@@ -342,6 +351,14 @@ void kp_exit(int a)
     UI[UI_FROMCHAIN] = 0;
     MODE = 11;
     SET_SCREEN(3, -2);
+}
+
+/* Play-mode EXIT with no knob pages (callp SET_SCREEN(16, patch) at 0xC00AC7F4,
+ * stock has just set mode 11): an effect opened from the chain goes back there. */
+void menu_exit(int screen, int row)
+{
+    if (UI[UI_FROMCHAIN] == 1) { UI[UI_FROMCHAIN] = 0; screen = 3; row = -2; }
+    SET_SCREEN(screen, row);
 }
 
 /* Screens 32 / 33 keys (callp at 0xC00A832C): stock, and when an add from the

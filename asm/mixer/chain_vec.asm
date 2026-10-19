@@ -3,7 +3,7 @@
 ; name them by address. TI assembler syntax (this file goes through cl6x).
         .sect   ".vectors"
         .nocmp                          ; 32-bit only: the vectors keep their 8-byte stride
-        .global chain_key, chain_draw_h, chain_poll, kp_exit, s33_keys
+        .global chain_key, chain_draw_h, chain_poll, kp_exit, s33_keys, menu_exit
         B       .S2     keys_e          ; +0  screen 3 key table entry
         NOP     5
         B       .S2     draw_e          ; +8  screen 3 draw table entry
@@ -13,6 +13,8 @@
         B       .S2     kp_exit         ; +24 callp at 0xC00AC804 (knob pages EXIT)
         NOP     5
         B       .S2     s33_keys        ; +32 callp at 0xC00A832C (screens 32/33 keys)
+        NOP     5
+        B       .S2     menu_exit       ; +40 callp at 0xC00AC7F4 (play-mode EXIT to the patch list)
         NOP     5
 
 ; Switch-table entries: the event pair is in the dispatcher's frame (+8 event,

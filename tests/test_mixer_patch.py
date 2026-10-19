@@ -169,7 +169,7 @@ def test_data_block():
 
 
 CSEC = PATCH["section"][1]                                           # M3b: chain_vec.asm + chain_keys.c + chain_draw.c
-CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "kp_exit": 24, "s33_keys": 32}
+CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "kp_exit": 24, "s33_keys": 32, "menu_exit": 40}
 
 
 def test_chain_section_vectors():
@@ -179,7 +179,7 @@ def test_chain_section_vectors():
     for off in CVEC.values():
         w = _word(data, off // 4)
         assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
-        assert CSEC["addr"] + 40 <= b_target(CSEC["addr"] + off, w) < CSEC["addr"] + len(data)
+        assert CSEC["addr"] + 48 <= b_target(CSEC["addr"] + off, w) < CSEC["addr"] + len(data)
     src = (ROOT / "asm/mixer/mixer.S").read_text()
     assert re.search(rf"\.equ\s+CHAIN_POLL,\s*0x{CSEC['addr'] + CVEC['chain_poll']:08X}\b", src)
 
@@ -190,7 +190,8 @@ def test_chain_screen_hooks():
         w = WRITES[addr]
         assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
         assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
-    callps = {0xC00AC804: (0xC00CCD18, "kp_exit"), 0xC00A832C: (0xC00A7A6C, "s33_keys")}
+    callps = {0xC00AC804: (0xC00CCD18, "kp_exit"), 0xC00A832C: (0xC00A7A6C, "s33_keys"),
+              0xC00AC7F4: (0xC00A75E0, "menu_exit")}
     for site, (stock, name) in callps.items():
         old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
         assert callp_target(site, old) == stock
@@ -245,7 +246,7 @@ def _stock_image():
 
 def test_effect_hooks_expect_the_stock_image():
     img = _stock_image()
-    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00AC804, 0xC00A832C):
+    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00AC804, 0xC00A832C, 0xC00AC7F4):
         assert img.read(site, 4).hex() == WRITES[site]["expect"]
 
 

@@ -18,13 +18,13 @@
 #define FX_REC(s) ((volatile int *)(0xC009BF58 + 44 * (s)))   /* [0] on, [1] effect id */
 #define DSP_OFF (*(volatile int *)0xC009C060)        /* bit slot: bypassed, DSP full */
 #define CURSOR (*(volatile signed char *)0xC009C064) /* play-mode cursor */
-#define VIEW_KNOBS (*(volatile int *)0xC009D398)     /* play mode: 1 = knob pages */
-#define SW_STATE (*(volatile int *)0xC009DF90)       /* switches, bit clear = down */
-#define SW_KNOB2 1                                   /* medium confidence */
+#define SW_STATE (*(volatile int *)0xC009DF90)       /* debounced switches: bit clear = down (scanner 0xC00C69A4) */
+#define SW_KNOB2 1                                   /* bit 0: events 64 / 65 */
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
 #define SET_SCREEN FN(0xC00A75E0, void, (int screen, int row))
-#define EVENT_POST FN(0xC00CBF40, void, (int mailbox, int event))
+#define EVENT_POST FN(0xC00CBF40, void, (int mailbox, int bits))  /* display task Event flags: 0x40 = redraw */
+#define KEY_POST FN(0xC00D1324, void, (int ev))  /* a key event into the UI mailbox B14[202] (as the timer task) */
 #define TIMER6 FN(0xC00C7D60, void, (int on))       /* cursor left hold -> event 230 */
 #define TIMER7 FN(0xC00C7D50, void, (int on))       /* cursor right hold -> event 231 */
 #define POPUP FN(0xC00CCB00, void, (int, unsigned, unsigned, int))

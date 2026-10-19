@@ -140,7 +140,7 @@ Key table entry: event in the dispatcher frame `+8`, knob steps `+12` (stock stu
 |---|---|---|
 | 32 / 33 | footswitch press / release | |
 | 34 | knob 1 press | |
-| 64 | knob 2 press; **also** the redraw request our poll / CC / the looper post | |
+| 64 | knob 2 press (redraw requests are display Event flag `0x40`, not this key: see below) | |
 | 65 | knob 2 release (EXIT) | `0xC00AC790` |
 | 66 / 67 | knob 3 press / release (OPEN, PAGE) | `0xC00AC778` (timer 3) / `0xC00AC634` |
 | 68 / 70 | cursor up / down press | `0xC00AC60C` (timers 4 / 5) |
@@ -157,9 +157,28 @@ Timers start / stop with `0xC00C7C80(timer, on)` (wrappers `0xC00C7D60` timer 6,
 `0xC00C7D50` timer 7). In the menu mode the play handlers never run, so **no cursor timer
 starts**: chain_key starts / stops 6 and 7 itself on 72-75. No timer exists for knob 2, so
 the long press is ours: `chain_poll` (every 16 ms, from mixer.S `poll`) counts polls with
-knob 2 down in `SW_STATE` `0xC009DF90` (bit clear = down, knob 2 = bit 0: **medium**) and
-posts 225 (`EVENT_POST 0xC00CBF40(*(B14+656), 225)`) after 38 polls (0.6 s); the release
+knob 2 down in `SW_STATE` `0xC009DF90` and posts key 225 after 38 polls (0.6 s); the release
 that follows is not EXIT.
+
+**Key scanner and the two mailboxes (high; pedal step 8 fix).** `Task_SwitchNrmlSpdRead`
+`0xC00C69A4` runs every 16 ms: raw bits `0xC009DF8C` (built by `0xC00CD474` from GPIO reads,
+bit 0 = GPIO 25), debounced `0xC009DF90` = old raw & new raw. On a change of bit i (mask
+table `0xC00EC850` = 1 << i) it posts key 64 + 2i, or 65 + 2i when the bit is now set, into
+the **UI key mailbox `B14[202]`** (`0xC00DA840`). All 7 bits share one GPIO path with no
+inversion; stock knob 3 (66 starts timer 3, 67 stops it) and the cursor (72 starts timer 6)
+show even = press = bit clear. So bit clear = down and knob 2 = bit 0 (**refutes** the
+"wrong bit / reads backwards" guess; knob 2's own wiring is medium, by the shared path).
+`EVENT_POST 0xC00CBF40(*(B14+656), bits)` is a SYS/BIOS `Event_post` to the **display task**
+(pends on `0x79FF` at `0xC00BADA4`; `0x40` = redraw), not a key. The M3b build posted
+`EVENT_POST(MAILBOX, 225)`: flags `0xE1` (a redraw), so 225 never reached chain_key, DELETE?
+never showed and skip65 was never set. Keys go through **`KEY_POST 0xC00D1324(ev)`** (into
+`B14[202]`, as the timer task does; the UI receive `0xC00D1418` gives keys 64-76 steps = 1).
+Timer n posts key 224 + n (`0xC00C7D6C(n, on)` -> core `0xC00C7C80`); timer 1 (225) is the
+play-mode footswitch hold, so 225 is free in mode 11. Fix: chain_key latches `down` on 64 on
+screen 3, chain_poll counts only while `down` and the bit is clear, a 225 sets skip65 only
+while `down`, and 65 clears both, so a stale or wrong hold can never eat EXIT. The short-press
+EXIT failure is not explained by skip65 (never set): most likely the effect was still
+selected (sel = 1: a release does nothing, by design). **Pedal.**
 
 **Stock add path (high).** `0xC00AB968`: count < 6 (`0xC00C2018`), else the popup
 `0xC00CCB00(0, 0xC00EBD5F, 0xC00EBD5E, 1000)` ("MAX EFFECT UNIT!"); `B14[80]` = 11;
@@ -177,9 +196,20 @@ then `VIEW_KNOBS` = 0 and redraw. We retarget that callp (`kp_exit`): stock, the
 from the chain (`UI_FROMCHAIN` = 1) mode 11, `SET_SCREEN(3, -2)`. Opening them from the chain:
 `B14[80]` = 0, play cursor byte `0xC009C064` = the cursor whose slot
 (`0xC00BA2D8(cursor)` = `CURSOR_SLOTS[6 x VIEW + cursor]`, runtime table `0xC00EE748`) is
-ours, `VIEW_KNOBS` = 1 (play draw `0xC00BA9D8` reads index 0). The same cursor lookup is
-how stock delete `0xC00C2030` finds its slot. **Medium:** that every slot has a cursor in
-the current play view.
+ours. The same cursor lookup is how stock delete `0xC00C2030` finds its slot. **Medium:**
+that every slot has a cursor in the current play view.
+
+**Why EXIT from an opened effect went to the patch list (high; pedal step 10 fix).** The
+main loop calls the mode change handler `0xC00ACC80(old, new)` on every MODE change; it
+always calls `0xC00D1500` and `0xC00AB540` = memset(`VIEW_KNOBS`, 0, 4) (and KNOBS_EXIT(0)
+unless 11 -> 0). So our `VIEW_KNOBS` = 1 was wiped at once, and 65 took the other branch of
+`0xC00AC790`: MODE = 11, `0xC00A7544()`, `callp 0xC00A75E0` = `SET_SCREEN(16, B14[81])` (the
+patch list) at **`0xC00AC7F4`**; kp_exit never ran. FROMCHAIN was still 1. Fix: retarget that
+callp to `menu_exit` (vector +40): if `UI_FROMCHAIN` = 1, clear it and `SET_SCREEN(3, -2)`,
+else stock. open() no longer sets `VIEW_KNOBS` (it opens the covers view, as stock's mode
+change leaves it); kp_exit stays for knob pages the user opens in play. Limit: FROMCHAIN
+stays 1 until the next play-mode EXIT, so that EXIT returns to the chain even after a patch
+change.
 
 **Type change (high).** id = word `0xC009BF5C + 44 x slot`; next = `0xC00CA670(id, dir)`;
 if next >= 0 and != id, `0xC00ABACC(slot, next)` (a nonzero return shows a popup via
