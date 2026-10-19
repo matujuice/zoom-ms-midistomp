@@ -219,7 +219,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
     p.add_argument("--out", required=True, help="new .app (must not exist); its name is also the window title")
     p.add_argument("--keep-boot-steps", action="store_true",
-                   help="also rewrite the bootloader like the stock updater does (not recommended)")
+                   help="also rewrite the bootloader (and, in the MS-70CDR app, the effects file system, "
+                        "which deletes installed effects) like the stock updater does (not recommended)")
     p.set_defaults(func=cmd_build_mac)
     p = sub.add_parser("ais", help="decode a TI AIS boot image (bootloader or main OS part)")
     p.add_argument("image")

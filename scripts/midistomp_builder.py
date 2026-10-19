@@ -35,7 +35,8 @@ def build(updater: Path, out: Path, mac: bool = False) -> int:
 def run(args: list[str]) -> int:
     if len(args) != 1:
         print(f"{NAME} builder\n\nDrag Zoom's official MS-70CDR v2.10 updater "
-              "(ZOOM MS-70CDR v2.10 Updater.exe) onto this program.")
+              "(ZOOM MS-70CDR v2.10 Updater.exe) onto this program.\n"
+              "On a Mac, pass Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) instead.")
         return 1
     updater = Path(args[0].rstrip("/"))
     mac = updater.suffix == ".app"

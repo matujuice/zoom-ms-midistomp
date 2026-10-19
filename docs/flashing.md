@@ -141,7 +141,7 @@ check is different and is left alone.
 
 The window title (Zoom's app name, a constant CFString) becomes the name of
 the `--out` app, at most 27 characters. The app must be re-signed ad hoc on
-the Mac (`codesign --force --deep --sign -`).
+the Mac (`xattr -cr` then `codesign --force --deep --sign -`).
 
 ```sh
 zoomms build-mac "firmware/MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \

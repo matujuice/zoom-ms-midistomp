@@ -112,8 +112,10 @@ and flashed to an MS-50G from an Apple Silicon Mac.
    install it). Its window reads **MIDISTOMP V1.2 Updater**; click Execute.
 
 After v1.2 the pedal reports itself as an MS-70CDR over USB, whichever pedal
-it is. Zoom's MS-50G Mac updater then refuses it ("Illegal device connected"),
-so on a Mac, recovery uses Zoom's MS-70CDR Mac updater or the MIDISTOMP one.
+it is. Zoom's MS-50G Mac updater only accepts model 0x58, so it will refuse
+the pedal ("Illegal device connected"). On a Mac, recover with the MIDISTOMP
+updater, which accepts all three pedals. Zoom's MS-70CDR Mac updater should
+accept it too, but that hasn't been tried.
 
 ## 3. Recovery and going back to stock
 
@@ -122,8 +124,8 @@ If the pedal doesn't boot, or you want stock firmware back:
 1. Enter update mode (step 5 above: hold up + down while plugging in USB).
    This works even when the firmware is broken.
 2. Run Zoom's original updater for your pedal (the MS-70CDR 2.10 one, or the MS-50G 3.10 / MS-60B one you had before). It puts back the stock firmware and
-   the stock boot screen. On a Mac, after v1.2, only the MS-70CDR one works
-   (see [On a Mac](#on-a-mac)).
+   the stock boot screen. On a Mac, after v1.2, Zoom's MS-50G updater won't
+   accept the pedal (see [On a Mac](#on-a-mac)).
 
 On an MS-60B you can also run Zoom's MS-60B updater to go back to the bass
 firmware (4 effects per patch).

@@ -23,7 +23,8 @@ loop only acts on 0 and 1), which is how build_app() turns off the steps
 flash.boot_steps() names: bootloader, effects file system and Preset.bin.
 
 The executable is code-signed, so a modified app has to be re-signed on the
-Mac (`codesign --force --deep --sign - <app>`) before macOS will run it.
+Mac (`xattr -cr <app> && codesign --force --deep --sign - <app>`) before
+macOS will run it.
 """
 
 from __future__ import annotations
@@ -143,9 +144,10 @@ def set_title(exe: bytearray, old: str, new: str) -> None:
 def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None = None,
               new_133: bytes | None = None, skip_boot: bool = True, title: str | None = None) -> list[Step]:
     """Copy stock_app to out_app with new Main.bin / Preset.bin, matching MD5
-    table entries and the bootloader steps (and Preset.bin's, unless new_133
-    is given) set to skip. The window title, Zoom's app name, becomes title if
-    given. Returns the new flash script."""
+    table entries and the steps flash.boot_steps() names set to skip
+    (bootloader, effects file system, and Preset.bin unless new_133 is given).
+    The window title, Zoom's app name, becomes title if given. Returns the new
+    flash script."""
     stock_app, out_app = Path(stock_app), Path(out_app)
     if out_app.exists():
         raise FileExistsError(f"{out_app} already exists")
@@ -194,7 +196,7 @@ def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None =
 # flash.MODELS, and the loop bound goes from 2 to 4.
 MODEL_LOOP = (bytes.fromhex("48837de8020f83"), bytes.fromhex("488d05"),
               bytes.fromhex("488b4de848c1e1024801c88b108b35"))
-MODEL_LOAD = bytes.fromhex("488b4de8") + bytes.fromhex("0fb61408") + bytes.fromhex("0f1f440000")
+MODEL_LOAD = bytes.fromhex("488b4de8" "0fb61408" "0f1f440000")  # movq; movzbl (%rax,%rcx),%edx; 5-byte nop
 
 
 def _find_model_loop(exe: bytes) -> int:
@@ -216,7 +218,7 @@ def accept_models(exe: bytearray) -> bool:
     lea = at + len(MODEL_LOOP[0]) + 4
     # __TEXT has file offset 0, so a RIP-relative target in it is a file offset.
     table = lea + 7 + struct.unpack_from("<i", exe, lea + 3)[0]
-    if struct.unpack_from("<2I", exe, table) != (0x57, 0x61):
+    if not 0 <= table <= len(exe) - 8 or struct.unpack_from("<2I", exe, table) != (0x57, 0x61):
         return False
     exe[table:table + 8] = flash.MODELS + bytes(8 - len(flash.MODELS))
     exe[at + 4] = len(flash.MODELS)
