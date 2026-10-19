@@ -127,7 +127,8 @@ def cmd_build_mac(args) -> int:
     if patched is None:
         return 1
     new_os, new_133, img = patched
-    steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps)
+    steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
+                             title=Path(args.out).stem)
 
     out_res = macapp.resources(Path(args.out))
     check = ais.parse((out_res / "Main.bin").read_bytes())
@@ -212,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("app", help="stock official updater .app")
     p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
-    p.add_argument("--out", required=True, help="new .app (must not exist)")
+    p.add_argument("--out", required=True, help="new .app (must not exist); its name is also the window title")
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader like the stock updater does (not recommended)")
     p.set_defaults(func=cmd_build_mac)
