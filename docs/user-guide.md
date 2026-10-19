@@ -93,7 +93,9 @@ and flashed to an MS-50G from an Apple Silicon Mac.
    [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    (file like `MS-70CDR_v2.10_Mac_E.zip`) and unzip it. Use this one for the
    MS-50G and MS-60B too.
-2. Get this repository and Python 3, then in its folder:
+2. Get this repository (`git clone`, or Code > Download ZIP on GitHub) and
+   Python 3.10 or newer (from python.org or Homebrew; the `python3` that comes
+   with macOS is too old). Then in the repository's folder:
    ```sh
    python3 -m venv .venv && .venv/bin/pip install -e .
    .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
@@ -120,7 +122,8 @@ If the pedal doesn't boot, or you want stock firmware back:
 1. Enter update mode (step 5 above: hold up + down while plugging in USB).
    This works even when the firmware is broken.
 2. Run Zoom's original updater for your pedal (the MS-70CDR 2.10 one, or the MS-50G 3.10 / MS-60B one you had before). It puts back the stock firmware and
-   the stock boot screen.
+   the stock boot screen. On a Mac, after v1.2, only the MS-70CDR one works
+   (see [On a Mac](#on-a-mac)).
 
 On an MS-60B you can also run Zoom's MS-60B updater to go back to the bass
 firmware (4 effects per patch).

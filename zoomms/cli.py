@@ -127,8 +127,12 @@ def cmd_build_mac(args) -> int:
     if patched is None:
         return 1
     new_os, new_133, img = patched
-    steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
-                             title=Path(args.out).stem)
+    try:
+        steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
+                                 title=Path(args.out).stem)
+    except (ValueError, FileExistsError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
     out_res = macapp.resources(Path(args.out))
     check = ais.parse((out_res / "Main.bin").read_bytes())
@@ -138,7 +142,7 @@ def cmd_build_mac(args) -> int:
     changed_133 = sum(1 for a, b in zip(stock_133, new_133 or stock_133) if a != b)
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
     print("flash steps: " + "; ".join(s.describe() for s in steps))
-    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: codesign --force --deep --sign - \"{args.out}\"")
+    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: xattr -cr \"{args.out}\" && codesign --force --deep --sign - \"{args.out}\"")
     return 0
 
 

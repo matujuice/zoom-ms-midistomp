@@ -17,6 +17,10 @@ def fake_app(tmp_path, script=macapp.SCRIPT):
         (res / f"{name}.bin").write_bytes(data)
         md5s += macapp.md5_hex(data).encode() + b"\0"
     exe = b"\0" * 64 + b"".join(struct.pack("<4I", *s) for s in script) + b"\0" * 16 + md5s
+    if script == macapp.SCRIPT_70CDR:  # the 70CDR app's model check, its list 0x39 bytes after the leaq
+        loop = bytearray(b"\x90" * 16 + MODEL_LOOP_CODE + bytes(64))
+        struct.pack_into("<2I", loop, 16 + 18 + 0x39, 0x57, 0x61)
+        exe += bytes(loop)
     macapp.executable(app).write_bytes(exe)
     return app
 
@@ -171,3 +175,23 @@ def test_set_title():
 def test_set_title_too_long():
     with pytest.raises(ValueError):
         macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "Zoom MS MIDISTOMP Custom Updater")
+
+
+def test_build_app_70cdr_needs_model_check(tmp_path):
+    app = fake_app(tmp_path, macapp.SCRIPT_70CDR)
+    exe = macapp.executable(app)
+    exe.write_bytes(exe.read_bytes().replace(MODEL_LOOP_CODE[:7], b"\x90" * 7))
+    with pytest.raises(ValueError):
+        macapp.build_app(app, tmp_path / "Mod.app", b"\x77" * 64)
+    assert not (tmp_path / "Mod.app").exists()
+
+
+def test_find_title():
+    assert macapp.find_title(bytes(cfstring_exe())) == "ZOOM MS-70CDR v2.10 Updater"
+    with pytest.raises(ValueError):
+        macapp.find_title(bytes(64))
+
+
+def test_set_title_ascii_only():
+    with pytest.raises(ValueError):
+        macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "MIDISTOMP V1.2 Updatér")

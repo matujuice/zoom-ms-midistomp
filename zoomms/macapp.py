@@ -29,6 +29,7 @@ Mac (`codesign --force --deep --sign - <app>`) before macOS will run it.
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import struct
 from dataclasses import dataclass
@@ -108,10 +109,24 @@ def md5_hex(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()
 
 
+TITLE = re.compile(rb"\0(ZOOM [ -~]{1,40} Updater)\0")
+
+
+def find_title(exe: bytes) -> str:
+    """Zoom's window title, e.g. "ZOOM MS-70CDR v2.10 Updater" (not taken from
+    the .app name, which the user may have changed)."""
+    found = TITLE.findall(exe)
+    if len(found) != 1:
+        raise ValueError(f"window title not found exactly once ({len(found)} candidates)")
+    return found[0].decode()
+
+
 def set_title(exe: bytearray, old: str, new: str) -> None:
     """Change the window title, a constant CFString whose characters are a C
     string in __TEXT,__cstring: {isa, flags, pointer, length} in __DATA. The
     new title is written over the old one, so it can't be longer."""
+    if not new.isascii() or not new.isprintable():
+        raise ValueError(f"title {new!r} must be plain ASCII")
     old_b, new_b = old.encode("ascii"), new.encode("ascii")
     if len(new_b) > len(old_b):
         raise ValueError(f"title {new!r} is longer than {old!r} ({len(old_b)} characters)")
@@ -136,7 +151,7 @@ def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None =
         raise FileExistsError(f"{out_app} already exists")
     exe = bytearray(executable(stock_app).read_bytes())
     if title is not None:
-        set_title(exe, stock_app.stem, title)
+        set_title(exe, find_title(bytes(exe)), title)
     steps = find_script(bytes(exe))
     for name in BIN_NAMES:
         if md5_hex((resources(stock_app) / f"{name}.bin").read_bytes()).encode() not in exe:
@@ -159,7 +174,8 @@ def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None =
     if skip_boot:
         for s in flash.boot_steps(steps, keep_133=new_133 is not None):
             struct.pack_into("<I", exe, s.offset, SKIP)
-    accept_models(exe)
+    if len(steps) == len(SCRIPT_70CDR) and not accept_models(exe):
+        raise ValueError("model check not found: the app would refuse MS-50G and MS-60B pedals")
 
     shutil.copytree(stock_app, out_app, symlinks=True)
     executable(out_app).write_bytes(bytes(exe))
