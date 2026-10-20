@@ -118,25 +118,38 @@ Value" sends CCs).
 - Unused CCs (CC 7) change nothing.
 - Effect Manager in normal mode still connects and lists the effects.
 
-## Mac updater (v1.1 only)
+## Mac updater
 
-There is no Mac builder for v1.2 (it needs a Mac updater from Zoom for the MS-70CDR 2.10 OS).
-The command below builds v1.1 and needs tag `v1.1`.
-
-`zoomms build-mac` does the same for Zoom's Mac updater app
-(`MS-50G_v3.10_Mac_E`), see `zoomms/macapp.py`. Its `Resources/Main.bin`,
-`Preset.bin`, `boot.bin` and `FS.bin` are byte-identical to BIN/129, 133,
-136 and 137, and `_RomProcedure` in the executable is the same 7-step script
+`zoomms build-mac` does the same for Zoom's Mac updater app, see
+`zoomms/macapp.py`. v1.2 is built from `MS-70CDR_v2.10_Mac_E`; v1.1 was built
+from `MS-50G_v3.10_Mac_E` (command below, needs tag `v1.1`). In both, the
+`Resources/Main.bin`, `Preset.bin`, `boot.bin` and `FS.bin` are byte-identical
+to BIN/129, 133, 136 and 137, and `_RomProcedure` in the executable is the
+same script as the Windows updater's (7 steps, 9 with the MS-70CDR's FS.bin),
 with types 0 = erase, 1 = write. The build replaces `Main.bin` and
 `Preset.bin`, updates their entries in the executable's MD5 table, and sets
-the bootloader steps to type 2, which the loop skips. Built with the v1.0
-patch set, `Main.bin` and `Preset.bin` match the Windows build's BIN/129 and
-BIN/133 exactly. The app must be re-signed ad hoc on the Mac
-(`codesign --force --deep --sign -`).
+the same steps as the Windows build to type 2, which the loop skips. Built
+with the same patch set, `Main.bin` and `Preset.bin` match the Windows build's
+BIN/129 and BIN/133 exactly.
+
+The MS-70CDR app's model check (in `-[MainWindow SendIdReq]`) loops over
+`_kTargetDeviceIDs`, two int32 `{0x57, 0x61}`. A double follows the list, so
+it can't grow in place: the build reads the list as bytes instead (one
+`movzbl` plus a nop in place of `shl`/`add`/`movl`), stores `0x57 0x58 0x5F
+0x61` in its 8 bytes and raises the loop bound from 2 to 4. The MS-50G app's
+check is different and is left alone.
+
+The window title (Zoom's app name, a constant CFString) becomes the name of
+the `--out` app, at most 27 characters. The app must be re-signed ad hoc on
+the Mac (`xattr -cr` then `codesign --force --deep --sign -`).
 
 ```sh
+zoomms build-mac "firmware/MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \
+  --patch patches/version-1.2.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
+  --patch patches/scroll.yaml --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V1.2 Updater.app"
 zoomms build-mac "firmware/MS-50G_v3.10_Mac_E/ZOOM MS-50G v3.10 Updater.app" \
   --patch patches/version-1.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
-  --patch patches/scroll.yaml --build-id ms50g-3.10 --out "build/out/MIDISTOMP V1.1 Updater.app"
+  --patch patches/scroll.yaml --build-id ms50g-3.10 --out "build/out/MIDISTOMP V1.1 Updater.app"   # tag v1.1
 ```

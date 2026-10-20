@@ -4,7 +4,10 @@ and it writes the MIDISTOMP updater next to it.
 Same output as `zoomms build` with the patch set (docs/flashing.md).
 Refuses any file that is not the stock updater (sha256 in models/ms70cdr.yaml).
 Frozen into MIDISTOMP-builder.exe by .github/workflows/builder.yml.
-The MS-50G build (and its Mac updater) is frozen at tag v1.1; v1.2 is built from the MS-70CDR 2.10 OS.
+The MS-50G build is frozen at tag v1.1; v1.2 is built from the MS-70CDR 2.10 OS.
+
+Also takes Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) and then writes
+MIDISTOMP V1.2 Updater.app, same as `zoomms build-mac`.
 """
 
 from __future__ import annotations
@@ -13,16 +16,17 @@ import hashlib
 import sys
 from pathlib import Path
 
-from zoomms import cli, models
+from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 NAME = "MIDISTOMP V1.2"
 PATCHES = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
 OUT_NAME = "MIDISTOMP V1.2 Updater.exe"
+OUT_NAME_MAC = "MIDISTOMP V1.2 Updater.app"
 
 
-def build(updater: Path, out: Path) -> int:
-    argv = ["build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out)]
+def build(updater: Path, out: Path, mac: bool = False) -> int:
+    argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out)]
     for p in PATCHES:
         argv += ["--patch", str(ROOT / "patches" / f"{p}.yaml")]
     return cli.main(argv)
@@ -31,12 +35,15 @@ def build(updater: Path, out: Path) -> int:
 def run(args: list[str]) -> int:
     if len(args) != 1:
         print(f"{NAME} builder\n\nDrag Zoom's official MS-70CDR v2.10 updater "
-              "(ZOOM MS-70CDR v2.10 Updater.exe) onto this program.")
+              "(ZOOM MS-70CDR v2.10 Updater.exe) onto this program.\n"
+              "On a Mac, pass Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) instead.")
         return 1
     updater = Path(args[0].rstrip("/"))
-    want = models.load_all(ROOT / "models")["ms70cdr"]["stock_updater_sha256"]
+    mac = updater.suffix == ".app"
+    model = models.load_all(ROOT / "models")["ms70cdr"]
+    want = model["stock_mac_updater_sha256" if mac else "stock_updater_sha256"]
     try:
-        got = hashlib.sha256(updater.read_bytes()).hexdigest()
+        got = hashlib.sha256((macapp.executable(updater) if mac else updater).read_bytes()).hexdigest()
     except OSError as e:
         print(f"Cannot read {updater}: {e}")
         return 1
@@ -44,9 +51,12 @@ def run(args: list[str]) -> int:
         print(f"{updater.name} is not Zoom's official MS-70CDR v2.10 updater.\n"
               f"sha256 {got}\nexpected {want}\nNothing was written.")
         return 1
-    out = updater.with_name(OUT_NAME)
+    out = updater.with_name(OUT_NAME_MAC if mac else OUT_NAME)
+    if mac and out.exists():
+        print(f"{out} already exists; move it away first. Nothing was written.")
+        return 1
     try:
-        failed = build(updater, out)
+        failed = build(updater, out, mac)
     except ValueError as e:
         print(f"error: {e}")
         failed = 1

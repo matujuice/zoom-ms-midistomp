@@ -14,9 +14,8 @@ that adds MIDI control, MIDI clock and new playing aids.</b></p>
 
 > **v1.2 runs on the MS-50G, MS-60B and MS-70CDR** from one build, made from
 > Zoom's MS-70CDR 2.10 firmware. It is tested on an MS-60B and an MS-70CDR (the
-> MS-70CDR gets real stereo input). Your effects and patches are kept. Tried it
-> on an MS-50G? [Tell me how it went](https://github.com/matujuice/zoom-ms-modding/issues).
-> Mac: not in v1.2 yet, use [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md).
+> MS-70CDR gets real stereo input), and on an MS-50G with the Mac updater. Your
+> effects and patches are kept. Mac: see [On a Mac](docs/user-guide.md#on-a-mac).
 
 <p align="center"><img width="1920" height="1536" alt="zoom midistomp mod v1 0 update" src="https://github.com/user-attachments/assets/49f817ca-8fe0-4b5a-8190-f3cc83cfe124" /></p>
 

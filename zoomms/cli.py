@@ -127,7 +127,12 @@ def cmd_build_mac(args) -> int:
     if patched is None:
         return 1
     new_os, new_133, img = patched
-    steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps)
+    try:
+        steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
+                                 title=Path(args.out).stem)
+    except (ValueError, FileExistsError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
     out_res = macapp.resources(Path(args.out))
     check = ais.parse((out_res / "Main.bin").read_bytes())
@@ -137,7 +142,7 @@ def cmd_build_mac(args) -> int:
     changed_133 = sum(1 for a, b in zip(stock_133, new_133 or stock_133) if a != b)
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
     print("flash steps: " + "; ".join(s.describe() for s in steps))
-    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: codesign --force --deep --sign - \"{args.out}\"")
+    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: xattr -cr \"{args.out}\" && codesign --force --deep --sign - \"{args.out}\"")
     return 0
 
 
@@ -212,9 +217,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("app", help="stock official updater .app")
     p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
-    p.add_argument("--out", required=True, help="new .app (must not exist)")
+    p.add_argument("--out", required=True, help="new .app (must not exist); its name is also the window title")
     p.add_argument("--keep-boot-steps", action="store_true",
-                   help="also rewrite the bootloader like the stock updater does (not recommended)")
+                   help="also rewrite the bootloader (and, in the MS-70CDR app, the effects file system, "
+                        "which deletes installed effects) like the stock updater does (not recommended)")
     p.set_defaults(func=cmd_build_mac)
     p = sub.add_parser("ais", help="decode a TI AIS boot image (bootloader or main OS part)")
     p.add_argument("image")
