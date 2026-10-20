@@ -32,7 +32,9 @@ from __future__ import annotations
 import hashlib
 import re
 import shutil
+import stat
 import struct
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -184,6 +186,30 @@ def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None =
     for name, data in replace.items():
         (resources(out_app) / name).write_bytes(data)
     return find_script(bytes(exe))
+
+
+def zip_app(app: str | Path, out_zip: str | Path) -> None:
+    """Zip app with Unix modes set (0755 for Contents/MacOS, else 0644), so it
+    runs after unzipping on a Mac even when built on Windows, where the
+    executable bit does not exist."""
+    app, out_zip = Path(app), Path(out_zip)
+    if out_zip.exists():
+        raise FileExistsError(f"{out_zip} already exists")
+    with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as z:
+        for path in sorted([app, *app.rglob("*")]):
+            name = path.relative_to(app.parent).as_posix()
+            if path.is_dir():
+                info = zipfile.ZipInfo.from_file(path, name)
+                info.external_attr = (stat.S_IFDIR | 0o755) << 16 | 0x10
+                info.create_system = 3
+                z.writestr(info, b"")
+                continue
+            info = zipfile.ZipInfo.from_file(path, name)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            mode = 0o755 if path.parent == executable(app).parent else 0o644
+            info.external_attr = (stat.S_IFREG | mode) << 16
+            info.create_system = 3  # Unix, so the modes are honored
+            z.writestr(info, path.read_bytes())
 
 
 # The updater's model check (MS-70CDR v2.10, block in -[MainWindow SendIdReq]):

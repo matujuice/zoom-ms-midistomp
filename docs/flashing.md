@@ -153,3 +153,21 @@ zoomms build-mac "firmware/MS-50G_v3.10_Mac_E/ZOOM MS-50G v3.10 Updater.app" \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
   --patch patches/scroll.yaml --build-id ms50g-3.10 --out "build/out/MIDISTOMP V1.1 Updater.app"   # tag v1.1
 ```
+
+### From a Windows build, without a Mac
+
+`--from-exe` takes the OS and BIN/133 from a Windows updater that has already
+been built (a test build, say) instead of applying patches. The .exe must sit
+on the same Zoom release as the app: its BIN/136 and BIN/137 have to match the
+app's `boot.bin` and `FS.bin`, or the build stops. An `--out` ending in `.zip`
+writes the app zipped, with the executable bit set inside the zip. Windows
+files don't have one, so this is how to build the Mac updater on Windows: unzip
+Zoom's `MS-70CDR_v2.10_Mac_E.zip` anywhere, then
+
+```sh
+zoomms build-mac "MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \
+  --from-exe "MIDISTOMP test build.exe" --out "MIDISTOMP test build.zip"
+```
+
+and send the .zip. The Mac user unzips it and re-signs the app as above
+before opening it.

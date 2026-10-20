@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
+import tempfile
 from pathlib import Path
 
 from . import ais, asm, flash, macapp, models, parts, patcher, updater, zdl
@@ -119,30 +120,66 @@ def cmd_build(args) -> int:
     return 0
 
 
+def _parts_from_exe(exe_path: str, res: Path):
+    """(main OS, BIN/133) of a built Windows updater, which must sit on the same
+    Zoom release as the Mac app: its bootloader and effects file system have to
+    match the app's boot.bin and FS.bin, as the Mac app keeps those."""
+    found = {p.resource_id: p for p in parts.find_parts(exe_path)}
+    for rid, name in ((136, "boot.bin"), (137, "FS.bin")):
+        if rid not in found or parts.read_part(exe_path, found[rid]) != (res / name).read_bytes():
+            raise ValueError(f"{exe_path}: BIN/{rid} does not match the app's {name}; "
+                             "the .exe and the .app must be updaters for the same Zoom release")
+    return parts.read_part(exe_path, found[129]), parts.read_part(exe_path, found[133])
+
+
 def cmd_build_mac(args) -> int:
     res = macapp.resources(Path(args.app))
     original = (res / "Main.bin").read_bytes()
     stock_133 = (res / "Preset.bin").read_bytes()
-    patched = _apply_patches(original, stock_133, args.patch, args.build_id)
-    if patched is None:
+    out = Path(args.out)
+    as_zip = out.suffix.lower() == ".zip"
+    if as_zip and out.exists():
+        print(f"error: {out} already exists", file=sys.stderr)
         return 1
-    new_os, new_133, img = patched
-    try:
-        steps = macapp.build_app(args.app, args.out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
-                                 title=Path(args.out).stem)
-    except (ValueError, FileExistsError) as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 1
+    if args.from_exe:
+        if args.patch:
+            print("error: --from-exe takes the OS as built; don't pass --patch", file=sys.stderr)
+            return 1
+        try:
+            new_os, new_133 = _parts_from_exe(args.from_exe, res)
+        except (ValueError, StopIteration, KeyError) as e:
+            print(f"error: {e or 'updater parts not found'}", file=sys.stderr)
+            return 1
+        new_133 = None if new_133 == stock_133 else new_133
+        sections = [s.addr for s in ais.parse(new_os).sections]
+    else:
+        patched = _apply_patches(original, stock_133, args.patch, args.build_id)
+        if patched is None:
+            return 1
+        new_os, new_133, img = patched
+        sections = [s.addr for s in img.sections]
 
-    out_res = macapp.resources(Path(args.out))
-    check = ais.parse((out_res / "Main.bin").read_bytes())
-    assert [s.addr for s in check.sections] == [s.addr for s in img.sections]
-    assert check.entry == ais.parse(original).entry
+    with tempfile.TemporaryDirectory() as tmp:
+        app_out = Path(tmp) / f"{out.stem}.app" if as_zip else out
+        try:
+            steps = macapp.build_app(args.app, app_out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
+                                     title=out.stem)
+        except (ValueError, FileExistsError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+
+        check = ais.parse((macapp.resources(app_out) / "Main.bin").read_bytes())
+        assert [s.addr for s in check.sections] == sections
+        assert check.entry == ais.parse(original).entry
+        if as_zip:
+            macapp.zip_app(app_out, out)
     changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
     changed_133 = sum(1 for a, b in zip(stock_133, new_133 or stock_133) if a != b)
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
     print("flash steps: " + "; ".join(s.describe() for s in steps))
-    print(f"wrote {args.out}\nOn the Mac, re-sign it before running: xattr -cr \"{args.out}\" && codesign --force --deep --sign - \"{args.out}\"")
+    app_name = f"{out.stem}.app" if as_zip else str(out)
+    print(f"wrote {out}\nOn the Mac{', after unzipping' if as_zip else ''}, re-sign it before running: "
+          f"xattr -cr \"{app_name}\" && codesign --force --deep --sign - \"{app_name}\"")
     return 0
 
 
@@ -217,7 +254,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("app", help="stock official updater .app")
     p.add_argument("--patch", action="append", default=[], help="patch file; omit to rebuild the stock OS")
     p.add_argument("--build-id", default="", help="e.g. ms50g-3.10, used by address-specific patches")
-    p.add_argument("--out", required=True, help="new .app (must not exist); its name is also the window title")
+    p.add_argument("--from-exe", metavar="EXE",
+                   help="take the OS and BIN/133 from an already built Windows updater for the same Zoom release "
+                        "instead of applying patches")
+    p.add_argument("--out", required=True,
+                   help="new .app, or .zip holding the app (works on Windows too); must not exist; "
+                        "its name is also the window title")
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader (and, in the MS-70CDR app, the effects file system, "
                         "which deletes installed effects) like the stock updater does (not recommended)")

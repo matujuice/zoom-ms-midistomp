@@ -195,3 +195,36 @@ def test_find_title():
 def test_set_title_ascii_only():
     with pytest.raises(ValueError):
         macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "MIDISTOMP V1.2 Updatér")
+
+
+def test_zip_app_sets_unix_modes(tmp_path):
+    import stat
+    import zipfile
+    app = fake_app(tmp_path)
+    out = tmp_path / "Stock.zip"
+    macapp.zip_app(app, out)
+    with zipfile.ZipFile(out) as z:
+        infos = {i.filename: i for i in z.infolist()}
+    assert "Stock.app/" in infos and "Stock.app/Contents/MacOS/" in infos
+    exe = infos["Stock.app/Contents/MacOS/EFX Updater"]
+    assert exe.create_system == 3 and stat.S_IMODE(exe.external_attr >> 16) == 0o755
+    assert stat.S_IMODE(infos["Stock.app/Contents/Resources/Main.bin"].external_attr >> 16) == 0o644
+    with pytest.raises(FileExistsError):
+        macapp.zip_app(app, out)
+
+
+def test_build_mac_from_exe_real_70cdr(tmp_path):
+    # Zoom's stock MS-70CDR 2.10 Windows updater stands in for a built one; needs both
+    # MIDISTOMP_70CDR_MAC_APP and MIDISTOMP_70CDR_UPDATER (never committed).
+    import os
+    import zipfile
+    from zoomms import cli
+    app, exe = os.environ.get("MIDISTOMP_70CDR_MAC_APP"), os.environ.get("MIDISTOMP_70CDR_UPDATER")
+    if not app or not exe:
+        pytest.skip("no MS-70CDR Mac and Windows updaters")
+    out = tmp_path / "MIDISTOMP Test.zip"
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--out", str(out)]) == 0
+    with zipfile.ZipFile(out) as z:
+        main = z.read("MIDISTOMP Test.app/Contents/Resources/Main.bin")
+    assert main == (macapp.resources(Path(app)) / "Main.bin").read_bytes()
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--patch", "x", "--out", str(tmp_path / "b.zip")]) == 1
