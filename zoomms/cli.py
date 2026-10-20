@@ -126,7 +126,10 @@ def _parts_from_exe(exe_path: str, res: Path):
     match the app's boot.bin and FS.bin, as the Mac app keeps those."""
     import pefile
 
+    if not Path(exe_path).is_file():
+        raise ValueError(f"{exe_path}: not found, or not a file")
     try:
+        open(exe_path, "rb").close()  # pefile turns an unreadable file into a bare Exception
         found = {p.resource_id: p for p in parts.find_parts(exe_path)}
     except (OSError, pefile.PEFormatError) as e:
         raise ValueError(f"{exe_path}: not a Windows updater .exe ({e})") from e

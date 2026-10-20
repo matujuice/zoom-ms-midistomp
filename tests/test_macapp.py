@@ -240,29 +240,32 @@ def fake_exe_parts(monkeypatch, app, **changed):
     found = [parts.Part(rid, "", 0, len(d), "") for rid, d in data.items() if d is not None]
     monkeypatch.setattr(parts, "find_parts", lambda path: found)
     monkeypatch.setattr(parts, "read_part", lambda path, p: data[p.resource_id])
+    exe = app.parent / "Built.exe"
+    exe.write_bytes(b"MZ")
+    return str(exe)
 
 
 def test_parts_from_exe(tmp_path, monkeypatch):
     from zoomms import cli
     app = fake_app(tmp_path)
-    fake_exe_parts(monkeypatch, app)
-    assert cli._parts_from_exe("x.exe", macapp.resources(app))[0] == b"\x77" * 64
+    exe = fake_exe_parts(monkeypatch, app)
+    assert cli._parts_from_exe(exe, macapp.resources(app))[0] == b"\x77" * 64
 
 
 def test_parts_from_exe_refuses_other_release(tmp_path, monkeypatch):
     from zoomms import cli
     app = fake_app(tmp_path)
-    fake_exe_parts(monkeypatch, app, b137=b"\x99" * 64)
+    exe = fake_exe_parts(monkeypatch, app, b137=b"\x99" * 64)
     with pytest.raises(ValueError, match="BIN/137"):
-        cli._parts_from_exe("x.exe", macapp.resources(app))
+        cli._parts_from_exe(exe, macapp.resources(app))
 
 
 def test_parts_from_exe_missing_part(tmp_path, monkeypatch):
     from zoomms import cli
     app = fake_app(tmp_path)
-    fake_exe_parts(monkeypatch, app, b129=None)
+    exe = fake_exe_parts(monkeypatch, app, b129=None)
     with pytest.raises(ValueError, match="no BIN/129"):
-        cli._parts_from_exe("x.exe", macapp.resources(app))
+        cli._parts_from_exe(exe, macapp.resources(app))
 
 
 def test_build_mac_from_exe_bad_file(tmp_path, capsys):
@@ -270,6 +273,6 @@ def test_build_mac_from_exe_bad_file(tmp_path, capsys):
     app = fake_app(tmp_path)
     not_exe = tmp_path / "Mac.zip"
     not_exe.write_bytes(b"PK\3\4" + bytes(60))
-    for exe in (tmp_path / "missing.exe", not_exe):
+    for exe in (tmp_path / "missing.exe", not_exe, tmp_path):
         assert cli.main(["build-mac", str(app), "--from-exe", str(exe), "--out", str(tmp_path / "o.zip")]) == 1
         assert "error:" in capsys.readouterr().err
