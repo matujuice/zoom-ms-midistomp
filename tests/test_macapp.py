@@ -228,3 +228,48 @@ def test_build_mac_from_exe_real_70cdr(tmp_path):
         main = z.read("MIDISTOMP Test.app/Contents/Resources/Main.bin")
     assert main == (macapp.resources(Path(app)) / "Main.bin").read_bytes()
     assert cli.main(["build-mac", app, "--from-exe", exe, "--patch", "x", "--out", str(tmp_path / "b.zip")]) == 1
+
+
+def fake_exe_parts(monkeypatch, app, **changed):
+    # find_parts/read_part stand-ins: a "built .exe" whose BIN/136 and 137 equal the app's boot.bin and FS.bin.
+    from zoomms import parts
+    res = macapp.resources(app)
+    data = {129: b"\x77" * 64, 133: (res / "Preset.bin").read_bytes(),
+            136: (res / "boot.bin").read_bytes(), 137: (res / "FS.bin").read_bytes()}
+    data.update({int(k[1:]): v for k, v in changed.items()})
+    found = [parts.Part(rid, "", 0, len(d), "") for rid, d in data.items() if d is not None]
+    monkeypatch.setattr(parts, "find_parts", lambda path: found)
+    monkeypatch.setattr(parts, "read_part", lambda path, p: data[p.resource_id])
+
+
+def test_parts_from_exe(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    fake_exe_parts(monkeypatch, app)
+    assert cli._parts_from_exe("x.exe", macapp.resources(app))[0] == b"\x77" * 64
+
+
+def test_parts_from_exe_refuses_other_release(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    fake_exe_parts(monkeypatch, app, b137=b"\x99" * 64)
+    with pytest.raises(ValueError, match="BIN/137"):
+        cli._parts_from_exe("x.exe", macapp.resources(app))
+
+
+def test_parts_from_exe_missing_part(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    fake_exe_parts(monkeypatch, app, b129=None)
+    with pytest.raises(ValueError, match="no BIN/129"):
+        cli._parts_from_exe("x.exe", macapp.resources(app))
+
+
+def test_build_mac_from_exe_bad_file(tmp_path, capsys):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    not_exe = tmp_path / "Mac.zip"
+    not_exe.write_bytes(b"PK\3\4" + bytes(60))
+    for exe in (tmp_path / "missing.exe", not_exe):
+        assert cli.main(["build-mac", str(app), "--from-exe", str(exe), "--out", str(tmp_path / "o.zip")]) == 1
+        assert "error:" in capsys.readouterr().err

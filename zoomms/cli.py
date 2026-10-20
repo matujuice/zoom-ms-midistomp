@@ -124,9 +124,17 @@ def _parts_from_exe(exe_path: str, res: Path):
     """(main OS, BIN/133) of a built Windows updater, which must sit on the same
     Zoom release as the Mac app: its bootloader and effects file system have to
     match the app's boot.bin and FS.bin, as the Mac app keeps those."""
-    found = {p.resource_id: p for p in parts.find_parts(exe_path)}
+    import pefile
+
+    try:
+        found = {p.resource_id: p for p in parts.find_parts(exe_path)}
+    except (OSError, pefile.PEFormatError) as e:
+        raise ValueError(f"{exe_path}: not a Windows updater .exe ({e})") from e
+    for rid in (129, 133, 136, 137):
+        if rid not in found:
+            raise ValueError(f"{exe_path}: no BIN/{rid}; not a Zoom updater .exe")
     for rid, name in ((136, "boot.bin"), (137, "FS.bin")):
-        if rid not in found or parts.read_part(exe_path, found[rid]) != (res / name).read_bytes():
+        if parts.read_part(exe_path, found[rid]) != (res / name).read_bytes():
             raise ValueError(f"{exe_path}: BIN/{rid} does not match the app's {name}; "
                              "the .exe and the .app must be updaters for the same Zoom release")
     return parts.read_part(exe_path, found[129]), parts.read_part(exe_path, found[133])
@@ -147,11 +155,11 @@ def cmd_build_mac(args) -> int:
             return 1
         try:
             new_os, new_133 = _parts_from_exe(args.from_exe, res)
-        except (ValueError, StopIteration, KeyError) as e:
-            print(f"error: {e or 'updater parts not found'}", file=sys.stderr)
+            sections = [s.addr for s in ais.parse(new_os).sections]
+        except ValueError as e:  # ais.AisError included
+            print(f"error: {e}", file=sys.stderr)
             return 1
         new_133 = None if new_133 == stock_133 else new_133
-        sections = [s.addr for s in ais.parse(new_os).sections]
     else:
         patched = _apply_patches(original, stock_133, args.patch, args.build_id)
         if patched is None:
@@ -172,7 +180,7 @@ def cmd_build_mac(args) -> int:
         assert [s.addr for s in check.sections] == sections
         assert check.entry == ais.parse(original).entry
         if as_zip:
-            macapp.zip_app(app_out, out)
+            macapp.zip_app(app_out, out)  # out was checked not to exist above
     changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
     changed_133 = sum(1 for a, b in zip(stock_133, new_133 or stock_133) if a != b)
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")

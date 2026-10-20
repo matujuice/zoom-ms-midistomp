@@ -169,5 +169,9 @@ zoomms build-mac "MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \
   --from-exe "MIDISTOMP test build.exe" --out "MIDISTOMP test build.zip"
 ```
 
-and send the .zip. The Mac user unzips it and re-signs the app as above
-before opening it.
+and send the .zip. The Mac user unzips it and, before opening it, re-signs it
+in Terminal from the folder it was unzipped into:
+
+```sh
+xattr -cr "MIDISTOMP test build.app" && codesign --force --deep --sign - "MIDISTOMP test build.app"
+```
