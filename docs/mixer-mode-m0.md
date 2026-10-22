@@ -267,6 +267,10 @@ other values.
 
 ### Route A: repack the 122 B patch record
 
+> **Replaced in M3b7 (2026-10-22).** P8 can be wider than 12 bits: a tester's patches
+> lost knob 8 values that M3b5/6 overwrote with mixer bytes. Settings 0-10 now live in a
+> table in record 50 (see mixer-mode-m3-research.md §7); only byte 17 stays in the patch.
+
 The packed widths are wider than the real ranges. Ranges below are the param `max` values in
 the descriptors of the 137 stock 70CDR ZDLs and the 11 pack ZDLs (ORANGELM's descriptor did
 not parse) **[C for the scan]**:

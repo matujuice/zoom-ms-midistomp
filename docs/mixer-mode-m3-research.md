@@ -94,6 +94,24 @@ place (e.g. a hook near `0xC00B6CF4`, after the record swap), and shifted by add
 | Others | IS_DIRTY compares the unpacked patch; SysEx and flash move the 122 bytes as they are | medium | |
 | Caveat | block 5 pack stores up to byte 110, harmless. A byte 17 written after pack (as `rec_save` / `pack_dump` do) is never cleared before the flash write | high | |
 
+## 7. Record 50: the mixer settings table (M3b7, 2026-10-22)
+
+Bytes 14/15 of the slot blocks are **not** free: P8 uses bits 100-127, and some effects use
+more than 12 bits of it (tester report, 12 of 50 patches lost knob 8). Settings 0-10 moved out.
+
+| what | address | conf | evidence |
+|---|---|---|---|
+| Record size table, entry 50 (globals) | `0xC00EA9A8`: 24 -> 824 | high | read by REC_LOAD/REC_SAVE and compaction |
+| Compaction buffer | `mvk/mvkh A10` at `0xC00B48C0/C8`, stock `0xC009D7D0`, now `0xC00F7400` (824 B) | high | stock buffer too small for 824 B |
+| Globals load | `callp` at `0xC00BA798` (REC_LOAD `0xC00B4AAC`) -> `r50_load` | high | only caller for record 50 at boot |
+| Globals save | `callp` at `0xC00BA3F8` (REC_SAVE `0xC00B49F4`) -> `r50_save` | high | |
+| Layout `0xC00F7000` | `[0..23]` stock globals, then 50 x 16 B: FNV-1a hash of the 6 effect ids + name, settings 0-10, pad | design | `pages.c` |
+
+Load order: entry n if its hash matches; else the M3b5/6 bytes 14/15 (then P8 is masked once);
+else any entry with the same hash (copied patch); else defaults. Values are clamped.
+Limits: an editor or SysEx store of another patch gets defaults; a power cut between the
+patch save and the record-50 save loses the new settings; downgrading loses the table.
+
 ## M3a hooks (2026-10-18, TI dis6x of the whole 2.10 OS image)
 
 Grep of every decoded `CALLP`/`B` target, plus a search for the three addresses as literal
@@ -190,26 +208,15 @@ ANCHOR + SIDE. Screens 32 / 33 keys `0xC00A7A6C` (stub `0xC00A832C`, shared): EN
 (`s33_keys`): after stock, if the add came from the chain (`UI_FROMCHAIN` = 2) and the mode
 is 0, back to `SET_SCREEN(3, -2)` in mode 11.
 
-**Knob pages EXIT hook (high).** `0xC00AC790` (event 65 in play mode): if the knob pages
-show (`VIEW_KNOBS` `0xC009D398` != 0), `callp 0xC00CCD18 || mvk 1, A4` at **`0xC00AC804`**,
-then `VIEW_KNOBS` = 0 and redraw. We retarget that callp (`kp_exit`): stock, then if opened
-from the chain (`UI_FROMCHAIN` = 1) mode 11, `SET_SCREEN(3, -2)`. Opening them from the chain:
-`B14[80]` = 0, play cursor byte `0xC009C064` = the cursor whose slot
-(`0xC00BA2D8(cursor)` = `CURSOR_SLOTS[6 x VIEW + cursor]`, runtime table `0xC00EE748`) is
-ours. The same cursor lookup is how stock delete `0xC00C2030` finds its slot. **Medium:**
-that every slot has a cursor in the current play view.
-
-**Why EXIT from an opened effect went to the patch list (high; pedal step 10 fix).** The
-main loop calls the mode change handler `0xC00ACC80(old, new)` on every MODE change; it
-always calls `0xC00D1500` and `0xC00AB540` = memset(`VIEW_KNOBS`, 0, 4) (and KNOBS_EXIT(0)
-unless 11 -> 0). So our `VIEW_KNOBS` = 1 was wiped at once, and 65 took the other branch of
-`0xC00AC790`: MODE = 11, `0xC00A7544()`, `callp 0xC00A75E0` = `SET_SCREEN(16, B14[81])` (the
-patch list) at **`0xC00AC7F4`**; kp_exit never ran. FROMCHAIN was still 1. Fix: retarget that
-callp to `menu_exit` (vector +40): if `UI_FROMCHAIN` = 1, clear it and `SET_SCREEN(3, -2)`,
-else stock. open() no longer sets `VIEW_KNOBS` (it opens the covers view, as stock's mode
-change leaves it); kp_exit stays for knob pages the user opens in play. Limit: FROMCHAIN
-stays 1 until the next play-mode EXIT, so that EXIT returns to the chain even after a patch
-change.
+**Opening an effect (high).** `B14[80]` = 0, play cursor byte `0xC009C064` = the cursor whose
+slot (`0xC00BA2D8(cursor)` = `CURSOR_SLOTS[6 x VIEW + cursor]`, runtime table `0xC00EE748`) is
+ours. The same cursor lookup is how stock delete `0xC00C2030` finds its slot. **Medium:** that
+every slot has a cursor in the current play view. EXIT stays stock (Luca 2026-10-19: back to the
+chain through the menu): `0xC00AC790` (event 65 in play mode) calls the knob pages exit
+`0xC00CCD18` at `0xC00AC804` if `VIEW_KNOBS` `0xC009D398` != 0, else MODE = 11 and
+`SET_SCREEN(16, B14[81])` (the patch list) at `0xC00AC7F4`. The mode change handler
+`0xC00ACC80(old, new)` zeroes `VIEW_KNOBS` (`0xC00AB540`) on every MODE change, so an opened
+effect shows the covers view. (A test build hooked both callps back to the chain; dropped.)
 
 **Type change (high).** id = word `0xC009BF5C + 44 x slot`; next = `0xC00CA670(id, dir)`;
 if next >= 0 and != id, `0xC00ABACC(slot, next)` (a nonzero return shows a popup via
@@ -237,6 +244,55 @@ services `0xC00F3000`, m0-probe `0xC00F3100`, mixer.S `0xC00F6000`-`0xC00F7280`.
 section is at `0xC00F8000`** (about 19.5 KB with chain_draw.c and its 2 KB of buffers,
 ends `0xC00FCC40`). B14 is the constant `0xC00EF748`, so the C (far data) reads OS variables
 at absolute addresses and never uses B14; built with no RTS (a helper call fails the link).
+
+## M3c: node knob pages, stock primitives (2026-10-19, TI dis6x of the 2.10 OS)
+
+`asm/mixer/pages.c` `pages_draw_h` now draws the MIXER node pages with the same calls stock
+`0xC00CAFA0(frame, slot)` makes for an effect page, fed our labels and values: pixel-identical
+by construction, no own imitation (chain_draw.c no longer draws pages; the host preview covers
+the chain screen only). The first argument of every primitive is the **LCD frame** (the play
+draw `0xC00BA9D8` passes 0; it indexes `0x11816800 + 1024 x frame` and the dirty mask
+`0xC00EEBB0 + frame`), not a view.
+
+| what | address, arguments | conf | evidence |
+|---|---|---|---|
+| Page layout | params from 2: page p (1-based, `VIEW_KNOBS[view]` `0xC009D398`) shows params 3p-1.. ; column loop stops at the **first missing param** (`A14 - 2 >= count`, `0xC00CB014`): 3 per page, no gaps, pages = (count + 2) / 3 (`0xC00DB5A0` is the int divide) | high | `0xCAFAC-0xCB01C` |
+| Column x | word table `0xC00ECC58` = 8, 48, 88 | high | image read |
+| Clear | `0xC00AB1B4(frame, 0, 11, 128, 53)` (knob area only); we clear the whole frame (`0x11816800`, 1024 bytes) and call **`0xC00A13C0(frame)`** (dirty byte `0xC00EEBB0 + frame` = 0xFF; 2 stock callers) | high | `0xCB000`, `0xA13C0` |
+| Label | **`0xC00A0040(frame, text, x, 16)`**: 7-px cells (glyphs `0xC00E87D8`, 7 bytes per char, `0xC009FEF8`), chars 9 / 12 = 3 / 5-px spaces | high | `0xCB0A8`, `0xA0040` |
+| Control style | per param: `0xC00B0474(slot)` != 0 and descriptor word 11 bit 4 clear -> fader; else max (descriptor word 3) == 1 -> toggle, else round knob | high | `0xCB0B0-0xCB0D4` |
+| Fader | **`0xC00AA1F8(frame, x, 24, val, min, max)`** (A4, B4, A6, B6 = val, **A8 = min 0, B8 = max**): 31 x 24 bitmap `0xC00EB7E0` plus a fill. M3b5 passed max / min swapped: the fill only moved at the max (pedal) | high | `0xCB12C-0xCB140` |
+| Round knob | **`0xC00A95A4(frame, double frac, x, 24)`**, frac = val / max from `0xC00C0980(double, double)` (stock's double divide; INTDP inline, no RTS) | high | `0xCB0E8-0xCB110` |
+| Toggle | **`0xC00A9AD8(frame, val, x, 24)`** | high | `0xCB118-0xCB124` |
+| Frame | the "clear" `0xC00AB1B4(frame, x, y, w, h)` clears the rect (`0xC00A132C`) and draws its border lines (`0xC00A0144`): the knob area box of stock pages | high | `0xAB1B4-0xAB234`, pedal M3b5 (no box) |
+| Value | **`0xC00A9C18(frame, text, right, 48)`**, right = x + 30: right aligned, 7 px per char (`x = right - 7 x len`), same font as the label. Stock text from `0xC00BB9EC(slot, param, buf, 32)` | high | `0xCB154`, `0xA9C18` |
+| Special knobs | params 9 / 10 of some effects (`0xC00CA778` / `0xC00CA790`) and flag 4 of descriptor word 11 use other drawers (`0xC00AABC4`, `0xC00AAC40`, `0xC00A9AD8`, `0xC00A95A4`); not used by us | medium | |
+| Tab row | tabs i = 0..pages (always one more than the pages: **a 1-page effect shows a "1" tab**); text i = 0 the effect name (`"%s"` of `0xC00BBA2C(slot)`), else `"%d"`; state = 0 if i == page, 2 if i < page, 1 if i > page (so the name tab is always 2); **`w = 0xC00AB238(frame, x, 0, state, text)`**, x += w - 1. Tab text at (x + 4, y + 2) | high (args), medium (width = 7 x len + 7) | `0xCB1E4-0xCB27C`, `0xAB238` |
+| Softkeys | **`0xC009F834(key, text, 0)`** (frame 0 fixed; x = 40 x key, centred, y 57; arg 3 != 0 draws arrows instead of the frame): key 0 `0xC00EC8CF` "TAP" when `0xC00BB92C(slot)` else `0xC00EC8CE` ""; key 1 `0xC00EC8D3` "EXIT"; key 2 `0xC00EC8D8` "PAGE" (always, even for 1 page) | high | `0xCB284-0xCB2D8`, string read |
+
+**Ours.** Node knob lists, 3 per page: IN InLvl (Split input: InL, InR) = 1 page; [ROUTE] XFade (was Send),
+Mode, BusA / BusB = 2; [MIX] XFade, Outpt, Curve / MixA, MixB, PhasB / MuteA, MuteB, Solo = 3;
+OUT Mastr (Output Split: MastL, MastR) = 1. The page counts never change, so `PAGE` keeps its
+`PG_*` meaning (0-6; chain_keys.c `UI_PFIRST` / `UI_PLAST`, mixer.S `PG_OUT` unchanged). Tab row
+= node name (state 2), a "!" tab (state 2) when [MIX] is silent, the page tabs; LIMIT as plain
+right-aligned text at (127, 2) on OUT while HOLD. Knob 1 softkey blank. Labels and values are
+cut to 5 characters (a 6th overlaps the next column / runs off the left edge at x = 8):
+Serl / Paral / Split / MSerl, Ster / Mono / Split, Smoth / DJ / Cut, Norm / Inv. A "-" value
+(does nothing now) draws an empty knob. **Pedal:** look, tab widths, the softkey row.
+
+## M3c: A/B tag, footswitch, CCs (2026-10-19, TI dis6x of the 2.10 OS)
+
+| what | address | conf | evidence |
+|---|---|---|---|
+| Knob pages have one caller | `0xC00CAFA0(view, slot)` only from `0xC00BAA4C` (play-mode draw); no pointer-table reference to it | high | literal-word search of the image; so the tag shows wherever stock draws knob pages |
+| Tab row registers | in `0xC00CAFA0`: B11 = view, A15 = slot, A11 = x of the last tab's right edge after the loop (`x = x + w - 1`, `0xC00CB264..26C`); tab y 0 | high | |
+| **A/B hook** | `0xC00CB284` `CALLP.S2 0xC00BB92C` (`93d5e01f`, `\|\| MV A15,A4`, 32-bit op in a header packet based at `0xC00CB280`) -> chain_vec.asm +104 `ab_e` (`13bd5910`) -> `ab_tag(slot, view, tabs_end)`, which makes the replaced call and returns its A4. Only A4 is used after it (`MV A4,A0`); the other caller of `0xC00BB92C` (`0xC00AC8AC`) is untouched | high | |
+| Tag | `0xC00AB238(view, 114, 0, 0, "A"/"B"/"R"/"M")` (R = Pre, M = Post, M3b6): width 7 * 1 + 7 = 14, state 0 = the filled "current tab" look, right edge 127; skipped when the tabs reach x 114 (a page count that wide is not on the pedal) | medium | pedal: look |
+| Footswitch in MODE 11 | main loop `0xC00ACDB0` sends every event to the screen dispatcher `0xC00A82AC` (`0xC00ACE48..54`, call `0xC00AD204`); only 225-231 go to `0xC00CCC50` first, so 32 / 33 reach chain_key | high | |
+| Play press (32) | `0xC00AC990` -> MODE 0 path `0xC00ACAA4`: hold timer `0xC00C7D6C(idx, 1)`; slot from the cursor; DSP_OFF bit set -> nothing; else **`0xC00ABCB8(slot)`** (toggle: semaphore B14[191], `0xC00BB600(slot, 0, !on, 1, 1)`, B14[87] = 1), flag `0xC009D02C[idx]` = 1, **`0xC00C75D4()`** (B14[108] = 1 under semaphore B14[205]) | medium-high | |
+| Chain footswitch | chain_key ev 32, cursor on an effect, DSP_OFF bit clear: `0xC00ABCB8(slot)`, `0xC00C75D4()`, redraw. No hold timer (225 is knob 2's long press here), no `0xC009D02C` flag. The loop's `0xC00ACD84` after every event marks the patch edited | medium | pedal: ON/OFF heard, edited dot |
+| DSP FULL | stock press skips a DSP-off (bypassed, DSP full) slot; `0xC00ABCB8` itself does no DSP check, and turning an effect ON never checks `0xC00BB4E0`. Chain does the same | medium | |
+| CCs 96-101 | mixer.S cc: range 85-101, cc_map + S_INR, S_MR, S_OUT, S_MUTEA, S_MUTEB, S_SOLO (maxes 150, 150, 2, 1, 1, 2). engine.c reads S_INR only in Split (`eff_mode() == 2`) and S_MR only with Output Split, else S_IN / S_MASTER for both sides; pages.c copies S_IN -> S_INR, S_MASTER -> S_MR when not split, so CC 88 / 87 do the same. No mono gate for Output Split: it splits the buses, not the input | high | source |
 
 ## Open questions and pedal probes
 

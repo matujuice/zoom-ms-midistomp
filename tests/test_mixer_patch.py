@@ -25,8 +25,9 @@ M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: releas
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
        "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "mv_swap": 96, "mv_add": 104,
        "mv_delete": 112, "poll": 120}
-UI, LIVE, LAYOUT, SAVED, PREV, MENU6, MAXES, DEFAULTS, PAGES = 136, 144, 156, 162, 180, 200, 248, 266, 284
-CODE = 320                                                           # the code after the data block
+UI, GAINS, PEDAL, MENU6, LIVE, SAVED, PREV, MAXES, DEFAULTS = 136, 144, 176, 200, 224, 248, 272, 296, 320
+NSET = 24                                                            # chain.h: 24 settings (12-17: the buses)
+CODE = 344                                                          # the code after the data block
 MAGIC = 0x4D
 
 
@@ -153,23 +154,46 @@ def test_menu_writes_match_the_settings_section():
 
 def test_data_block():
     data = _data(SEC)
-    # chain.h UI bytes: CUR, SEL, BUSROW = A, DELP, ADDBUS = none, FROMCHAIN, PFIRST, PLAST = every MIXER page
-    assert data[UI:UI + 8] == bytes([0, 0, 1, 0, 0xFF, 0, 0, 5])
-    assert LAYOUT == LIVE + 12 and SAVED >= LAYOUT + 6 and PREV >= SAVED + 18 and MENU6 >= PREV + 18
-    defaults = data[DEFAULTS:DEFAULTS + 18]                          # 12 settings + 6 buses
+    # chain.h UI bytes: CUR, SEL, BUSROW = A, DELP, ADDBUS = none, FROMCHAIN, PFIRST, PLAST = every node page (PG_OUT)
+    assert data[UI:UI + 8] == bytes([0, 0, 1, 0, 0xFF, 0, 0, 6])
+    assert data[GAINS + 20:GAINS + 24] == bytes.fromhex("0000803f")  # limiter gain 1.0
+    assert data[PEDAL] == 0 and PEDAL < MENU6                        # MONO until pedal_in.c unpacks
+    assert MENU6 + 24 <= LIVE and LIVE + NSET <= SAVED and SAVED + NSET <= PREV
+    assert PREV + NSET <= MAXES and MAXES + NSET <= DEFAULTS and DEFAULTS + NSET <= CODE
+    defaults = data[DEFAULTS:DEFAULTS + NSET]
     assert defaults[0] == 0 and defaults[11] == MAGIC               # Serial, settings present
-    assert defaults[12:] == bytes(6)                                 # every bus PRE
-    assert data[LIVE:LIVE + 18] == defaults == data[SAVED:SAVED + 18]
-    maxes = data[MAXES:MAXES + 18]
-    assert all(d <= m for d, m in zip(defaults, maxes)) and maxes[12:] == bytes([3] * 6)   # PRE A B POST
-    pages = data[PAGES:PAGES + 24]                                   # six pages (k_page wraps at PLAST + 1 = 6)
-    used = sorted(p for p in pages if p != 255)
-    assert used == list(range(11))                                   # every setting on exactly one knob (buses: chain screen)
-    assert PAGES + 24 <= CODE
+    assert defaults[12:18] == bytes(6)                               # every bus PRE
+    assert defaults[18:] == bytes([100, 100, 0, 0, 0, 0])            # Input R, Master R unity; Stereo, no Mute / Solo
+    assert data[LIVE:LIVE + NSET] == defaults == data[SAVED:SAVED + NSET]
+    maxes = data[MAXES:MAXES + NSET]
+    assert all(d <= m for d, m in zip(defaults, maxes)) and maxes[12:18] == bytes([3] * 6)   # PRE A B POST
+    assert maxes[0] == 3 and maxes[18:] == bytes([150, 150, 2, 1, 1, 2])
+    h = (ROOT / "asm/mixer/chain.h").read_text()                    # the C reads the same offsets
+    for name, off in {"SHOWN": 78, "PEDAL": PEDAL, "LIVE": LIVE}.items():
+        assert re.search(rf"#define {name} .*MIXER_BASE \+ {off}\)", h), name
+    assert f"#define NSET {NSET}" in h
+
+
+def test_cc_map_covers_85_to_101():
+    src = (ROOT / "asm/mixer/mixer.S").read_text()
+    eq = {n: int(v) for n, v in re.findall(r"\.equ\s+(S_\w+),\s*(\d+)", src)}
+    h = (ROOT / "asm/mixer/chain.h").read_text()
+    for n, v in eq.items():                                          # same numbers as the C
+        assert re.search(rf"#define {n} {v}\b", h), n
+    rows = re.search(r"cc_map:((?:\s*\.byte[^\n]*\n)+)", src).group(1)
+    names = [x.strip() for x in re.sub(r"\.byte", ",", rows).split(",") if x.strip()]
+    assert names[:17] == ["S_SEND", "S_XF", "S_MASTER", "S_IN", "S_RA", "S_RB", "S_MA", "S_MB", "S_MODE",
+                          "S_CURVE", "S_PHASE", "S_INR", "S_MR", "S_OUT", "S_MUTEA", "S_MUTEB", "S_SOLO"]
+    assert "CC_FIRST, 85" in src and re.search(r"mvk\s+\.S1\s+16, a0\s+cmpgtu", src)   # 85 + 16 = 101
 
 
 CSEC = PATCH["section"][1]                                           # M3b: chain_vec.asm + chain_keys.c + chain_draw.c
-CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "kp_exit": 24, "s33_keys": 32, "menu_exit": 40}
+CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "s33_keys": 24,
+        "settings_key": 32, "settings_draw": 40, "settings_pack": 48, "settings_unpack": 56,
+        "engine_run": 64, "mix_get": 72, "mix_put": 80, "pages_key": 88, "pages_draw": 96,
+        "ab_tag": 104, "r50_load": 112, "r50_save": 120}
+CMIX = {"C_POLL": "chain_poll", "C_ENGINE": "engine_run", "C_GET": "mix_get", "C_PUT": "mix_put",
+        "C_KEYS": "pages_key", "C_DRAW": "pages_draw"}                # mixer.S names for them
 
 
 def test_chain_section_vectors():
@@ -179,9 +203,11 @@ def test_chain_section_vectors():
     for off in CVEC.values():
         w = _word(data, off // 4)
         assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
-        assert CSEC["addr"] + 48 <= b_target(CSEC["addr"] + off, w) < CSEC["addr"] + len(data)
+        assert CSEC["addr"] + 8 * len(CVEC) <= b_target(CSEC["addr"] + off, w) < CSEC["addr"] + len(data)
     src = (ROOT / "asm/mixer/mixer.S").read_text()
-    assert re.search(rf"\.equ\s+CHAIN_POLL,\s*0x{CSEC['addr'] + CVEC['chain_poll']:08X}\b", src)
+    assert re.search(rf"\.equ\s+C_SEC,\s*0x{CSEC['addr']:08X}\b", src)
+    for name, vec in CMIX.items():
+        assert re.search(rf"\.equ\s+{name},\s*C_SEC \+ {CVEC[vec]}\b", src), name
 
 
 def test_chain_screen_hooks():
@@ -190,13 +216,71 @@ def test_chain_screen_hooks():
         w = WRITES[addr]
         assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
         assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
-    callps = {0xC00AC804: (0xC00CCD18, "kp_exit"), 0xC00A832C: (0xC00A7A6C, "s33_keys"),
-              0xC00AC7F4: (0xC00A75E0, "menu_exit")}
+    callps = {0xC00A832C: (0xC00A7A6C, "s33_keys"), 0xC00CB284: (0xC00BB92C, "ab_tag")}
     for site, (stock, name) in callps.items():
         old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
         assert callp_target(site, old) == stock
         assert callp_target(site, new) == CSEC["addr"] + CVEC[name]
         assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
+
+
+def test_record_50_holds_the_settings_table():
+    hdr = (ROOT / "asm/mixer/chain.h").read_text()
+    r50, size, copy = (int(re.search(rf"#define {n}\D*(0x[0-9A-Fa-f]+|\d+)", hdr).group(1), 0)
+                       for n in ("R50", "R50_SIZE", "R50_COPY"))
+    assert size == 24 + 16 * 50                                      # stock globals, then an entry per patch
+    end = BASE + len(_data(SEC))
+    assert end <= r50 and r50 + size <= copy and copy + size <= CSEC["addr"]   # free DDR between the sections
+    assert re.search(rf"\.equ\s+R50,\s*0x{r50:08X}", (ROOT / "asm/mixer/mixer.S").read_text())
+    table = WRITES[0xC00EA9A8]                                       # record size table, entry 50
+    assert (table["expect"], table["data"]) == ("18000000", size.to_bytes(4, "little").hex())
+    w = {(a, k): int.from_bytes(bytes.fromhex(WRITES[a][k]), "little") for a in (0xC00B48C0, 0xC00B48C8) for k in ("expect", "data")}
+    cst = lambda a, k: w[(a, k)] >> 7 & 0xFFFF
+    assert cst(0xC00B48C8, "expect") << 16 | cst(0xC00B48C0, "expect") == 0xC009D7D0   # compaction buffer, stock
+    assert cst(0xC00B48C8, "data") << 16 | cst(0xC00B48C0, "data") == copy
+    assert cst(0xC00B48C0, "data") < 0x8000                          # mvk sign-extends
+    for a in (0xC00B48C0, 0xC00B48C8):
+        assert w[(a, "expect")] & ~(0xFFFF << 7) == w[(a, "data")] & ~(0xFFFF << 7)
+    callps = {0xC00BA798: (0xC00B4AAC, "r50_load"), 0xC00BA3F8: (0xC00B49F4, "r50_save")}
+    for site, (stock, name) in callps.items():
+        old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
+        assert callp_target(site, old) == stock
+        assert callp_target(site, new) == CSEC["addr"] + CVEC[name]
+        assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80
+
+
+PEDAL_HOOKS = {0xC00EEFA0: "settings_key", 0xC00EEBB4: "settings_draw",      # screen 1 table entries
+               0xC00B9EC8: "settings_pack", 0xC00BD9E4: "settings_unpack"}  # settings.S trampolines
+
+
+def test_pedal_input_hooks():
+    ms = {w["addr"]: w for w in patcher.load(ROOT / "patches/midi-settings.yaml")["write"]}
+    for addr, name in PEDAL_HOOKS.items():
+        w = WRITES[addr]
+        assert w["expect"] == ms[addr]["data"]                          # on top of midi-settings
+        data = bytes.fromhex(w["data"])
+        if len(data) == 4:
+            assert int.from_bytes(data, "little") == CSEC["addr"] + CVEC[name]
+        else:                                                           # mvkl/mvkh b0, then as midi-settings
+            lo, hi = (_word(data, i) >> 7 & 0xFFFF for i in (0, 1))
+            assert hi << 16 | lo == CSEC["addr"] + CVEC[name] and data[8:] == bytes.fromhex(w["expect"])[8:]
+
+
+def test_pedal_input_names_settings_s_addresses():
+    """pedal_in.c calls into settings.S by address: check them against midi-settings.yaml."""
+    sec = next(s for s in patcher.load(ROOT / "patches/midi-settings.yaml")["section"] if s["addr"] == 0x1181EA00)
+    d = _data(sec)
+    w = lambda a: _word(d, (a - sec["addr"]) // 4)
+    bt = lambda a: b_target(a, w(a))
+    mvk = lambda a: (w(a + 4) >> 7 & 0xFFFF) << 16 | w(a) >> 7 & 0xFFFF
+    draw = bt(sec["addr"] + 88)                                         # settings_draw
+    keys = bt(bt(sec["addr"] + 80) + 12)                                # settings_keys_e's branch
+    want = {"SETTINGS_NAMES": mvk(draw + 16), "SETTINGS_ICONS": mvk(draw + 28),
+            "DRAW_LIST": bt(draw + 48), "SETTINGS_KEYS": keys,
+            "PACK_HOOK": sec["addr"] + 128, "UNPACK_HOOK": sec["addr"] + 136}
+    src = (ROOT / "asm/mixer/pedal_in.c").read_text()
+    for name, addr in want.items():
+        assert re.search(rf"#define {name} .*0x{addr:08X}\b", src), name
 
 
 def test_sections_match_a_fresh_ti_build():
@@ -220,7 +304,9 @@ def test_m2_build_does_not_overlap():
     other_writes = [s for s in _spans(M2_SET) if s[2].endswith("write") and s[2] != "mixer-m2 write"]
     for a, e, _ in _spans(["mixer-m2"]):                            # no write that another patch also makes
         hit = [p for s, t, p in other_writes if s < e and a < t]
-        assert hit in ([], ["midi-clock write"] if a == 0xC00C82D0 else []), hex(a)   # the poll trampoline, chained
+        chained = {0xC00C82D0: ["midi-clock write"]}                 # the poll trampoline
+        chained.update(dict.fromkeys(PEDAL_HOOKS, ["midi-settings write"]))
+        assert hit in ([], chained.get(a, [])), hex(a)
     assert BASE + len(_data(SEC)) <= 0xC0102000                     # inside the 64 KB MOD code area (looper buffer above)
 
 
@@ -246,7 +332,8 @@ def _stock_image():
 
 def test_effect_hooks_expect_the_stock_image():
     img = _stock_image()
-    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00AC804, 0xC00A832C, 0xC00AC7F4):
+    for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00A832C,
+                 0xC00CB284):
         assert img.read(site, 4).hex() == WRITES[site]["expect"]
 
 

@@ -33,7 +33,6 @@
 #define SLOT_AT FN(0xC00BA2D8, int, (int cursor))   /* play cursor -> slot, -1 */
 #define TYPE_NEXT FN(0xC00CA670, int, (int id, int dir))
 #define TYPE_SET FN(0xC00ABACC, int, (int slot, int id))
-#define KNOBS_EXIT FN(0xC00CCD18, void, (int))      /* the callp kp_exit replaces */
 #define S33_KEYS FN(0xC00A7A6C, int, (long long ev)) /* screens 32/33, the event pair in A5:A4 */
 #define BLIT FN(0xC009F9B0, void, (int frame, int x, int y, int w, int h, const unsigned char *src))
 
@@ -41,6 +40,29 @@
 #define MV_SWAP FN(0xC00F6000 + 96, void, (int row_a, int row_b))
 #define MV_DELETE FN(0xC00F6000 + 112, void, (void))
 #define HOLD (*(volatile int *)(0xC00F6000 + 80))    /* polls left to show LIMIT */
-#define PAGE (*(volatile int *)(0xC00F6000 + 128))   /* MIXER screen page */
+#define PAGE (*(volatile int *)(0xC00F6000 + 128))   /* node knob page PG_* (screen 15, pages.c) */
+
+/* node knob pages: the stock Effect View knob page primitives (0xC00CAFA0 draws an effect's
+ * page with them; docs/mixer-mode-m3-research.md "M3c"). frame 0 = the LCD frame buffer
+ * LCD0, page format; every primitive marks the rows it touches dirty. */
+#define LCD0 ((volatile unsigned *)0x11816800)        /* frame 0: 1024 bytes */
+#define LCD_DIRTY FN(0xC00A13C0, void, (int frame))   /* every row of the frame to the LCD */
+#define KP_TAB FN(0xC00AB238, int, (int frame, int x, int y, int state, const char *text))  /* returns width; state 0 current, 1 right of it, 2 left */
+#define KP_TEXT FN(0xC00A0040, void, (int frame, const char *text, int x, int y))   /* 7-px cells */
+#define KP_TEXT_R FN(0xC00A9C18, void, (int frame, const char *text, int right, int y))
+#define KP_FADER FN(0xC00AA1F8, void, (int frame, int x, int y, int val, int min, int max))  /* 31 x 24 fader, fill (val-min)/(max-min) */
+#define KP_KNOB FN(0xC00A95A4, void, (int frame, double frac, int x, int y))  /* round knob, frac = val / max */
+#define KP_TOGGLE FN(0xC00A9AD8, void, (int frame, int on, int x, int y))   /* stock: params with max 1 */
+#define KP_DIVD FN(0xC00C0980, double, (double a, double b))  /* a / b, stock's (no RTS here) */
+#define KP_BOX FN(0xC00AB1B4, void, (int frame, int x, int y, int w, int h))  /* clear a rect and draw its frame: stock (0, 11, 128, 53) */
+#define KP_SOFTKEY FN(0xC009F834, void, (int key, const char *text, int arrows))
+#define KP_COLX ((const int *)0xC00ECC58)              /* knob column x: 8, 48, 88 */
+#define KP_EXIT ((const char *)0xC00EC8D3)             /* stock softkey texts "EXIT", "PAGE" */
+#define KP_PAGE ((const char *)0xC00EC8D8)
+
+/* A/B tag, footswitch */
+#define FX_TOGGLE FN(0xC00ABCB8, void, (int slot))   /* effect ON <-> OFF (play-mode footswitch press) */
+#define FX_EDITED FN(0xC00C75D4, void, (void))       /* then this, as the play-mode press */
+#define PARAMS_ANY FN(0xC00BB92C, int, (int slot))   /* Effect View knob pages: the call ab_tag replaces */
 
 #endif

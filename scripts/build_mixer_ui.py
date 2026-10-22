@@ -78,7 +78,8 @@ def build_c(stub: bool = False, listing: list | None = None) -> bytes:
     draw = MIX / "chain_draw.c"
     if stub or not draw.is_file():
         draw = MIX / "chain_draw_stub.c"
-    srcs = [MIX / "chain_vec.asm", MIX / "chain_keys.c", draw]
+    srcs = [MIX / "chain_vec.asm", MIX / "chain_keys.c", draw, MIX / "pedal_in.c",
+            MIX / "engine.c", MIX / "pages.c"]
     with tempfile.TemporaryDirectory() as tmp:
         _run(CL + ["-O2", "--mem_model:data=far", "--mem_model:const=far", f"-I{MIX}", "-c"]
              + [str(s) for s in srcs], tmp)

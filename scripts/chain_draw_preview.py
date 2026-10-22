@@ -1,5 +1,5 @@
 """Host check for asm/mixer/chain_draw.c: build it with a host C compiler plus
-tests/chain_draw_host.c, draw the six preview states and write each as <name>.fb (the raw
+tests/chain_draw_host.c, draw the preview states (the chain screen; the node pages are stock drawing) and write each as <name>.fb (the raw
 128 x 64 framebuffer) and <name>.png (4x, the mockup's colors) in build/out/chain-preview/.
 
 Usage: py scripts/chain_draw_preview.py [outdir]

@@ -1,7 +1,7 @@
 /* Mixer Mode M3b: the Effect Chain screen (stock screen 3) model, keys and
  * hooks. Design: docs/mixer-ui-mockup.html v20 (knob(), cursor handlers),
  * addresses: docs/mixer-mode-m3-research.md "M3b". Entry points (chain_vec.asm
- * at the section start): chain_key, chain_draw_h, chain_poll, kp_exit, s33_keys.
+ * at the section start): chain_key, chain_draw_h, chain_poll, s33_keys.
  *
  * Slots stay sorted by zone (PRE, A, B, POST), so a zone's effects are
  * consecutive slots and every move is adjacent swaps through mixer.S mv_swap
@@ -23,6 +23,7 @@ static int skip65;          /* the release of a hold that went long is not EXIT 
 #define FX(it) ((it) < 6)
 #define ZONE(s) (LAYOUT[s] & 3)
 #define OTHER(b) ((b) == BUS_A ? BUS_B : BUS_A)
+#define PAR(c) ((c)->mode == 1 || (c)->mode == 2)   /* Parallel or Split: buses, [MIX] */
 
 void chain_build(Chain *c)
 {
@@ -30,14 +31,20 @@ void chain_build(Chain *c)
     if (n > 6) n = 6;
     if (n < 0) n = 0;
     c->n = n;
-    c->mode = LIVE[S_MODE];
+    c->mode = eff_mode();
+    c->stereo = PEDAL;
+    c->out = LIVE[S_OUT] > 2 ? 0 : LIVE[S_OUT];
+    for (b = 0; b < 2; b++)             /* Solo overrides Mute; Serial has no [MIX] */
+        c->mute[b] = !PAR(c) ? 0 : LIVE[S_SOLO] ? LIVE[S_SOLO] != b + 1 : LIVE[S_MUTEA + b] != 0;
+    c->silent = mix_silent();
     for (b = 0; b < 4; b++) c->nz[b] = 0;
-    for (s = 0; s < 6; s++) { c->name[s] = 0; c->on[s] = 0; }
+    for (s = 0; s < 6; s++) { c->name[s] = 0; c->on[s] = 0; c->full[s] = 0; }
     for (s = 0; s < n; s++) {
         b = ZONE(s);
         c->z[b][c->nz[b]++] = s;
         c->name[s] = FX_NAME(s, 1);
-        c->on[s] = FX_REC(s)[0] != 0 && !(DSP_OFF >> s & 1);
+        c->full[s] = DSP_OFF >> s & 1;
+        c->on[s] = FX_REC(s)[0] != 0 && !c->full[s];
     }
     c->cur = UI[UI_CUR];
     c->sel = UI[UI_SEL];
@@ -46,7 +53,7 @@ void chain_build(Chain *c)
     c->limit = HOLD != 0;
     /* keep the UI state valid for what the patch is now */
     if (FX(c->cur) ? c->cur >= n : c->cur < IT_ROUTE || c->cur > IT_OUT) c->cur = n ? n - 1 : IT_IN;
-    if (c->cur == IT_MIX && !c->mode) c->cur = IT_ROUTE;
+    if (c->cur == IT_MIX && !PAR(c)) c->cur = IT_ROUTE;
     if (c->cur == IT_IN || c->cur == IT_OUT) c->sel = 0;
     if (c->busrow != BUS_A && c->busrow != BUS_B) c->busrow = BUS_A;
 }
@@ -71,7 +78,7 @@ static void enter(void)
     UI[UI_ADDBUS] = 0xFF;
     UI[UI_FROMCHAIN] = 0;
     UI[UI_PFIRST] = 0;
-    UI[UI_PLAST] = 5;
+    UI[UI_PLAST] = PG_N - 1;
     down = skip65 = 0;
     ROW = -2;
 }
@@ -91,9 +98,9 @@ static int list(const Chain *c, unsigned char *l, int bus)
     l[k++] = IT_IN;
     k = zone_add(c, l, k, PRE);
     l[k++] = IT_ROUTE;
-    if (bus < 0 || !c->mode) { k = zone_add(c, l, k, BUS_A); k = zone_add(c, l, k, BUS_B); }
+    if (bus < 0 || !PAR(c)) { k = zone_add(c, l, k, BUS_A); k = zone_add(c, l, k, BUS_B); }
     else k = zone_add(c, l, k, bus);
-    if (c->mode) l[k++] = IT_MIX;
+    if (PAR(c)) l[k++] = IT_MIX;
     k = zone_add(c, l, k, POST);
     l[k++] = IT_OUT;
     return k;
@@ -126,7 +133,7 @@ static void step(Chain *c, int dir)          /* +1 = right on screen = earlier i
 static void other_bus(Chain *c)              /* same column, else the nearest effect */
 {
     int z, o, i;
-    if (!c->mode || !on_bus(c, c->cur)) return;
+    if (!PAR(c) || !on_bus(c, c->cur)) return;
     z = ZONE(c->cur);
     o = OTHER(z);
     if (!c->nz[o]) return;
@@ -222,24 +229,25 @@ static void delete(Chain *c)                 /* mockup deleteEffect: the cursor 
     c->sel = 0;
 }
 
-static int open(Chain *c)                    /* OPEN: an effect's knob pages, a node's MIXER pages */
+static int open(Chain *c)                    /* OPEN: an effect's knob pages, a node's knob pages */
 {
-    static const unsigned char first[4] = { 1, 3, 0, 5 }, last[4] = { 2, 4, 0, 5 };   /* ROUTE MIX IN OUT */
+    static const unsigned char first[4] = { PG_ROUTE, PG_MIX, PG_IN, PG_OUT };   /* ROUTE MIX IN OUT */
+    static const unsigned char last[4] = { PG_MIX - 1, PG_OUT - 1, PG_IN, PG_OUT };
     int p;
     c->sel = 0;
     save(c);
     if (FX(c->cur)) {
         p = play_cursor(c->cur);
         if (p < 0) return 1;
-        CURSOR = p;                          /* play view on it (stock's mode change clears VIEW_KNOBS) */
+        CURSOR = p;                          /* play view on it; EXIT is stock (patch list), Luca 2026-10-19 */
         MODE = 0;
-    } else {
-        UI[UI_PFIRST] = first[c->cur - IT_ROUTE];
-        UI[UI_PLAST] = last[c->cur - IT_ROUTE];
-        PAGE = UI[UI_PFIRST];
-        SET_SCREEN(15, 0);
+        return 1;
     }
-    UI[UI_FROMCHAIN] = 1;                    /* menu_exit / kp_exit / the MIXER EXIT come back here */
+    UI[UI_PFIRST] = first[c->cur - IT_ROUTE];
+    UI[UI_PLAST] = last[c->cur - IT_ROUTE];
+    PAGE = UI[UI_PFIRST];
+    SET_SCREEN(15, 0);
+    UI[UI_FROMCHAIN] = 1;                    /* the MIXER EXIT comes back here */
     return 1;
 }
 
@@ -294,12 +302,15 @@ int chain_key(int ev, int steps)
             chain_build(&c);
         }
     } else if (ev == 162) {
-        if (c.sel && c.cur == IT_ROUTE) {    /* Mode, straight from the chain: Serial / Parallel */
-            n = LIVE[S_MODE] + steps;
-            LIVE[S_MODE] = n < 0 ? 0 : n > 1 ? 1 : n;
-        } else if (c.sel && c.mode && on_bus(&c, c.cur)) swap_bus(&c);
+        if (c.sel && c.cur == IT_ROUTE) {    /* Mode, straight from the chain (Split, Mono Serial: STEREO) */
+            n = c.mode + steps;
+            LIVE[S_MODE] = n < 0 ? 0 : n > (PEDAL ? 3 : 1) ? (PEDAL ? 3 : 1) : n;
+        } else if (c.sel && c.cur == IT_MIX) {   /* Output Mode: Stereo / Mono / Split */
+            n = c.out + steps;
+            LIVE[S_OUT] = n < 0 ? 0 : n > 2 ? 2 : n;
+        } else if (c.sel && PAR(&c) && on_bus(&c, c.cur)) swap_bus(&c);
         else if (!c.sel) other_bus(&c);
-        else r = 0;                          /* ponytail: [MIX] Output Mode waits for M3c */
+        else r = 0;
     } else if (ev == 67) {
         return open(&c);
     } else if (ev == 230 || ev == 231) {
@@ -307,10 +318,26 @@ int chain_key(int ev, int steps)
         return add(&c, ev == 230 ? -1 : 1);  /* left hold: left of the cursor, later in the signal */
     } else if (ev == 69 || ev == 71) {
         type(&c, ev == 69 ? 1 : -1);
+    } else if (ev == 32) {                   /* footswitch press: the effect ON / OFF, as in play mode */
+        if (FX(c.cur) && !(DSP_OFF >> c.cur & 1)) { FX_TOGGLE(c.cur); FX_EDITED(); }
     } else if (ev != 73 && ev != 75 && ev != 161) {
-        return 0;                            /* footswitch and the rest: nothing here */
+        return 0;                            /* footswitch release and the rest: nothing here */
     }
     save(&c);
+    return r;
+}
+
+/* Effect View knob pages (0xC00CAFA0), in place of its call of 0xC00BB92C after
+ * the page tabs: an effect on a bus gets an A / B tag at the right of the tab
+ * row in Parallel and Split, Pre / Post effects an R / M tag. tabs_end = x of the last tab's right edge. */
+#define AB_X 114                             /* 14 px tag (7 * 1 + 7) at the right edge */
+int ab_tag(int slot, int view, int tabs_end)
+{
+    int r = PARAMS_ANY(slot), m = eff_mode(), z;
+    if ((m == 1 || m == 2) && slot >= 0 && slot < COUNT && tabs_end < AB_X) {
+        z = ZONE(slot);           /* PRE..POST: R (before [ROUTE]), A, B, M (after [MIX]) */
+        KP_TAB(view, AB_X, 0, 0, z == BUS_A ? "A" : z == BUS_B ? "B" : z == PRE ? "R" : "M");
+    }
     return r;
 }
 
@@ -318,19 +345,25 @@ int chain_key(int ev, int steps)
  * page format (byte = 8 rows of one column, bit 0 on top). */
 void chain_draw_h(void)
 {
-    static unsigned char fb[64][16], pg[1024];
+    static unsigned char fb[64][16];
     Chain c;
-    int x, y;
     enter();
     chain_build(&c);
     save(&c);
     chain_draw(&c, fb);
+    blit_fb(fb);
+    SHOWN = c.limit;
+}
+
+void blit_fb(unsigned char fb[64][16])
+{
+    static unsigned char pg[1024];
+    int x, y;
     for (x = 0; x < 1024; x++) pg[x] = 0;
     for (y = 0; y < 64; y++)
         for (x = 0; x < 128; x++)
             if (fb[y][x >> 3] & 0x80 >> (x & 7)) pg[(y >> 3) * 128 + x] |= 1 << (y & 7);
     BLIT(0, 0, 0, 128, 64, pg);
-    SHOWN = c.limit;
 }
 
 /* Every 16 ms (mixer.S poll, the switch task): the knob 2 long press as a key
@@ -341,24 +374,6 @@ void chain_poll(void)
     if (!down || SW_STATE & SW_KNOB2) held = 0;
     else if (++held == LONG_POLLS) KEY_POST(EV_KNOB2_LONG);
     if ((HOLD != 0) != SHOWN) EVENT_POST(MAILBOX, 0x40);
-}
-
-/* Knob pages EXIT (callp at 0xC00AC804): stock, then back to the chain if opened from it. */
-void kp_exit(int a)
-{
-    KNOBS_EXIT(a);
-    if (UI[UI_FROMCHAIN] != 1) return;
-    UI[UI_FROMCHAIN] = 0;
-    MODE = 11;
-    SET_SCREEN(3, -2);
-}
-
-/* Play-mode EXIT with no knob pages (callp SET_SCREEN(16, patch) at 0xC00AC7F4,
- * stock has just set mode 11): an effect opened from the chain goes back there. */
-void menu_exit(int screen, int row)
-{
-    if (UI[UI_FROMCHAIN] == 1) { UI[UI_FROMCHAIN] = 0; screen = 3; row = -2; }
-    SET_SCREEN(screen, row);
 }
 
 /* Screens 32 / 33 keys (callp at 0xC00A832C): stock, and when an add from the

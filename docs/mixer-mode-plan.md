@@ -31,8 +31,8 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M2.2 | **Levels:** Input Level moves to an IN page and acts on the input in every mode (before Pre); Input, the four bus levels and Master go 0-150 (100 = unity, CCs scaled to 150); a `LIMIT` tag on the OUT page while the limiter reduces gain | boost a quiet chain; LIMIT shows when it bites | Sonnet |
 | M3 | Split in three: | | |
 | M3a | **A bus for every slot**, saved per patch (byte 17 of each packed slot block), that follows the effect when the stock Effect Chain screen moves it, or an effect is added or deleted; a temporary MIXER screen page pair BUS 1/2, BUS 2/2 sets it; old patches load as Serial, every effect Pre | stock effects on Bus A / B, kept across STORE and power-off, following moves | Opus |
-| M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages. **Test build 2026-10-19, static checks only** (section "M3b test build") | the new screen | Sonnet, Opus review |
-| M3c | **PEDAL INPUT** setting (MONO / STEREO, default MONO: hides Split input and Mono Serial, draws one IN), Split modes, Mono Serial, Output Mode, Mute / Solo, jack L / R levels (Input L / R, Master L / R) | the rest of the design | Sonnet, Opus review |
+| M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages. Also the **PEDAL INPUT** setting itself: a 9th SETTINGS row (MONO INPUT / STEREO INPUT, ENTER flips it, saved in bit 7 of byte 23 of record 50; `asm/mixer/pedal_in.c` through the screen 1 table entries and the settings.S pack/unpack trampolines, because settings.S has no room left in L2). **Test build 2026-10-19, static checks only** (section "M3b test build") | the new screen | Sonnet, Opus review |
+| M3c | **PEDAL INPUT** acts (MONO hides Split input and Mono Serial, draws one IN), Split modes, Mono Serial, Output Mode, Mute / Solo, jack L / R levels (Input L / R, Master L / R) | the rest of the design | Sonnet, Opus review |
 | M4 | Smart Warning, bus latency matching, effect types table | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
@@ -116,8 +116,11 @@ of the patch it leaves (`0xC00B89F4`, now gets PREV); all six round 2 steps pass
 - **Buses** come from `RoutePrb` (effects pack, `src/probes/routeprb`): its Bus knob writes
   `0x80 | bus` into MAIL[slot] (`0xC00F6088`) every block; the engine latches it and clears
   MAIL, so a removed probe falls back to Pre. Stock effects stay in Pre until M3. (M2 only: M3a sets buses on the MIXER screen and drops RoutePrb.)
-- **Saved per patch (route A):** the bytes ride in bytes 14/15 of the six 18-byte slot blocks
-  of the packed patch (the high bits of P8, which `w9 &= 0xFFF` clears after unpack). Hooks:
+- **Saved per patch:** since M3b7, settings 0-10 live in a 16-byte entry per patch in
+  record 50 (the globals record, grown 24 -> 824 B), keyed by a hash of the patch's effect ids
+  and name. Settings 18-23 (bus, output mode, mute, solo) stay in byte 17 of the slot blocks.
+  (M3b5/6 used bytes 14/15, the high bits of P8, and broke effects with a wide knob 8; their
+  patches are read once and P8 is cleared.) Hooks:
   the live and saved-copy unpacks, the editor dump pack, REC_SAVE (`0xC00B84C0`, every save) and
   IS_DIRTY (four call sites; AUTO SAVE's goes through tempo-hold's `dirty_hook`). A patch
   without the magic loads the defaults (Serial). Not hooked: the compact IS_DIRTY call in patch
@@ -126,7 +129,9 @@ of the patch it leaves (`0xC00B89F4`, now gets PREV); all six round 2 steps pass
 - **Screen:** MENU > MIXER (stock-unused screen 15), 4 pages of 3 knobs, knob 1 press = page.
 - **CCs** (follow CC RECEIVE and MIDI CHANNEL, 0-127 scaled to the range): 85 Send,
   86 Crossfade, 87 Master, 88 Input Level, 89 Route A, 90 Route B, 91 Mix A, 92 Mix B, 93 Mode,
-  94 Curve, 95 Phase Invert B. Go in `docs/user-guide.md` section 5 when the mixer ships.
+  94 Curve, 95 Phase Invert B, 96 Input R, 97 Master R, 98 Output Mode, 99 Mute A, 100 Mute B,
+  101 Solo. 88 Input also sets Input R unless Split (input), 87 Master also sets Master R unless
+  Split (output), as the knobs. 96-101 clash with nothing (chart 14-73, stock 74/75, 80/81). Go in `docs/user-guide.md` section 5 when the mixer ships.
 
 Build: as M1 with `--patch patches/mixer-m2.yaml --stamp "label=M2 MIXER"`.
 
@@ -180,7 +185,8 @@ The MIXER screen's BUS pages are gone (6 pages again); buses are set here.
   then across `[ROUTE]` / `[MIX]` (Pre ↔ A, A / B ↔ Post); a node takes the effect next to it.
   Knob 3 on a selected effect: A ↔ B; on `[ROUTE]`: Mode Serial / Parallel.
 - **OPEN** (knob 3 press): an effect's stock knob pages, a node's or jack's MIXER pages (IN,
-  ROUTE 1-2, MIX 1-2, OUT only); EXIT comes back here.
+  ROUTE 1-2, MIX 1-2, OUT only); EXIT from MIXER pages comes back here, from an effect it is
+  stock (the patch list).
 - **Add:** hold cursor left / right: stock's type list (screen 33), then back here with the
   new effect on the zone the mockup gives it and the cursor on it. Cursor up / down: type.
 - **Delete:** select an effect, hold knob 2 (0.6 s): DELETE?, then press knob 2; anything
@@ -193,5 +199,25 @@ B14) equals the yaml hex. Not done: the footswitch on this screen (does nothing)
 popups, `[MIX]` Output Mode (M3c).
 
 Pedal checks: every key above; LIMIT tag over OUT; a long chain move (4 swaps) in Parallel
-for clicks; EXIT from knob pages / MIXER pages / the add list lands back on the chain with
+for clicks; EXIT from MIXER pages / the add list lands back on the chain (an opened effect's EXIT is stock: the patch list) with
 the same cursor.
+
+## M3c test build (2026-10-19, M3b4)
+
+PEDAL INPUT now acts, and the MIXER screen (15) is the node knob pages of the brief
+("Node knob pages"), drawn like stock effect pages (`pages.c` model, `chain_draw.c`
+`pages_draw`): IN 1 page, `[ROUTE]` 2, `[MIX]` 3, OUT 1; knob 3 press walks the pages of the
+node opened (MENU > MIXER: all 7), EXIT back to the chain or the menu.
+
+- **Engine in C** (`engine.c`, called from the mixer.S stub): Serial, Parallel, Split,
+  Mono Serial; `[MIX]` crossfade curves Smooth / DJ / Cut, Mix A / B, Phase B, Mute / Solo,
+  Output Stereo / Mono / Split; Input and Master L / R; the limiter.
+- **Settings:** 24 bytes (18-23: Input R, Master R, Output, Mute A, Mute B, Solo), packed in
+  byte 17 bits 2-7 of the six slot blocks (`mix_get` / `mix_put`); older patches read as
+  unity / Stereo / Off.
+- **MONO input:** Split plays as Parallel, Mono Serial as Serial; the Mode knob and CC Mode
+  stop at Parallel. **STEREO:** the chain screen draws the double lines and the mode icons.
+
+**Status: static checks only, not pedal-tested.** pytest checks the data block, the vectors
+and that a fresh TI build equals the yaml hex; host PNGs of the chain and pages match the
+mockup. Not done: Smart Warning, the A/B tag in Effect View.

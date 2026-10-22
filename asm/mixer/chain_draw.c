@@ -1,7 +1,8 @@
-/* Mixer Mode M3b: draws the Effect Chain screen (stock screen 3) into a 128 x 64 frame
- * buffer. A line-for-line port of drawChain() in docs/mixer-ui-mockup.html (v20), cut to
- * what M3b ships: mono input, Output Mode Stereo, Serial / Parallel, no Mute / Solo, no
- * Smart Warning, no popup (M3c). Pure: reads Chain, writes only fb. No libc, no floats.
+/* Mixer Mode: draws the Effect Chain screen (stock screen 3) into a 128 x 64 frame buffer
+ * (the node knob pages are drawn by stock code: pages.c). A port of drawChain() / columns() in
+ * docs/mixer-ui-mockup.html (v20): mono / stereo input, the four modes, the three Output
+ * Modes, Mute (dotted lanes), the silent "!". No Smart Warning, no popup (M3c).
+ * Pure: reads Chain, writes only fb. No libc, no floats, no RTS (no / % by variables).
  * fb: row-major, bit 7 of byte 0 = pixel (0,0), 1 = ink. */
 #include "chain.h"
 
@@ -17,7 +18,8 @@
 #define K_NODE 3
 #define K_BUS 4
 
-typedef struct { int kind, e, a, b; } Col;      /* e: slot or IT_*; a / b: the Bus A / Bus B slot or -1 */
+typedef struct { int kind, e, a, b, bi, jn; } Col;  /* e: slot or IT_*; a / b: the Bus A / Bus B slot or -1; bi: bus column index or -1; jn: last Serial column (its lines may join) */
+typedef struct { int y, nt, t[4]; } Grp;               /* a fan group: line y forks into / joins from the nt lines t */
 typedef struct { unsigned char (*fb)[16]; const Chain *c; int cur; } D;
 
 /* Stock fonts from the mockup: 5x7 (bit 4 = left column) for covers and titles, 3x5 (bit 2) for softkeys, hints, tags. */
@@ -73,12 +75,6 @@ static void sq(const D *d, int x, int y, int w, int h)  /* square 1-px frame */
 {
     fill(d, x, y, w, 1, 1); fill(d, x, y + h - 1, w, 1, 1);
     fill(d, x, y + 1, 1, h - 2, 1); fill(d, x + w - 1, y + 1, 1, h - 2, 1);
-}
-
-static void hspan(const D *d, int a, int b, int y)      /* 1-px horizontal wire from a to b */
-{
-    if (a > b) { int t = a; a = b; b = t; }
-    fill(d, a, y, b - a + 1, 1, 1);
 }
 
 static int slen(const char *s) { int n = 0; while (s[n]) n++; return n; }
@@ -157,16 +153,22 @@ static void cover(const D *d, int slot, int l, int cy)
     pill(d, l, y, !d->c->on[slot], cur && d->c->sel ? 1 : 2);
     part(nm, 0, a); part(nm, 5, z);
     t7(d, a, l + 1 + (CW - 2 - w5(a, 1)) / 2, y + 2);
+    if (d->c->full[slot]) part("     FULL", 5, z);      /* bypassed by DSP FULL: dotted (on = 0), FULL as line 2 */
     t7(d, z, l + 1 + (CW - 2 - w5(z, 1)) / 2, y + 10);
     if (cur) mark(d, l, y, CW, CH, d->c->sel);
 }
 
+
 /* ---- [ROUTE] / [MIX] nodes -------------------------------------------------------------- */
 /* Mode icons: lines of [knot count, then x y per knot] x 0 (output) to 29 (input), rows 0-13; 0 ends. */
 static const unsigned char IC_SERIAL[] = { 2, 0, 6, 29, 6, 0 };
+static const unsigned char IC_SPLIT[] = { 2, 0, 2, 29, 2,  2, 0, 10, 29, 10, 0 };
 static const unsigned char IC_PARAL[] = { 4, 0, 2, 11, 2, 19, 6, 29, 6,  4, 0, 10, 11, 10, 19, 6, 29, 6, 0 };
+static const unsigned char IC_MONO[] = { 4, 0, 6, 10, 6, 18, 2, 29, 2,  4, 0, 6, 10, 6, 18, 10, 29, 10, 0 };
 static const unsigned char IC_STEREO[] = { 6, 0, 2, 5, 2, 13, 6, 16, 6, 24, 2, 29, 2,
                                            6, 0, 10, 5, 10, 13, 6, 16, 6, 24, 10, 29, 10, 0 };
+static const unsigned char *const IC_ROUTE[4] = { IC_SERIAL, IC_PARAL, IC_SPLIT, IC_MONO };
+static const unsigned char *const IC_MIX[3] = { IC_STEREO, IC_MONO, IC_SPLIT };
 
 static int udiv(int a, int b)   /* a >= 0, b > 0: no RTS on the pedal, so no / by a variable */
 {
@@ -199,8 +201,156 @@ static void node(const D *d, int n, int l)      /* stock EXIT box as wide as a c
     clear(d, l, top, CW, h, cur);
     sq(d, l, top, CW, h);
     t7(d, name, l + 1 + (CW - 2 - w5(name, 1)) / 2, top + 2);
-    icon(d, n == IT_MIX ? IC_STEREO : d->c->mode ? IC_PARAL : IC_SERIAL, l + 4, YC - 6);
+    icon(d, n == IT_MIX ? IC_MIX[d->c->out % 3] : IC_ROUTE[d->c->mode & 3], l + 4, YC - 6);
+    if (n == IT_MIX && d->c->silent) t7(d, "!", l + 16, top + 31);
     if (cur) mark(d, l, top, CW, h, d->c->sel);
+}
+
+/* ---- lanes ---------------------------------------------------------------------------- */
+/* One line per channel: mono 1 line on row 32; stereo L on 31, R on 33 (bus rows 20 / 22 and 42 / 44).
+ * Each helper writes the rows to o[] and returns how many. */
+static int lane(int y, int st, int *o)
+{
+    if (st) { o[0] = y - 1; o[1] = y + 1; return 2; }
+    o[0] = y;
+    return 1;
+}
+static int is_par(const Chain *c) { return c->mode == 1 || c->mode == 2; }
+static int lanes_m(const Chain *c, int *o) { return lane(YC, c->stereo, o); }                /* before [ROUTE] */
+static int lanes_bus(const Chain *c, int y, int *o) { return lane(y, c->stereo && c->mode != 2, o); }   /* Split input: L alone on A, R on B */
+static int lanes_ab(const Chain *c, int *o) { int n = lanes_bus(c, YA, o); return n + lanes_bus(c, YB, o + n); }
+static int lanes_l(const Chain *c, int *o)      /* Serial: Mono Serial sums L and R before [ROUTE] */
+{
+    if (c->mode == 3) { o[0] = YC; return 1; }
+    return lanes_m(c, o);
+}
+static int lanes_p(const Chain *c, int *o)      /* after [MIX]: Mono 1, Split 2 (A to L, B to R), Stereo as the input */
+{
+    if (c->out == 1 || c->mode == 3) { o[0] = YC; return 1; }
+    if (c->out == 2 && is_par(c)) { o[0] = YC - 1; o[1] = YC + 1; return 2; }
+    return lane(YC, c->stereo, o);
+}
+
+static int zone_of(const Chain *c, int slot)
+{
+    int b, i;
+    for (b = 0; b < 4; b++)
+        for (i = 0; i < c->nz[b]; i++) if (c->z[b][i] == slot) return b;
+    return -1;
+}
+
+static int left_of(const Chain *c, const Col *col, int *o)     /* the rows the signal leaves a column on */
+{
+    int z;
+    switch (col->kind) {
+    case K_IN: return lanes_m(c, o);
+    case K_OUT: return 0;
+    case K_BUS: return lanes_ab(c, o);
+    case K_NODE: return is_par(c) ? lanes_ab(c, o) : lanes_l(c, o);
+    }
+    z = zone_of(c, col->e);
+    return z == PRE ? lanes_m(c, o) : z == POST ? lanes_p(c, o) : lanes_l(c, o);
+}
+
+static int plugs(const Chain *c, int out, int n, int *o)      /* Output Stereo: both jacks, even from one line */
+{
+    if (n > 1 || (out && c->out == 0)) { o[0] = YA; o[1] = YB; return 2; }
+    o[0] = YC;
+    return 1;
+}
+
+/* The fan in the gap between column j (right) and j + 1 (left): 1 split (before Parallel / Split [ROUTE]),
+ * 2 sum (Mono Serial [ROUTE], L and R join before it), 3 join (after [MIX], or Serial with a mono Output). */
+static int fan_kind(const Chain *c, const Col *cols, int nc, int j)
+{
+    int o[2];
+    if (j < 0 || j + 1 >= nc) return 0;
+    if (cols[j + 1].kind == K_NODE && cols[j + 1].e == IT_ROUTE) return is_par(c) ? 1 : c->mode == 3 && c->stereo ? 2 : 0;
+    if (cols[j].kind == K_NODE && cols[j].e == IT_MIX) return 3;
+    return cols[j].jn && lanes_p(c, o) < lanes_l(c, o) ? 3 : 0;
+}
+
+static int groups(const Chain *c, int kind, Grp *g)
+{
+    int m[2], p[2], l[2], b[2], nm = lanes_m(c, m), np, nl, nb, i, k, mm;
+    if (kind == 1) {
+        for (i = 0; i < nm; i++) {
+            g[i].y = m[i];
+            if (c->mode == 2) { g[i].nt = 1; g[i].t[0] = i ? YB : YA; }
+            else { g[i].nt = 2; g[i].t[0] = m[i] - YC + YA; g[i].t[1] = m[i] - YC + YB; }
+        }
+        return nm;
+    }
+    if (kind == 2) {
+        g[0].y = YC; g[0].nt = nm;
+        for (i = 0; i < nm; i++) g[0].t[i] = m[i];
+        return 1;
+    }
+    np = lanes_p(c, p);
+    for (i = 0; i < np; i++) {
+        g[i].y = p[i]; g[i].nt = 0;
+        if (!is_par(c)) { nl = lanes_l(c, l); for (k = 0; k < nl; k++) g[i].t[g[i].nt++] = l[k]; continue; }
+        for (mm = YA; mm <= YB; mm += YB - YA) {
+            nb = lanes_bus(c, mm, b);
+            for (k = 0; k < nb; k++)
+                if (c->out == 2 ? mm == (p[i] < YC ? YA : YB) : np < 2 || nb < 2 || b[k] - mm == p[i] - YC)
+                    g[i].t[g[i].nt++] = b[k];
+        }
+    }
+    return np;
+}
+
+/* ---- wires, fans ----------------------------------------------------------------------- */
+static void wires(const D *d, int nh, int h[][3], int nv, int v[][3])   /* a horizontal that crosses a vertical mid-way hops over it */
+{
+    int i, j, x0, x1;
+    for (j = 0; j < nv; j++) fill(d, v[j][0], v[j][1], 1, v[j][2] - v[j][1] + 1, 1);
+    for (i = 0; i < nh; i++) {
+        x0 = h[i][1] < h[i][2] ? h[i][1] : h[i][2];
+        x1 = h[i][1] < h[i][2] ? h[i][2] : h[i][1];
+        for (j = 0; j < nv; j++)
+            if (v[j][0] > x0 && v[j][0] < x1 && h[i][0] > v[j][1] && h[i][0] < v[j][2]) {
+                fill(d, v[j][0], h[i][0] - 1, 1, 1, 0); fill(d, v[j][0], h[i][0] + 1, 1, 1, 0);
+            }
+        fill(d, x0, h[i][0], x1 - x0 + 1, 1, 1);
+    }
+}
+
+static void fan(const D *d, int g, int w, const Grp *gr, int ng, int split)   /* one riser per group inside the gap g .. g+w-1 */
+{
+    int h[12][3], v[2][3], lo[2], hi[2], nh = 0, i, j, k, one = 1, dd, x;
+    for (i = 0; i < ng; i++) {
+        lo[i] = hi[i] = gr[i].y;
+        for (k = 0; k < gr[i].nt; k++) {
+            if (gr[i].t[k] < lo[i]) lo[i] = gr[i].t[k];
+            if (gr[i].t[k] > hi[i]) hi[i] = gr[i].t[k];
+        }
+    }
+    for (i = 0; i < ng; i++)
+        for (j = 0; j < ng; j++)
+            if (i != j && !(hi[i] < lo[j] || hi[j] < lo[i])) one = 0;     /* risers that do not overlap line up */
+    for (i = 0; i < ng; i++) {
+        dd = one ? 1 : 2 * i;
+        x = split ? g + 2 + dd : g + w - 3 - dd;        /* risers in the middle 3 cols, clear of a cursor frame (2 px) */
+        h[nh][0] = gr[i].y; h[nh][1] = split ? g + w - 1 : g; h[nh++][2] = x;
+        for (k = 0; k < gr[i].nt; k++) { h[nh][0] = gr[i].t[k]; h[nh][1] = split ? g : g + w - 1; h[nh++][2] = x; }
+        v[i][0] = x; v[i][1] = lo[i]; v[i][2] = hi[i];
+    }
+    wires(d, nh, h, ng, v);
+}
+
+static void hline(const D *d, int x, int y, int w, int dot)
+{
+    int i;
+    if (!dot) { fill(d, x, y, w, 1, 1); return; }
+    for (i = 0; i < w; i += 2) fill(d, x + i, y, 1, 1, 1);
+}
+
+/* A muted bus after its last effect is drawn dotted. */
+static int dead(const Chain *c, const Col *col, int y)
+{
+    int k = y < YC ? BUS_A : BUS_B;
+    return col->bi >= 0 && c->mute[k - 1] && col->bi >= c->nz[k] - 1;
 }
 
 /* ---- IN / OUT plugs -------------------------------------------------------------------- */
@@ -213,12 +363,12 @@ static const unsigned char PLUG[15][4] = {
 
 static int px(int out, int l, int x, int w) { return out ? l + CW - 1 - (x - l) - (w - 1) : x; }
 
-/* Output Mode Stereo: OUT always has both plugs, IN one. straight: a node sits next to the plug, so the
- * cables run straight in at the plug rows; otherwise one cable at YC with a riser to each plug. */
-static void jack(const D *d, int out, int l, int straight)
+/* One plug per channel, L the upper one; ln[0..nl-1]: the rows the lines arrive on. */
+static void jack(const D *d, int out, int l, int nl, const int *ln)
 {
-    int ys[2], ln, n = out ? 2 : 1, i, r, k, x, x0 = l + 5, top;
-    ys[0] = out ? YA : YC; ys[1] = YB;
+    int ys[2], lv[2], i, r, k, x, x0 = l + 5, top, n, h[4][3], v[2][3], a, b;
+    n = plugs(d->c, out, nl, ys);
+    for (i = 0; i < n; i++) lv[i] = i < nl ? ln[i] : ln[0];
     for (i = 0; i < n; i++) {
         top = ys[i] - 4;
         for (k = 0; k < 15; k++)
@@ -228,35 +378,30 @@ static void jack(const D *d, int out, int l, int straight)
             fill(d, px(out, l, x0 + 14 + (r % 2 ? 0 : 1), 1), top + r, 1, 1, 1);
         }
         x = px(out, l, l + 2, 1);       /* the risers share one vertical line */
-        ln = out && straight ? ys[i] : YC;
-        hspan(d, x, px(out, l, x0, 1), ys[i]);
-        hspan(d, px(out, l, l, 1), x, ln);
-        fill(d, x, ys[i] < ln ? ys[i] : ln, 1, (ys[i] < ln ? ln - ys[i] : ys[i] - ln) + 1, 1);
+        h[2 * i][0] = ys[i]; h[2 * i][1] = x; h[2 * i][2] = px(out, l, x0, 1);
+        h[2 * i + 1][0] = lv[i]; h[2 * i + 1][1] = px(out, l, l, 1); h[2 * i + 1][2] = x;
+        a = ys[i] < lv[i] ? ys[i] : lv[i]; b = ys[i] < lv[i] ? lv[i] : ys[i];
+        v[i][0] = x; v[i][1] = a; v[i][2] = b;
     }
+    wires(d, 2 * n, h, n, v);
     if (d->cur == (out ? IT_OUT : IT_IN)) mark(d, l, ys[0] - 4, CW, ys[n - 1] - ys[0] + 10, 0);
-    if (out && d->c->limit) {           /* LIMIT tag between the two plugs */
-        fill(d, l + 9, YC - 3, w3("LIMIT") + 2, 7, 1);
-        t3(d, "LIMIT", l + 10, YC - 2, 0);
+    if (out && d->c->limit) {           /* LIMIT tag between two plugs, else above the one */
+        k = n > 1 ? YC - 3 : 12;
+        fill(d, l + 9, k, w3("LIMIT") + 2, 7, 1);
+        t3(d, "LIMIT", l + 10, k + 1, 0);
     }
+}
+
+/* A jack's lines; next to a node (tall enough for both) the cables go straight in at the plug rows. */
+static int jack_lanes(const Chain *c, const Col *cols, int nc, int i, int *o)
+{
+    int out = cols[i].kind == K_OUT, nb = out ? i - 1 : i + 1, n;
+    if (!out) n = lanes_m(c, o);
+    else n = fan_kind(c, cols, nc, i - 1) ? lanes_p(c, o) : left_of(c, &cols[nb], o);
+    return cols[nb].kind == K_NODE ? plugs(c, out, n, o) : n;
 }
 
 /* ---- the screen ----------------------------------------------------------------------- */
-static int zone_of(const Chain *c, int slot)
-{
-    int b, i;
-    for (b = 0; b < 4; b++)
-        for (i = 0; i < c->nz[b]; i++) if (c->z[b][i] == slot) return b;
-    return -1;
-}
-
-/* The fan in the gap between column j (right) and j + 1 (left): 1 split (before [ROUTE]), 2 join (after [MIX]). */
-static int fan_of(const Col *cols, int nc, int par, int j)
-{
-    if (!par || j < 0 || j + 1 >= nc) return 0;
-    if (cols[j + 1].kind == K_NODE && cols[j + 1].e == IT_ROUTE) return 1;
-    return cols[j].kind == K_NODE && cols[j].e == IT_MIX ? 2 : 0;
-}
-
 static void softkeys(const D *d, const char *lab[3], const char *hint[3])
 {
     static const unsigned char XW[3][2] = { {0, 41}, {43, 41}, {86, 42} };
@@ -270,77 +415,79 @@ static void softkeys(const D *d, const char *lab[3], const char *hint[3])
     }
 }
 
+static void push(Col *cols, int *nc, int kind, int e, int a, int b, int bi)
+{
+    Col *k = &cols[(*nc)++];
+    k->kind = kind; k->e = e; k->a = a; k->b = b; k->bi = bi; k->jn = 0;
+}
+
 void chain_draw(const Chain *c, unsigned char fb[64][16])
 {
     D d;
     Col cols[16];
-    int X[16], nc = 0, k, i, j, n, par = c->mode == 1, cur = c->cur;
+    Grp gr[2];
+    int X[16], nc = 0, k, i, j, n, par = is_par(c), cur = c->cur, o[4], nl;
     int sel = c->sel, del = c->delp, onbus, fx, nm, ab, zn;
     const char *lab[3], *hint[3];
+    static const char *const MODE[4] = { "SERIAL", "PARAL", "SPLIT", "MONOSER" };
+    static const char *const OUTM[3] = { "STEREO", "MONO", "SPLIT" };
 
     for (j = 0; j < 64; j++) for (i = 0; i < 16; i++) fb[j][i] = 0;
     if (!par && cur == IT_MIX) cur = IT_ROUTE;      /* Serial has no [MIX] */
     d.fb = fb; d.c = c; d.cur = cur;
 
-    cols[nc].kind = K_IN; cols[nc].e = IT_IN; cols[nc].a = cols[nc].b = -1; nc++;
-    for (i = 0; i < c->nz[PRE]; i++) { cols[nc].kind = K_EFF; cols[nc].e = c->z[PRE][i]; cols[nc].a = cols[nc].b = -1; nc++; }
-    cols[nc].kind = K_NODE; cols[nc].e = IT_ROUTE; cols[nc].a = cols[nc].b = -1; nc++;
+    push(cols, &nc, K_IN, IT_IN, -1, -1, -1);
+    for (i = 0; i < c->nz[PRE]; i++) push(cols, &nc, K_EFF, c->z[PRE][i], -1, -1, -1);
+    push(cols, &nc, K_NODE, IT_ROUTE, -1, -1, -1);
     if (par) {
         n = c->nz[BUS_A] > c->nz[BUS_B] ? c->nz[BUS_A] : c->nz[BUS_B];
         if (n < 1) n = 1;
-        for (i = 0; i < n; i++) {
-            cols[nc].kind = K_BUS; cols[nc].e = -1;
-            cols[nc].a = i < c->nz[BUS_A] ? c->z[BUS_A][i] : -1;
-            cols[nc].b = i < c->nz[BUS_B] ? c->z[BUS_B][i] : -1;
-            nc++;
-        }
-        cols[nc].kind = K_NODE; cols[nc].e = IT_MIX; cols[nc].a = cols[nc].b = -1; nc++;
+        for (i = 0; i < n; i++)
+            push(cols, &nc, K_BUS, -1, i < c->nz[BUS_A] ? c->z[BUS_A][i] : -1, i < c->nz[BUS_B] ? c->z[BUS_B][i] : -1, i);
+        push(cols, &nc, K_NODE, IT_MIX, -1, -1, -1);
     } else {                                        /* zones A then B in a row */
         for (j = BUS_A; j <= BUS_B; j++)
-            for (i = 0; i < c->nz[j]; i++) { cols[nc].kind = K_EFF; cols[nc].e = c->z[j][i]; cols[nc].a = cols[nc].b = -1; nc++; }
+            for (i = 0; i < c->nz[j]; i++) push(cols, &nc, K_EFF, c->z[j][i], -1, -1, -1);
+        cols[nc - 1].jn = 1;
     }
-    for (i = 0; i < c->nz[POST]; i++) { cols[nc].kind = K_EFF; cols[nc].e = c->z[POST][i]; cols[nc].a = cols[nc].b = -1; nc++; }
-    cols[nc].kind = K_OUT; cols[nc].e = IT_OUT; cols[nc].a = cols[nc].b = -1; nc++;
+    for (i = 0; i < c->nz[POST]; i++) push(cols, &nc, K_EFF, c->z[POST][i], -1, -1, -1);
+    push(cols, &nc, K_OUT, IT_OUT, -1, -1, -1);
 
     for (k = 0, i = 0; i < nc; i++)
         if (cols[i].e == cur || cols[i].a == cur || cols[i].b == cur) { k = i; break; }
 
     X[k] = 45;                                      /* 3 columns at 3 / 45 / 87, the cursor's in the middle */
-    for (i = k - 1; i >= 0 && i >= k - 2; i--) X[i] = X[i + 1] + CW + (fan_of(cols, nc, par, i) ? 7 : 4);
-    for (i = k + 1; i < nc && i <= k + 2; i++) X[i] = X[i - 1] - CW - (fan_of(cols, nc, par, i - 1) ? 7 : 4);
+    for (i = k - 1; i >= 0 && i >= k - 2; i--) X[i] = X[i + 1] + CW + (fan_kind(c, cols, nc, i) ? 7 : 4);
+    for (i = k + 1; i < nc && i <= k + 2; i++) X[i] = X[i - 1] - CW - (fan_kind(c, cols, nc, i - 1) ? 7 : 4);
 
     for (j = k - 2; j <= k + 1; j++) {              /* lines in the gap between column j and j + 1, out to the edges */
         int g, w, f, s = -1;
         if (j < 0 || j + 1 >= nc) continue;
-        g = X[j + 1] + CW; w = X[j] - g; f = fan_of(cols, nc, par, j);
+        g = X[j + 1] + CW; w = X[j] - g; f = fan_kind(c, cols, nc, j);
         if (cols[j].kind <= K_OUT && cols[j + 1].kind == K_NODE) s = j;          /* a jack next to a node */
         else if (cols[j + 1].kind <= K_OUT && cols[j].kind == K_NODE) s = j + 1;
         if (s >= 0) {
-            if (cols[s].kind == K_IN) fill(&d, g, YC, w, 1, 1);
-            else { fill(&d, g, YA, w, 1, 1); fill(&d, g, YB, w, 1, 1); }          /* OUT: both plug rows */
-        } else if (f) {                             /* one riser; 3 cols clear of a cursor frame */
-            int x = f == 1 ? g + 3 : g + w - 4;
-            hspan(&d, f == 1 ? g + w - 1 : g, x, YC);
-            hspan(&d, f == 1 ? g : g + w - 1, x, YA);
-            hspan(&d, f == 1 ? g : g + w - 1, x, YB);
-            fill(&d, x, YA, 1, YB - YA + 1, 1);
-        } else if (cols[j].kind == K_BUS || (cols[j].kind == K_NODE && par)) {
-            fill(&d, g, YA, w, 1, 1); fill(&d, g, YB, w, 1, 1);
-        } else if (cols[j].kind != K_OUT) {
-            fill(&d, g, YC, w, 1, 1);
+            nl = jack_lanes(c, cols, nc, s, o);
+            for (i = 0; i < nl; i++) hline(&d, g, o[i], w, 0);
+        } else if (f) {
+            fan(&d, g, w, gr, groups(c, f, gr), f == 1);
+        } else {
+            nl = left_of(c, &cols[j], o);
+            for (i = 0; i < nl; i++) hline(&d, g, o[i], w, dead(c, &cols[j], o[i]));
         }
     }
     for (i = k - 1; i <= k + 1; i++) {
         int l;
         if (i < 0 || i >= nc) continue;
         l = X[i];
-        if (cols[i].kind == K_IN) jack(&d, 0, l, 0);
-        else if (cols[i].kind == K_OUT) jack(&d, 1, l, cols[i - 1].kind == K_NODE);
+        if (cols[i].kind <= K_OUT) { nl = jack_lanes(c, cols, nc, i, o); jack(&d, cols[i].kind == K_OUT, l, nl, o); }
         else if (cols[i].kind == K_NODE) node(&d, cols[i].e, l);
         else if (cols[i].kind == K_EFF) cover(&d, cols[i].e, l, YC);
         else {
-            if (cols[i].a >= 0) cover(&d, cols[i].a, l, YA); else fill(&d, l, YA, CW, 1, 1);
-            if (cols[i].b >= 0) cover(&d, cols[i].b, l, YB); else fill(&d, l, YB, CW, 1, 1);
+            if (cols[i].a >= 0) cover(&d, cols[i].a, l, YA);
+            else { nl = lanes_bus(c, YA, o); for (n = 0; n < nl; n++) hline(&d, l, o[n], CW, c->mute[0]); }
+            if (cols[i].b >= 0) cover(&d, cols[i].b, l, YB);
+            else { nl = lanes_bus(c, YB, o); for (n = 0; n < nl; n++) hline(&d, l, o[n], CW, c->mute[1]); }
         }
     }
 
@@ -358,7 +505,7 @@ void chain_draw(const Chain *c, unsigned char fb[64][16])
     if (del) { lab[0] = ""; lab[1] = "DELETE?"; lab[2] = ""; }
     else if (sel) {
         lab[0] = "DROP"; lab[1] = fx ? "DELETE" : "";
-        lab[2] = nm ? (cur == IT_MIX ? "STEREO" : par ? "PARAL" : "SERIAL") : ab ? "A/B" : "";
+        lab[2] = nm ? (cur == IT_MIX ? OUTM[c->out % 3] : MODE[c->mode & 3]) : ab ? "A/B" : "";
     } else { lab[0] = cur == IT_IN || cur == IT_OUT ? "" : "SELECT"; lab[1] = "EXIT"; lab[2] = "OPEN"; }
     hint[0] = "{}"; hint[1] = fx && !del ? "HOLD" : ""; hint[2] = nm ? "{}" : ab ? "^v" : "";
     softkeys(&d, lab, hint);

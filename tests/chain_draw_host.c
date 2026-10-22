@@ -1,4 +1,4 @@
-/* Host driver for asm/mixer/chain_draw.c: draws the six preview states and writes each
+/* Host driver for asm/mixer/chain_draw.c: draws the preview states (chains; the node pages are stock drawing, not previewed) and writes each
  * framebuffer (64 rows x 16 bytes) to <outdir>/<name>.fb. Run by scripts/chain_draw_preview.py. */
 #include <stdio.h>
 #include <string.h>
@@ -63,5 +63,37 @@ int main(int argc, char **argv)
 
     patch(&c, 1); c.cur = 4; c.sel = 1; c.delp = 1; c.limit = 1;  /* f: DELETE? and LIMIT on */
     out(dir, "f_delete_limit", &c);
+
+    /* stereo / modes / outputs; P: PRE 1, A 1, B 2 (one OFF), POST 1 */
+    patch(&c, 0); c.cur = 1; out(dir, "g_mono_serial", &c);
+    patch(&c, 1); c.cur = IT_ROUTE; out(dir, "g_mono_parallel", &c);
+    patch(&c, 1); c.cur = IT_MIX; c.out = 1; out(dir, "g_mono_parallel_outmono", &c);
+
+    patch(&c, 0); c.stereo = 1; c.cur = IT_ROUTE; out(dir, "h_stereo_serial", &c);
+    patch(&c, 0); c.stereo = 1; c.out = 1; c.cur = 4; out(dir, "h_stereo_serial_outmono", &c);
+    patch(&c, 1); c.stereo = 1; c.cur = IT_ROUTE; out(dir, "i_stereo_parallel_route", &c);
+    patch(&c, 1); c.stereo = 1; c.cur = IT_MIX; out(dir, "i_stereo_parallel_mix", &c);
+    patch(&c, 1); c.stereo = 1; c.cur = 2; out(dir, "i_stereo_parallel_bus", &c);
+    patch(&c, 1); c.stereo = 1; c.cur = IT_IN; c.n = 0; memset(c.nz, 0, sizeof c.nz);
+    add(&c, BUS_A, "GridDly", 1); out(dir, "i_stereo_parallel_in", &c);
+    patch(&c, 1); c.stereo = 1; c.cur = IT_OUT; c.n = 0; memset(c.nz, 0, sizeof c.nz);
+    add(&c, BUS_A, "GridDly", 1); out(dir, "i_stereo_parallel_out", &c);
+
+    patch(&c, 2); c.stereo = 1; c.out = 2; c.cur = IT_ROUTE; out(dir, "j_split_split_route", &c);
+    patch(&c, 2); c.stereo = 1; c.out = 2; c.cur = IT_MIX; out(dir, "j_split_split_mix", &c);
+    patch(&c, 2); c.stereo = 1; c.out = 2; c.cur = 4; out(dir, "j_split_split_post", &c);
+    patch(&c, 2); c.stereo = 1; c.out = 0; c.cur = IT_MIX; out(dir, "j_split_outstereo_mix", &c);
+
+    patch(&c, 3); c.stereo = 1; c.cur = IT_ROUTE; out(dir, "k_monoserial_route", &c);
+    patch(&c, 3); c.stereo = 1; c.cur = 1; c.sel = 1; out(dir, "k_monoserial_fx", &c);
+    patch(&c, 3); c.stereo = 1; c.cur = IT_ROUTE; c.sel = 1; out(dir, "k_monoserial_sel", &c);
+
+    patch(&c, 1); c.mute[1] = 1; c.silent = 1; c.cur = IT_MIX; out(dir, "l_mute_b_silent", &c);
+    patch(&c, 1); c.mute[1] = 1; c.stereo = 1; c.cur = 2; out(dir, "l_mute_b_stereo", &c);
+    patch(&c, 1); c.mute[0] = 1; c.cur = 3; out(dir, "l_mute_a", &c);
+    patch(&c, 1); c.out = 1; c.cur = IT_MIX; c.sel = 1; out(dir, "l_out_mono_sel", &c);
+    patch(&c, 1); c.out = 2; c.cur = IT_MIX; c.sel = 1; out(dir, "l_out_split_sel", &c);
+
+    patch(&c, 1); c.on[2] = 0; c.full[2] = 1; c.cur = 1; out(dir, "m_dsp_full", &c);   /* Breather bypassed by DSP FULL */
     return 0;
 }
