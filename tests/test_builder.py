@@ -24,3 +24,12 @@ def test_release_sections_do_not_overlap():
                    for s in patcher.load(builder.ROOT / "patches" / f"{p}.yaml").get("section", []))
     for (_, end, a), (start, _, b) in zip(spans, spans[1:]):
         assert end <= start, f"{a} and {b} overlap at 0x{start:08X}"
+
+
+def test_refuses_other_mac_apps(tmp_path):
+    app = tmp_path / "x.app"
+    exe = app / "Contents" / "MacOS" / "EFX Updater"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"not zoom")
+    assert builder.run([str(app)]) == 1
+    assert not (tmp_path / builder.OUT_NAME_MAC).exists()

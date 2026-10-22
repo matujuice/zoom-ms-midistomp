@@ -29,7 +29,7 @@ One build runs on all three pedals:
 |---|---|
 | MS-70CDR | Runs it, with real **stereo input**. Tested. |
 | MS-60B | Runs it. Tested. It behaves like an MS-70CDR with only the L input, so the input is mono. |
-| MS-50G | Same as the MS-60B: runs it, mono input. |
+| MS-50G | Same as the MS-60B: runs it, mono input. Tested with the Mac updater. |
 | "+" models (MS-50G+, MS-70CDR+) | No: different hardware. |
 
 You get 6 effects per patch.
@@ -49,14 +49,14 @@ every report helps.
 - The features are the same as v1.1: MIDI CC (including CC 80/81 patch
   up/down), MIDI clock and Start/Stop, MIDI menu, tempo screen, HOLD FOR,
   button combos, faster scrolling, boot logo.
-- No Mac builder yet. On a Mac, stay on [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md#on-a-mac).
+- Works on a Mac too, see [On a Mac](#on-a-mac).
 - The looper is not in v1.2.
 
 ## 2. Getting it onto the pedal
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP
-updater yourself from Zoom's official one. This needs Windows. (Mac users stay
-on [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide.md#on-a-mac) for now.)
+updater yourself from Zoom's official one. This needs Windows, or a Mac
+(see [On a Mac](#on-a-mac) below).
 
 1. Download [Zoom's **MS-70CDR v2.10** updater for Windows](https://zoomcorp.com/it/it/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/) from zoomcorp.com
    (MS-70CDR support page, file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it.
@@ -82,6 +82,41 @@ on [v1.1](https://github.com/matujuice/zoom-ms-modding/blob/v1.1/docs/user-guide
 Your patches and installed effects stay as they are. The updater never
 rewrites the pedal's effects area or its bootloader, which keeps the update mode always available.
 
+### On a Mac
+
+Zoom's Mac updater holds the same firmware files as the Windows one and runs
+the same flash steps, so a MIDISTOMP version of it can be built too. The
+build has been checked byte for byte against the Windows MIDISTOMP updater
+and flashed to an MS-50G from an Apple Silicon Mac.
+
+1. Download Zoom's **MS-70CDR v2.10** updater **for Mac** from the
+   [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
+   (file like `MS-70CDR_v2.10_Mac_E.zip`) and unzip it. Use this one for the
+   MS-50G and MS-60B too.
+2. Get this repository (`git clone`, or Code > Download ZIP on GitHub) and
+   Python 3.10 or newer (from python.org or Homebrew; the `python3` that comes
+   with macOS is too old). Then in the repository's folder:
+   ```sh
+   python3 -m venv .venv && .venv/bin/pip install -e .
+   .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
+   ```
+   It writes **MIDISTOMP V1.2 Updater.app** next to Zoom's app, and refuses
+   anything that is not Zoom's original.
+3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
+   ```sh
+   xattr -cr "/path/to/MIDISTOMP V1.2 Updater.app"
+   codesign --force --deep --sign - "/path/to/MIDISTOMP V1.2 Updater.app"
+   ```
+4. Put the pedal in update mode (step 5 above) and open the app. It is an
+   Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to
+   install it). Its window reads **MIDISTOMP V1.2 Updater**; click Execute.
+
+After v1.2 the pedal reports itself as an MS-70CDR over USB, whichever pedal
+it is. Zoom's MS-50G Mac updater only accepts model 0x58, so it will refuse
+the pedal ("Illegal device connected"). On a Mac, recover with Zoom's
+MS-70CDR Mac updater (checked: it accepts an MS-50G after v1.2) or the
+MIDISTOMP one.
+
 ## 3. Recovery and going back to stock
 
 If the pedal doesn't boot, or you want stock firmware back:
@@ -89,7 +124,8 @@ If the pedal doesn't boot, or you want stock firmware back:
 1. Enter update mode (step 5 above: hold up + down while plugging in USB).
    This works even when the firmware is broken.
 2. Run Zoom's original updater for your pedal (the MS-70CDR 2.10 one, or the MS-50G 3.10 / MS-60B one you had before). It puts back the stock firmware and
-   the stock boot screen.
+   the stock boot screen. On a Mac, after v1.2, use the MS-70CDR one: Zoom's
+   MS-50G updater won't accept the pedal (see [On a Mac](#on-a-mac)).
 
 On an MS-60B you can also run Zoom's MS-60B updater to go back to the bass
 firmware (4 effects per patch).

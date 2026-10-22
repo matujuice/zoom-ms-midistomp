@@ -1,4 +1,5 @@
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +17,10 @@ def fake_app(tmp_path, script=macapp.SCRIPT):
         (res / f"{name}.bin").write_bytes(data)
         md5s += macapp.md5_hex(data).encode() + b"\0"
     exe = b"\0" * 64 + b"".join(struct.pack("<4I", *s) for s in script) + b"\0" * 16 + md5s
+    if script == macapp.SCRIPT_70CDR:  # the 70CDR app's model check, its list 0x39 bytes after the leaq
+        loop = bytearray(b"\x90" * 16 + MODEL_LOOP_CODE + bytes(64))
+        struct.pack_into("<2I", loop, 16 + 18 + 0x39, 0x57, 0x61)
+        exe += bytes(loop)
     macapp.executable(app).write_bytes(exe)
     return app
 
@@ -68,3 +73,206 @@ def test_build_app_refuses_modified_resources(tmp_path):
 def test_build_app_refuses_size_change(tmp_path):
     with pytest.raises(ValueError):
         macapp.build_app(fake_app(tmp_path), tmp_path / "Mod.app", b"\x77" * 65)
+
+
+def test_build_app_70cdr_skips_effects_steps(tmp_path):
+    steps = macapp.build_app(fake_app(tmp_path, macapp.SCRIPT_70CDR), tmp_path / "Mod.app", b"\x77" * 64)
+    assert [s.kind for s in steps] == [macapp.ERASE] + [macapp.SKIP] * 6 + [macapp.ERASE, macapp.WRITE]
+
+
+# The model check loop as in the MS-70CDR v2.10 app, its list 0x40 bytes after the leaq.
+MODEL_LOOP_CODE = bytes.fromhex("48837de802" "0f835b000000" "488d0539000000" "488b4de8" "48c1e102" "4801c8" "8b10"
+                                "8b35" "00000000")
+
+
+def test_accept_models():
+    exe = bytearray(b"\x90" * 16 + MODEL_LOOP_CODE + bytes(64))
+    table = 16 + 18 + 0x39
+    struct.pack_into("<2I", exe, table, 0x57, 0x61)
+    assert macapp.accept_models(exe)
+    assert exe[table:table + 8] == bytes([0x57, 0x58, 0x5F, 0x61, 0, 0, 0, 0])
+    assert exe[16 + 4] == 4
+    assert exe[16 + 22:16 + 31] == bytes.fromhex("0fb614080f1f440000")
+    assert not macapp.accept_models(exe)  # already patched
+
+
+def test_accept_models_absent():
+    assert not macapp.accept_models(bytearray(bytes(64)))
+
+
+def test_build_app_70cdr_with_new_preset(tmp_path):
+    # The real v1.2 build: boot logo in Preset.bin, so only boot and FS steps are skipped.
+    steps = macapp.build_app(fake_app(tmp_path, macapp.SCRIPT_70CDR), tmp_path / "Mod.app", b"\x77" * 64,
+                             new_133=b"\x88" * 64)
+    assert [s.kind for s in steps] == [macapp.ERASE, macapp.SKIP, macapp.SKIP, macapp.ERASE, macapp.WRITE,
+                                       macapp.SKIP, macapp.SKIP, macapp.ERASE, macapp.WRITE]
+
+
+def test_find_script_rejects_unknown_70cdr_layout(tmp_path):
+    script = list(macapp.SCRIPT_70CDR)
+    script[6] = (macapp.WRITE, 0x0F0000, 0x2C7000, 2)  # FS write pointing at Preset.bin
+    with pytest.raises(ValueError):
+        macapp.find_script(macapp.executable(fake_app(tmp_path, script)).read_bytes())
+
+
+def test_accept_models_other_list():
+    exe = bytearray(b"\x90" * 16 + MODEL_LOOP_CODE + bytes(64))
+    struct.pack_into("<2I", exe, 16 + 18 + 0x39, 0x57, 0x58)  # the MS-50G list
+    before = bytes(exe)
+    assert not macapp.accept_models(exe)
+    assert exe == before
+
+
+def test_build_app_real_70cdr(tmp_path):
+    # Needs Zoom's MS-70CDR 2.10 Mac updater (never committed): MIDISTOMP_70CDR_MAC_APP=path/to/.app
+    import os
+    app = os.environ.get("MIDISTOMP_70CDR_MAC_APP")
+    if not app:
+        pytest.skip("no MS-70CDR Mac updater")
+    res = macapp.resources(Path(app))
+    new_os = bytearray((res / "Main.bin").read_bytes())
+    new_os[0x1000] ^= 0xFF
+    new_133 = bytearray((res / "Preset.bin").read_bytes())
+    new_133[0] ^= 0xFF
+    out = tmp_path / "Mod.app"
+    steps = macapp.build_app(app, out, bytes(new_os), new_133=bytes(new_133), title="MIDISTOMP V1.2 Updater")
+    assert [s.kind for s in steps] == [macapp.ERASE, macapp.SKIP, macapp.SKIP, macapp.ERASE, macapp.WRITE,
+                                       macapp.SKIP, macapp.SKIP, macapp.ERASE, macapp.WRITE]
+    stock = macapp.executable(Path(app)).read_bytes()
+    exe = macapp.executable(out).read_bytes()
+    assert len(exe) == len(stock)
+    title = stock.find(b"ZOOM MS-70CDR v2.10 Updater\0")
+    assert exe[title:title + 28] == b"MIDISTOMP V1.2 Updater" + bytes(6)
+    cfstr = stock.find(struct.pack("<QQ", macapp.TEXT_VMADDR + title, 27))
+    assert struct.unpack_from("<Q", exe, cfstr + 8)[0] == 22
+    md5s = set(range(title, title + 27)) | set(range(cfstr + 8, cfstr + 9))
+    for name in ("Main", "Preset"):
+        at = stock.find(macapp.md5_hex((res / f"{name}.bin").read_bytes()).encode())
+        md5s |= set(range(at, at + 32))
+    changed = {i for i in range(len(stock)) if stock[i] != exe[i]} - md5s
+    # model loop: bound 2 -> 4 at 0x5680, movzbl + nop at 0x5692; step types; the list
+    assert changed == ({0x5680} | set(range(0x5692, 0x569B)) | {0x21760, 0x21770, 0x217A0, 0x217B0}
+                       | set(range(0x217E1, 0x217E5)))
+    assert exe[0x217E0:0x217E8] == bytes([0x57, 0x58, 0x5F, 0x61, 0, 0, 0, 0])
+    assert exe[0x5692:0x569B] == bytes.fromhex("0fb614080f1f440000")
+    assert macapp.md5_hex(bytes(new_os)).encode() in exe and macapp.md5_hex(bytes(new_133)).encode() in exe
+
+
+def cfstring_exe(title=b"ZOOM MS-70CDR v2.10 Updater"):
+    exe = bytearray(64) + b"\0" + title + b"\0bin\0" + bytes(16)
+    exe += struct.pack("<QQQQ", 0, 0x7C8, macapp.TEXT_VMADDR + 65, len(title))
+    return exe
+
+
+def test_set_title():
+    exe = cfstring_exe()
+    macapp.set_title(exe, "ZOOM MS-70CDR v2.10 Updater", "MIDISTOMP V1.2 Updater")
+    assert exe[65:65 + 28] == b"MIDISTOMP V1.2 Updater" + bytes(6)
+    assert exe[65 + 28:65 + 32] == b"bin\0"
+    assert struct.unpack_from("<Q", exe, len(exe) - 8)[0] == 22
+
+
+def test_set_title_too_long():
+    with pytest.raises(ValueError):
+        macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "Zoom MS MIDISTOMP Custom Updater")
+
+
+def test_build_app_70cdr_needs_model_check(tmp_path):
+    app = fake_app(tmp_path, macapp.SCRIPT_70CDR)
+    exe = macapp.executable(app)
+    exe.write_bytes(exe.read_bytes().replace(MODEL_LOOP_CODE[:7], b"\x90" * 7))
+    with pytest.raises(ValueError):
+        macapp.build_app(app, tmp_path / "Mod.app", b"\x77" * 64)
+    assert not (tmp_path / "Mod.app").exists()
+
+
+def test_find_title():
+    assert macapp.find_title(bytes(cfstring_exe())) == "ZOOM MS-70CDR v2.10 Updater"
+    with pytest.raises(ValueError):
+        macapp.find_title(bytes(64))
+
+
+def test_set_title_ascii_only():
+    with pytest.raises(ValueError):
+        macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "MIDISTOMP V1.2 Updatér")
+
+
+def test_zip_app_sets_unix_modes(tmp_path):
+    import stat
+    import zipfile
+    app = fake_app(tmp_path)
+    out = tmp_path / "Stock.zip"
+    macapp.zip_app(app, out)
+    with zipfile.ZipFile(out) as z:
+        infos = {i.filename: i for i in z.infolist()}
+    assert "Stock.app/" in infos and "Stock.app/Contents/MacOS/" in infos
+    exe = infos["Stock.app/Contents/MacOS/EFX Updater"]
+    assert exe.create_system == 3 and stat.S_IMODE(exe.external_attr >> 16) == 0o755
+    assert stat.S_IMODE(infos["Stock.app/Contents/Resources/Main.bin"].external_attr >> 16) == 0o644
+    with pytest.raises(FileExistsError):
+        macapp.zip_app(app, out)
+
+
+def test_build_mac_from_exe_real_70cdr(tmp_path):
+    # Zoom's stock MS-70CDR 2.10 Windows updater stands in for a built one; needs both
+    # MIDISTOMP_70CDR_MAC_APP and MIDISTOMP_70CDR_UPDATER (never committed).
+    import os
+    import zipfile
+    from zoomms import cli
+    app, exe = os.environ.get("MIDISTOMP_70CDR_MAC_APP"), os.environ.get("MIDISTOMP_70CDR_UPDATER")
+    if not app or not exe:
+        pytest.skip("no MS-70CDR Mac and Windows updaters")
+    out = tmp_path / "MIDISTOMP Test.zip"
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--out", str(out)]) == 0
+    with zipfile.ZipFile(out) as z:
+        main = z.read("MIDISTOMP Test.app/Contents/Resources/Main.bin")
+    assert main == (macapp.resources(Path(app)) / "Main.bin").read_bytes()
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--patch", "x", "--out", str(tmp_path / "b.zip")]) == 1
+
+
+def fake_exe_parts(monkeypatch, app, **changed):
+    # find_parts/read_part stand-ins: a "built .exe" whose BIN/136 and 137 equal the app's boot.bin and FS.bin.
+    from zoomms import parts
+    res = macapp.resources(app)
+    data = {129: b"\x77" * 64, 133: (res / "Preset.bin").read_bytes(),
+            136: (res / "boot.bin").read_bytes(), 137: (res / "FS.bin").read_bytes()}
+    data.update({int(k[1:]): v for k, v in changed.items()})
+    found = [parts.Part(rid, "", 0, len(d), "") for rid, d in data.items() if d is not None]
+    monkeypatch.setattr(parts, "find_parts", lambda path: found)
+    monkeypatch.setattr(parts, "read_part", lambda path, p: data[p.resource_id])
+    exe = app.parent / "Built.exe"
+    exe.write_bytes(b"MZ")
+    return str(exe)
+
+
+def test_parts_from_exe(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app)
+    assert cli._parts_from_exe(exe, macapp.resources(app))[0] == b"\x77" * 64
+
+
+def test_parts_from_exe_refuses_other_release(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app, b137=b"\x99" * 64)
+    with pytest.raises(ValueError, match="BIN/137"):
+        cli._parts_from_exe(exe, macapp.resources(app))
+
+
+def test_parts_from_exe_missing_part(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app, b129=None)
+    with pytest.raises(ValueError, match="no BIN/129"):
+        cli._parts_from_exe(exe, macapp.resources(app))
+
+
+def test_build_mac_from_exe_bad_file(tmp_path, capsys):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    not_exe = tmp_path / "Mac.zip"
+    not_exe.write_bytes(b"PK\3\4" + bytes(60))
+    for exe in (tmp_path / "missing.exe", not_exe, tmp_path):
+        assert cli.main(["build-mac", str(app), "--from-exe", str(exe), "--out", str(tmp_path / "o.zip")]) == 1
+        assert "error:" in capsys.readouterr().err
