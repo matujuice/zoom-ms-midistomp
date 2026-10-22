@@ -195,3 +195,84 @@ def test_find_title():
 def test_set_title_ascii_only():
     with pytest.raises(ValueError):
         macapp.set_title(cfstring_exe(), "ZOOM MS-70CDR v2.10 Updater", "MIDISTOMP V1.2 Updatér")
+
+
+def test_zip_app_sets_unix_modes(tmp_path):
+    import stat
+    import zipfile
+    app = fake_app(tmp_path)
+    out = tmp_path / "Stock.zip"
+    macapp.zip_app(app, out)
+    with zipfile.ZipFile(out) as z:
+        infos = {i.filename: i for i in z.infolist()}
+    assert "Stock.app/" in infos and "Stock.app/Contents/MacOS/" in infos
+    exe = infos["Stock.app/Contents/MacOS/EFX Updater"]
+    assert exe.create_system == 3 and stat.S_IMODE(exe.external_attr >> 16) == 0o755
+    assert stat.S_IMODE(infos["Stock.app/Contents/Resources/Main.bin"].external_attr >> 16) == 0o644
+    with pytest.raises(FileExistsError):
+        macapp.zip_app(app, out)
+
+
+def test_build_mac_from_exe_real_70cdr(tmp_path):
+    # Zoom's stock MS-70CDR 2.10 Windows updater stands in for a built one; needs both
+    # MIDISTOMP_70CDR_MAC_APP and MIDISTOMP_70CDR_UPDATER (never committed).
+    import os
+    import zipfile
+    from zoomms import cli
+    app, exe = os.environ.get("MIDISTOMP_70CDR_MAC_APP"), os.environ.get("MIDISTOMP_70CDR_UPDATER")
+    if not app or not exe:
+        pytest.skip("no MS-70CDR Mac and Windows updaters")
+    out = tmp_path / "MIDISTOMP Test.zip"
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--out", str(out)]) == 0
+    with zipfile.ZipFile(out) as z:
+        main = z.read("MIDISTOMP Test.app/Contents/Resources/Main.bin")
+    assert main == (macapp.resources(Path(app)) / "Main.bin").read_bytes()
+    assert cli.main(["build-mac", app, "--from-exe", exe, "--patch", "x", "--out", str(tmp_path / "b.zip")]) == 1
+
+
+def fake_exe_parts(monkeypatch, app, **changed):
+    # find_parts/read_part stand-ins: a "built .exe" whose BIN/136 and 137 equal the app's boot.bin and FS.bin.
+    from zoomms import parts
+    res = macapp.resources(app)
+    data = {129: b"\x77" * 64, 133: (res / "Preset.bin").read_bytes(),
+            136: (res / "boot.bin").read_bytes(), 137: (res / "FS.bin").read_bytes()}
+    data.update({int(k[1:]): v for k, v in changed.items()})
+    found = [parts.Part(rid, "", 0, len(d), "") for rid, d in data.items() if d is not None]
+    monkeypatch.setattr(parts, "find_parts", lambda path: found)
+    monkeypatch.setattr(parts, "read_part", lambda path, p: data[p.resource_id])
+    exe = app.parent / "Built.exe"
+    exe.write_bytes(b"MZ")
+    return str(exe)
+
+
+def test_parts_from_exe(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app)
+    assert cli._parts_from_exe(exe, macapp.resources(app))[0] == b"\x77" * 64
+
+
+def test_parts_from_exe_refuses_other_release(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app, b137=b"\x99" * 64)
+    with pytest.raises(ValueError, match="BIN/137"):
+        cli._parts_from_exe(exe, macapp.resources(app))
+
+
+def test_parts_from_exe_missing_part(tmp_path, monkeypatch):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    exe = fake_exe_parts(monkeypatch, app, b129=None)
+    with pytest.raises(ValueError, match="no BIN/129"):
+        cli._parts_from_exe(exe, macapp.resources(app))
+
+
+def test_build_mac_from_exe_bad_file(tmp_path, capsys):
+    from zoomms import cli
+    app = fake_app(tmp_path)
+    not_exe = tmp_path / "Mac.zip"
+    not_exe.write_bytes(b"PK\3\4" + bytes(60))
+    for exe in (tmp_path / "missing.exe", not_exe, tmp_path):
+        assert cli.main(["build-mac", str(app), "--from-exe", str(exe), "--out", str(tmp_path / "o.zip")]) == 1
+        assert "error:" in capsys.readouterr().err
