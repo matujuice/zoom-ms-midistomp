@@ -18,6 +18,17 @@
  * knob and CC moves don't step. No RTS: no float division, no libc. */
 #include "chain.h"
 
+void perf_block(void);          /* asm/perform/perform_engine.c: the Perform moves land first */
+
+/* DIAGNOSTICS (asm/diag/diag.h): cycles of perf_block and of each slot this block,
+ * handed to diag_end with the block's start time when the diag section is loaded. */
+extern __cregister volatile unsigned int TSCL;
+#define DIAG_MAGIC (*(volatile unsigned *)0xC00F3128)
+#define DIAG_END ((void (*)(unsigned, unsigned *))0xC00F3100)
+#define MS_ON (*(volatile int *)0xC010A020)     /* MASTER screen open (asm/master/master_vec.asm) */
+#define MS_TAP ((void (*)(void))0xC010A000)     /* copies this block for it */
+static unsigned dg_cyc[7];      /* [0] perf_block, [1 + s] slot s (diag_end clears them) */
+
 #define F ((float *)0x11F03738)         /* ctx[5], the chain signal */
 #define S ((float *)0x11F03B80)         /* split copy (free L1D, M0) */
 #define A ((float *)0x11F03BC0)         /* bus A result */
@@ -36,10 +47,10 @@
 #define G_INR 6
 #define G_MR 7
 
-static float pct(int s) { return LIVE[s] * 0.01f; }
-static float min1(float x) { return x > 1.0f ? 1.0f : x; }
-static float eqp(float t) { return t * (1.5f - 0.5f * t * t); }     /* about sin(pi t / 2) */
-static void sm(float *g, float t) { *g += (t - *g) * 0.25f; }
+static inline float pct(int s) { return LIVE[s] * 0.01f; }
+static inline float min1(float x) { return x > 1.0f ? 1.0f : x; }
+static inline float eqp(float t) { return t * (1.5f - 0.5f * t * t); }     /* about sin(pi t / 2) */
+static inline void sm(float *g, float t) { *g += (t - *g) * 0.25f; }
 
 /* Every slot whose bus is `bus` (all slots when mask is 0), in slot order. */
 static void run(int bus, int mask)
@@ -47,8 +58,10 @@ static void run(int bus, int mask)
     int s;
     for (s = 0; s < 6; s++)
         if ((LAYOUT[s] & mask) == bus) {
+            unsigned t = TSCL;
             SLOT_VAR = s;
             FX_TABLE[s]((void *)(STATE0 + 212 * s));
+            dg_cyc[1 + s] += TSCL - t;
         }
 }
 
@@ -106,10 +119,13 @@ static void limit(void)
 
 void engine_run(void)
 {
-    int mode = eff_mode(), par = mode == 1 || mode == 2, out = LIVE[S_OUT];
-    int i;
+    int mode, par, out, i;
     float x, xa, xb, ma, mb;
+    unsigned t0 = TSCL;
 
+    perf_block();
+    dg_cyc[0] = TSCL - t0;
+    mode = eff_mode(); par = mode == 1 || mode == 2; out = LIVE[S_OUT];
     sm(&G[G_IN], pct(S_IN));
     sm(&G[G_INR], pct(mode == 2 ? S_INR : S_IN));
     gain2(F, G[G_IN], G[G_INR]);
@@ -182,4 +198,8 @@ void engine_run(void)
     sm(&G[G_MR], pct(par && out == 2 ? S_MR : S_MASTER));
     gain2(F, MASTER_G, G[G_MR]);
     limit();
+    if (MS_ON)
+        MS_TAP();
+    if (DIAG_MAGIC == 0x47414944u)      /* "DIAG" */
+        DIAG_END(t0, dg_cyc);
 }

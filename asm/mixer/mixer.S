@@ -22,7 +22,8 @@
 ; Saving (pages.c mix_get / mix_put): the bus of each slot and settings
 ; 18-23 ride in byte 17 of the six 18-byte slot blocks of the packed 122-byte
 ; patch (free: bytes 0-16 are the effect's), settings 0-10 in a table at the
-; end of the global record 50 (R50, grown to 824 bytes, an entry per patch).
+; end of the global record 50 (R50, grown to 824 bytes, an entry per patch;
+; then the Perform table, asm/perform/perform_store.c).
 ; LIVE holds the 24 bytes of the patch being played, SAVED the ones stored in
 ; flash (IS_DIRTY compares them, as stock compares the patch with its saved
 ; copy at 0xC009C07C).
@@ -55,7 +56,8 @@
         .equ    UI, BASE + 136              ; [8] Effect Chain UI state (chain.h)
         .equ    GAINS, BASE + 144           ; [8 floats] engine.c
         .equ    PEDAL, BASE + 176           ; PEDAL INPUT: 1 = STEREO (pedal_in.c)
-        .equ    MENU6, BASE + 200           ; menu entry names
+        .equ    MENUSCR, BASE + 184         ; [7] the screen of each menu entry (menu_enter.S)
+        .equ    MENU7, BASE + 196           ; menu entry names (menu_draw.S)
         .equ    LIVE, BASE + 224            ; [24] settings of the patch played (chain.h)
         .equ    LAYOUT, LIVE + 12           ; [6] the bus of each slot (settings 12-17)
         .equ    SAVED, BASE + 248           ; [24] ... as saved in flash
@@ -63,7 +65,7 @@
         .equ    MAXES, BASE + 296           ; [24] maximum of each setting
         .equ    DEFAULTS, BASE + 320        ; [24]
         .equ    NSET, 24
-        .equ    R50, 0xC00F7000             ; [824] record 50 (chain.h)
+        .equ    R50, 0xC01086E0             ; [6428] record 50 (chain.h)
         .equ    CUR_PATCH, 324              ; B14 offset: the patch played
 
         .equ    C_SEC, 0xC00F8000           ; chain_vec.asm vectors
@@ -100,6 +102,8 @@
         .equ    STEP, 0xC00F2020            ; midi_cc step.S: CC 80/81, then stock
         .equ    UI_REFRESH, 0xC00ACD84
         .equ    POLL, 0x1181E800            ; midi_clock poll.S (L2)
+        .equ    LP_POLL, 0xC00F2200         ; looper.S poll_pre (it calls poll.S), when looper.yaml is in
+        .equ    LP_MAGIC, 0x5A4C5301        ; at 0xC00F3000, its services block (block.S)
         .equ    MODE, 320                   ; B14 offsets: 11 = menu
         .equ    SCREEN, 352                 ; 15 = MIXER
         .equ    HOLD_POLLS, 30              ; LIMIT stays about 0.5 s
@@ -167,11 +171,15 @@ vectors:
         .word   0, 0                        ; +128 PAGE
         .byte   0, 0, BUS_A, 0, NONE, 0, 0, PG_OUT ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .word   0, 0, 0, 0, 0, F_ONE, 0, 0  ; +144 GAINS: In, SendA, SendB, cA, cB, limiter, InR, MasterR
-        .byte   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ; +176 PEDAL, then free to +200
-        .byte   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        ; +200 MENU6: the five menu entries (midi_settings.S) with MIXER
-        ; before the version entry
-        .word   0xC00E8FE4, 0xC00E8FF7, 0xC00E9004, 0x1181EC63, s_mixer, 0xC00E900D
+        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, then free to +184
+        ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 SETTINGS (1),
+        ; 4 the version entry (9), 5 MASTER (11), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
+        ; MIDI SETTINGS is the last SETTINGS row (pedal_in.c).
+        .byte   0, 0, 11, 1, 9, 11, 11, 0
+        .word   0                           ; +192 free
+        ; +196 MENU7: the stock menu entries with PERFORM MODE after EFFECT CHAIN
+        ; then MASTER and KALEIDO (all 7 used)
+        .word   0xC00E8FE4, 0xC00E8FF7, s_perform, 0xC00E9004, 0xC00E900D, s_master, s_kaleido
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +224 LIVE
         .byte   PRE, PRE, PRE, PRE, PRE, PRE, 100, 100, 0, 0, 0, 0
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +248 SAVED
@@ -677,10 +685,18 @@ pl_out:
         addkpc  .S2     pl_ret, b3, 4
 pl_ret:
         ldw     .D2T2   *+b15(4), b3
-        nop     4
+        mvkl    .S1     0xC00F3000, a0
+        mvkh    .S1     0xC00F3000, a0
+        ldw     .D1T1   *a0, a0
+        mvkl    .S2     LP_MAGIC, b1
+        mvkh    .S2     LP_MAGIC, b1
+        nop     3
+        cmpeq   .L2X    a0, b1, b1          ; looper.yaml applied first: chain its poll
         addk    .S2     16, b15
         mvkl    .S2     POLL, b0
         mvkh    .S2     POLL, b0
+  [b1]  mvkl    .S2     LP_POLL, b0
+  [b1]  mvkh    .S2     LP_POLL, b0
         b       .S2     b0
         nop     5
 
@@ -771,6 +787,11 @@ cc_done:
 cc_map: .byte   S_SEND, S_XF, S_MASTER, S_IN, S_RA, S_RB, S_MA, S_MB
         .byte   S_MODE, S_CURVE, S_PHASE, S_INR, S_MR, S_OUT, S_MUTEA, S_MUTEB
         .byte   S_SOLO, 0, 0, 0
-s_mixer:    .string "MIXER"
+s_perform:  .string "PERFORM MODE"
             .byte 0
             .byte 0, 0
+s_master:   .string "MASTER"
+            .byte 0
+s_kaleido:  .string "KALEIDO"
+            .byte 0
+            .align 4                ; ends on a word: an odd length here crashes cl6x 8.5 (fatal error 99926)

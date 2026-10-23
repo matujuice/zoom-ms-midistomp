@@ -22,9 +22,9 @@
 #define PEDAL (*(volatile unsigned char *)(MIXER_BASE + 176)) /* PEDAL INPUT: 1 = STEREO (pedal_in.c) */
 #define LIVE ((volatile unsigned char *)(MIXER_BASE + 224))   /* [24] settings of the patch played */
 #define LAYOUT (LIVE + 12)      /* [6] bus of each slot (settings 12-17) */
-#define R50 ((volatile unsigned char *)0xC00F7000u)  /* record 50 as in flash: globals + settings table (pages.c) */
-#define R50_SIZE 824
-#define R50_COPY 0xC00F7400u    /* [824] the record store compaction buffer (mixer-m2.yaml) */
+#define R50 ((volatile unsigned char *)0xC01086E0u)  /* record 50 as in flash: globals + settings table (pages.c) + Perform (perform_store.c) */
+#define R50_SIZE (824 + 4 + 50 * 112)
+#define R50_COPY 0xC0106DC0u    /* [R50_SIZE] the record store compaction buffer (mixer-m2.yaml) */
 
 /* Settings: LIVE[S_*]. Levels 0-150, 100 = unity; Send and Crossfade 0-100. */
 #define S_MODE 0                /* 0 Serial, 1 Parallel, 2 Split, 3 Mono Serial (2, 3: STEREO only) */

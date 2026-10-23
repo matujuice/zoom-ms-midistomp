@@ -15,8 +15,10 @@
         .equ    S_LEDMASK, 60               ; firmware: the LED's bit in both
         .equ    S_LEVEL, 64                 ; ZDL: LED level 0..32 (its own PWM)
         .equ    S_TEXT, 68                  ; ZDL: 8 status characters, space padded
-        .equ    S_PROG, 76                  ; ZDL: loop progress 0..256 (box fill)
+        .equ    S_PROG, 76                  ; ZDL: 0-15 fill 0..256, 16-21 cycle, 22-27 bar, 28-29 beat-1, 30 no clock
         .equ    S_INV, 80                   ; ZDL: 1 = box inverted (pulse, blink)
+        .equ    S_CYCLE, 84                 ; Perform: CYCLE in bars, 0 = none (zero at boot)
+        .equ    S_LEFT, 120                 ; ZDL: left text code (lbox.c, docs/looper-services.md)
         .equ    S_LASTHB, 96                ; firmware private: heartbeat seen last poll
         .equ    S_STALE, 100                ; firmware private: polls without a heartbeat
         .equ    S_WASMINE, 104              ; firmware private: S_MINE last poll

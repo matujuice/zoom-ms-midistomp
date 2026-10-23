@@ -38,13 +38,13 @@ static const unsigned char G5[][7] = {
     {14,17,17,14,17,17,14},{14,17,17,15,1,2,12},{0,0,0,0,0,0,0},{14,8,8,8,8,8,14},{14,2,2,2,2,2,14},{0,0,0,31,0,0,0},
     {0,0,0,0,0,12,12},{4,4,4,4,4,0,4},{0,1,2,4,8,16,0},
 };
-static const char K3[] = "ABCDEGILMNOPRSTUX/F? !H{}^v<>";
+static const char K3[] = "ABCDEGILMNOPRSTUX/F? !H{}";
 static const unsigned char G3[][5] = {
     {2,5,7,5,5},{6,5,6,5,6},{3,4,4,4,3},{6,5,5,5,6},{7,4,6,4,7},{3,4,5,5,3},
     {7,2,2,2,7},{4,4,4,4,7},{5,7,7,5,5},{6,5,5,5,5},{2,5,5,5,2},{6,5,6,4,4},
     {6,5,6,5,5},{3,4,2,1,6},{7,2,2,2,2},{5,5,5,5,7},{5,5,2,5,5},{1,1,2,4,4},
     {7,4,6,4,4},{6,1,2,0,2},{0,0,0,0,0},{2,2,2,0,2},{5,5,7,5,5},{1,3,7,3,1},
-    {4,6,7,6,4},{0,2,7,0,0},{0,7,2,0,0},{0,1,3,1,0},{0,4,6,4,0},
+    {4,6,7,6,4},
 };
 
 /* ---- pixels --------------------------------------------------------------------------- */
@@ -404,14 +404,16 @@ static int jack_lanes(const Chain *c, const Col *cols, int nc, int i, int *o)
 /* ---- the screen ----------------------------------------------------------------------- */
 static void softkeys(const D *d, const char *lab[3], const char *hint[3])
 {
-    static const unsigned char XW[3][2] = { {0, 41}, {43, 41}, {86, 42} };
-    int i, w, x, h;
+    static const unsigned char XW[3][2] = { {2, 40}, {44, 40}, {86, 40} };   /* stock softkey 0xC009F8F0: x 42k+2..42k+41, y 57-63 */
+    int i, w, x, h, r;
     for (i = 0; i < 3; i++) {
         x = XW[i][0]; w = XW[i][1];
-        fill(d, x, 56, w, 8, 1);
-        h = hint[i][0] ? w3(hint[i]) + 3 : 0;      /* a hint sits at the key's left end, the label centred in the rest */
-        if (h) t3(d, hint[i], x + 1, 57, 0);
-        t3(d, lab[i], x + h + (w - h - w3(lab[i])) / 2, 57, 0);
+        fill(d, x, 57, w, 7, 1);
+        h = hint[i][0] ? (hint[i][0] == '^' ? 11 : w3(hint[i])) + 3 : 0;   /* a hint sits at the key's left end, the label centred in the rest */
+        if (hint[i][0] == '^')                     /* "^v": the 5 x 3 up and down arrows, as Perform's */
+            for (r = 0; r < 3; r++) { fill(d, x + 3 - r, 59 + r, 2 * r + 1, 1, 0); fill(d, x + 7 + r, 59 + r, 5 - 2 * r, 1, 0); }
+        else if (h) t3(d, hint[i], x + 1, 58, 0);
+        t3(d, lab[i], x + h + (w - h - w3(lab[i])) / 2, 58, 0);
     }
 }
 
@@ -494,8 +496,8 @@ void chain_draw(const Chain *c, unsigned char fb[64][16])
     /* title bar with the scroll arrows, then the softkeys with the knob hints */
     fill(&d, 0, 0, 128, 9, 1);
     t5(&d, "EFFECT CHAIN", 64 - w5("EFFECT CHAIN", 1) / 2, 1, 0, 1);
-    if (k + 2 < nc) t3(&d, "<", 1, 2, 0);
-    if (k - 2 >= 0) t3(&d, ">", 124, 2, 0);
+    if (k + 2 < nc) t3(&d, "{", 1, 2, 0);     /* the 3 x 5 side arrows */
+    if (k - 2 >= 0) t3(&d, "}", 124, 2, 0);
 
     zn = cur >= 0 && cur < 6 ? zone_of(c, cur) : -1;
     onbus = zn == BUS_A || zn == BUS_B;

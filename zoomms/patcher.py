@@ -7,7 +7,8 @@ Patch kinds supported so far:
         `count` times, so a patch written once works on every model's build
         or fails loudly.
     write:     - model: ms50g-3.10  addr: 0x...  expect: "hex"  data: "hex"
-        Raw write at an address for one specific OS build; `expect` must match.
+        Raw write at an address for one specific OS build; `expect` must match
+        (or one of a list, where another patch may have chained the same hook).
     section:   - model: ms50g-3.10  addr: 0x...  data: "hex"  source: asm/...
         New code or data loaded by the boot image as an extra section (into RAM
         nothing else uses). `source` names the assembly it was built from;
@@ -84,8 +85,9 @@ def apply(img: ais.AisImage, patch: dict, build_id: str, stamp: dict | None = No
     for w in patch.get("write", []):
         if w["model"] != build_id:
             continue
-        expect, data = bytes.fromhex(w["expect"]), bytes.fromhex(w["data"])
-        if img.read(w["addr"], len(expect)) != expect:
+        data = bytes.fromhex(w["data"])
+        expects = w["expect"] if isinstance(w["expect"], list) else [w["expect"]]   # a list: any of them
+        if not any(img.read(w["addr"], len(e) // 2) == bytes.fromhex(e) for e in expects):
             raise PatchError(f"{patch['name']}: bytes at 0x{w['addr']:08X} are not the expected ones")
         img.write(w["addr"], data)
         log.append(f"write 0x{w['addr']:08X} {len(data)} B")

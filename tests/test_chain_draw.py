@@ -32,7 +32,7 @@ def test_six_states_rendered(out):
 def test_bars_and_cursor(out):
     fb = (out / "a_parallel.fb").read_bytes()
     assert all(px(fb, x, 0) for x in range(128))        # title bar
-    assert all(px(fb, x, 63) for x in range(41))        # first softkey
+    assert all(px(fb, x, 63) for x in range(2, 42))     # first softkey, stock box x 2-41
     assert px(fb, 43, 10) and not px(fb, 44, 11)        # cursor outline, then the 1-px gap, around the A cover at (45, 12)
     assert fb != (out / "b_serial.fb").read_bytes()
 

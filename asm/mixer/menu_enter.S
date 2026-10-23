@@ -1,14 +1,17 @@
-; Mixer Mode M2: menu ENTER (settings.S mk_enter, 0x1181F0F0, A3 = entry):
-; 3 MIDI SETTINGS (screen 14), 4 MIXER (screen 15), 5 the version entry
-; (screen 9); the stock handler does 0-2. The branch after these eight
-; instructions goes to SET_SCREEN(A4, B4) when A1 is set.
+; Mixer Mode M2 / Perform: menu ENTER (settings.S mk_enter, 0x1181F0F0, A3 = entry):
+; entries 2-5 go to the screen in MENUSCR (mixer.S): 2 PERFORM MODE (11),
+; 3 SETTINGS (1, as the stock row 2), 4 the version entry (9), 5 MASTER (11);
+; the stock handler does 0-1. MENUSCR[7] keeps the entry, so screen 11 knows
+; PERFORM from MASTER (chain_vec.asm). The branch after these
+; eight instructions goes to SET_SCREEN(A4, B4) when A1 is set. A5 is free
+; here (mk_stock reloads it).
         .text
         .nocmp
-        cmplt   .L1     2, a3, a1           ; entries 3-5 are ours
-        mvk     .L1     5, a0
-        cmpeq   .L1     a3, a0, a2          ; the version entry
-        add     .L1     11, a3, a4          ; 3 -> 14, 4 -> 15
-  [a2]  mvk     .L1     9, a4
+        mvkl    .S1     0xC00F60B8, a5      ; MENUSCR
+        mvkh    .S1     0xC00F60B8, a5
+        cmplt   .L1     1, a3, a1           ; entries 2-5 are ours
+        ldbu    .D1T1   *+a5[a3], a4
         mvk     .L2     0, b4
+        nop     4
         nop
-        nop
+        stb     .D1T1   a3, *+a5[7]         ; MENUSCR[7] = the entry

@@ -33,7 +33,7 @@ OUTPUT ← Post ← [MIX] ← Bus A ← [ROUTE] ← Pre ← INPUT
 | M3a | **A bus for every slot**, saved per patch (byte 17 of each packed slot block), that follows the effect when the stock Effect Chain screen moves it, or an effect is added or deleted; a temporary MIXER screen page pair BUS 1/2, BUS 2/2 sets it; old patches load as Serial, every effect Pre | stock effects on Bus A / B, kept across STORE and power-off, following moves | Opus |
 | M3b | **Effect Chain screen** rebuilt as in the official mockup [`mixer-ui-mockup.html`](mixer-ui-mockup.html) (two rows, nodes, signal lines, A/B tags in Effect View, add / change type / delete, DSP FULL); replaces the BUS pages. Also the **PEDAL INPUT** setting itself: a 9th SETTINGS row (MONO INPUT / STEREO INPUT, ENTER flips it, saved in bit 7 of byte 23 of record 50; `asm/mixer/pedal_in.c` through the screen 1 table entries and the settings.S pack/unpack trampolines, because settings.S has no room left in L2). **Test build 2026-10-19, static checks only** (section "M3b test build") | the new screen | Sonnet, Opus review |
 | M3c | **PEDAL INPUT** acts (MONO hides Split input and Mono Serial, draws one IN), Split modes, Mono Serial, Output Mode, Mute / Solo, jack L / R levels (Input L / R, Master L / R) | the rest of the design | Sonnet, Opus review |
-| M4 | Smart Warning, bus latency matching, effect types table | badges | later |
+| M4 | Smart Warning, checked live on the pedal (no effect types table, so it works for any ZDL): while playing, the engine compares each slot's L and R in and out; stereo in but identical L / R out means the effect collapsed it to mono. Bus latency matching dropped (Luca, 2026-10-22: effects run on the same block, gain too small) | badges | later |
 
 Each step ends with tests, a real build from Zoom's MS-70CDR updater and a
 flash test by Luca before the next one starts, as in the 70CDR port.
@@ -195,7 +195,7 @@ The MIXER screen's BUS pages are gone (6 pages again); buses are set here.
 
 **Status: static checks only, not pedal-tested.** `py -m pytest -q` checks the hooks against
 the stock image, the C section's place and vectors, and that a fresh TI build (no RTS, no
-B14) equals the yaml hex. Not done: the footswitch on this screen (does nothing), DSP FULL
+B14) equals the yaml hex. The footswitch on this screen works (Luca, 2026-10-23). Not done: DSP FULL
 popups, `[MIX]` Output Mode (M3c).
 
 Pedal checks: every key above; LIMIT tag over OUT; a long chain move (4 swaps) in Parallel
@@ -220,4 +220,13 @@ node opened (MENU > MIXER: all 7), EXIT back to the chain or the menu.
 
 **Status: static checks only, not pedal-tested.** pytest checks the data block, the vectors
 and that a fresh TI build equals the yaml hex; host PNGs of the chain and pages match the
-mockup. Not done: Smart Warning, the A/B tag in Effect View.
+mockup. The A/B tag in Effect View is in the build. Smart Warning is postponed to after v2.0 (Luca, 2026-10-23).
+
+## M3b8 pedal test (2026-10-22)
+
+M3b8 = M3b7 (settings 0-10 in record 50, byte 17 only in the patch) + both crossfades shown
+pan-style (A100 .. AB .. B100, "-" when inactive). Luca ran the M3b7 steps and the M3b8
+steps on M3b8: **all pass** (knob 8 kept, mixer settings per patch through patch change and
+power-cycle, globals kept, copy, dirty mark, crossfade text and sides, "-", saved B30, fit).
+One fail: **[ROUTE] XFade drew as a knob**, not a fader like [MIX] XFade. Fixed in
+**M3b9** (`pages.c`: S_SEND is a FADER), sha256 31ebfd37...: **pedal-tested, pass** (Luca, 2026-10-22).

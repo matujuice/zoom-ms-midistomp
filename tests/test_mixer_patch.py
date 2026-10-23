@@ -25,7 +25,7 @@ M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: releas
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
        "rec_save": 40, "keys": 48, "draw": 56, "cc": 64, "mv_swap": 96, "mv_add": 104,
        "mv_delete": 112, "poll": 120}
-UI, GAINS, PEDAL, MENU6, LIVE, SAVED, PREV, MAXES, DEFAULTS = 136, 144, 176, 200, 224, 248, 272, 296, 320
+UI, GAINS, PEDAL, MENUSCR, MENU7, LIVE, SAVED, PREV, MAXES, DEFAULTS = 136, 144, 176, 184, 196, 224, 248, 272, 296, 320
 NSET = 24                                                            # chain.h: 24 settings (12-17: the buses)
 CODE = 344                                                          # the code after the data block
 MAGIC = 0x4D
@@ -135,21 +135,34 @@ def test_auto_save_hook_retargets_tempo_hold():
 def test_poll_trampoline_chains_through_the_mixer():
     w = WRITES[0xC00C82D0]
     clock = [x for x in patcher.load(ROOT / "patches/midi-clock.yaml")["write"] if x["addr"] == 0xC00C82D0][0]
-    assert w["expect"] == clock["data"] and far_target(clock["data"]) == 0x1181E800   # midi-clock's, to poll.S
+    looper = [x for x in patcher.load(ROOT / "patches/looper.yaml")["write"] if x["addr"] == 0xC00C82D0][0]
+    assert w["expect"] == [clock["data"], looper["data"]] and far_target(clock["data"]) == 0x1181E800   # midi-clock's, to poll.S
     assert far_target(w["data"]) == BASE + VEC["poll"]
-    assert ".equ    POLL, 0x1181E800" in (ROOT / "asm/mixer/mixer.S").read_text()      # the mixer poll goes on there
+    src = (ROOT / "asm/mixer/mixer.S").read_text()
+    assert ".equ    POLL, 0x1181E800" in src                                         # the mixer poll goes on there,
+    assert f".equ    LP_POLL, 0x{far_target(looper['data']):08X}" in src             # or to the looper's poll_pre
 
 
 def test_menu_writes_match_the_settings_section():
     sec = [s for s in SETTINGS["section"] if s["addr"] == 0x1181EA00][0]
     sb = _data(sec)
-    for addr in (0x1181EF78, 0x1181F0B0, 0x1181F0F0):
+    for addr in (0x1181EF78, 0x1181F0B0, 0x1181F0F0, 0x1181F27C):
         w = WRITES[addr]
         assert sb[addr - 0x1181EA00:][:len(bytes.fromhex(w["expect"]))].hex() == w["expect"]
-    assert far_target(WRITES[0x1181EF78]["data"]) == BASE + MENU6
+    assert far_target(WRITES[0x1181EF78]["data"]) == BASE + MENU7
+    assert far_target(WRITES[0x1181F0F0]["data"]) == BASE + MENUSCR
     menu = sb[0x1181EB80 - 0x1181EA00:][:20]                         # settings.S menu_names
-    menu6 = _data(SEC)[MENU6:MENU6 + 24]
-    assert menu6[:16] == menu[:16] and menu6[20:] == menu[16:]       # stock + MIDI, MIXER, version
+    m7 = _data(SEC)[MENU7:MENU7 + 28]
+    stock = [menu[4 * i:4 * i + 4] for i in range(5)]
+    got = [m7[4 * i:4 * i + 4] for i in range(5)]
+    assert got[:2] + got[3:] == stock[:3] + stock[4:]                # stock without MIDI; PERFORM MODE 2
+    got.append(m7[20:24])
+    got.append(m7[24:28])
+    sec = _data(SEC)
+    assert sec[MENUSCR + 2:MENUSCR + 8] == bytes([11, 1, 9, 11, 11, 0])   # PERFORM, SETTINGS (stock row 2), version, MASTER, KALEIDO
+    for i, name in ((2, b"PERFORM MODE\0"), (5, b"MASTER\0"), (6, b"KALEIDO\0")):
+        off = _word(got[i]) - BASE
+        assert sec[off:off + len(name)] == name
 
 
 def test_data_block():
@@ -157,8 +170,8 @@ def test_data_block():
     # chain.h UI bytes: CUR, SEL, BUSROW = A, DELP, ADDBUS = none, FROMCHAIN, PFIRST, PLAST = every node page (PG_OUT)
     assert data[UI:UI + 8] == bytes([0, 0, 1, 0, 0xFF, 0, 0, 6])
     assert data[GAINS + 20:GAINS + 24] == bytes.fromhex("0000803f")  # limiter gain 1.0
-    assert data[PEDAL] == 0 and PEDAL < MENU6                        # MONO until pedal_in.c unpacks
-    assert MENU6 + 24 <= LIVE and LIVE + NSET <= SAVED and SAVED + NSET <= PREV
+    assert data[PEDAL] == 0 and PEDAL < MENUSCR                        # MONO until pedal_in.c unpacks
+    assert MENUSCR + 7 <= MENU7 and MENU7 + 28 <= LIVE and LIVE + NSET <= SAVED and SAVED + NSET <= PREV
     assert PREV + NSET <= MAXES and MAXES + NSET <= DEFAULTS and DEFAULTS + NSET <= CODE
     defaults = data[DEFAULTS:DEFAULTS + NSET]
     assert defaults[0] == 0 and defaults[11] == MAGIC               # Serial, settings present
@@ -191,7 +204,8 @@ CSEC = PATCH["section"][1]                                           # M3b: chai
 CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "s33_keys": 24,
         "settings_key": 32, "settings_draw": 40, "settings_pack": 48, "settings_unpack": 56,
         "engine_run": 64, "mix_get": 72, "mix_put": 80, "pages_key": 88, "pages_draw": 96,
-        "ab_tag": 104, "r50_load": 112, "r50_save": 120}
+        "ab_tag": 104, "r50_load": 112, "r50_save": 120, "perf_keys": 128, "perf_draw": 136,
+        "midi_key": 144, "midi_draw": 152}
 CMIX = {"C_POLL": "chain_poll", "C_ENGINE": "engine_run", "C_GET": "mix_get", "C_PUT": "mix_put",
         "C_KEYS": "pages_key", "C_DRAW": "pages_draw"}                # mixer.S names for them
 
@@ -199,7 +213,7 @@ CMIX = {"C_POLL": "chain_poll", "C_ENGINE": "engine_run", "C_GET": "mix_get", "C
 def test_chain_section_vectors():
     data = _data(CSEC)
     assert CSEC["addr"] == 0xC00F8000 and CSEC["source"] == "asm/mixer/chain_keys.c"
-    assert BASE + len(_data(SEC)) <= CSEC["addr"] and CSEC["addr"] + len(data) <= 0xC0102000   # after mixer.S, below the looper buffer
+    assert BASE + len(_data(SEC)) <= CSEC["addr"] and CSEC["addr"] + len(data) <= 0xC0106DC0   # after mixer.S, below R50_COPY
     for off in CVEC.values():
         w = _word(data, off // 4)
         assert w & 0x7F == 0x12 and _word(data, off // 4 + 1) == 0x8000   # b .S2 ; nop 5
@@ -224,13 +238,26 @@ def test_chain_screen_hooks():
         assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
 
 
+def test_perform_screen_11_hooks():
+    tables = {0xC00EEFC8: (0xC00A8310, "perf_keys"), 0xC00EEBDC: (0xC00A9398, "perf_draw")}   # free screen 11, stock stubs
+    for addr, (stock, name) in tables.items():
+        w = WRITES[addr]
+        assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
+        assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
+    hdr = (ROOT / "asm/perform/perform.h").read_text()
+    assert re.search(r"#define PT_SIZE 112\s", hdr)                 # 50 of them in record 50 (R50_SIZE)
+    build = (ROOT / "scripts/build_mixer_ui.py").read_text()
+    for f in ("perform_engine.c", "perform_store.c", "perform_keys.c", "perform_draw.c"):
+        assert f in build and (ROOT / "asm/perform" / f).exists()
+
+
 def test_record_50_holds_the_settings_table():
     hdr = (ROOT / "asm/mixer/chain.h").read_text()
-    r50, size, copy = (int(re.search(rf"#define {n}\D*(0x[0-9A-Fa-f]+|\d+)", hdr).group(1), 0)
-                       for n in ("R50", "R50_SIZE", "R50_COPY"))
-    assert size == 24 + 16 * 50                                      # stock globals, then an entry per patch
-    end = BASE + len(_data(SEC))
-    assert end <= r50 and r50 + size <= copy and copy + size <= CSEC["addr"]   # free DDR between the sections
+    r50, copy = (int(re.search(rf"#define {n}\D*(0x[0-9A-Fa-f]+)", hdr).group(1), 0) for n in ("R50", "R50_COPY"))
+    assert re.search(r"#define R50_SIZE \(824 \+ 4 \+ 50 \* 112\)", hdr)
+    size = 24 + 16 * 50 + 4 + 50 * 112                               # stock globals, a mixer entry per patch, Perform
+    end = CSEC["addr"] + len(_data(CSEC))
+    assert end <= copy and copy + size <= r50 and r50 + size <= 0xC010A000   # above the C section, below the looper
     assert re.search(rf"\.equ\s+R50,\s*0x{r50:08X}", (ROOT / "asm/mixer/mixer.S").read_text())
     table = WRITES[0xC00EA9A8]                                       # record size table, entry 50
     assert (table["expect"], table["data"]) == ("18000000", size.to_bytes(4, "little").hex())
@@ -250,7 +277,8 @@ def test_record_50_holds_the_settings_table():
 
 
 PEDAL_HOOKS = {0xC00EEFA0: "settings_key", 0xC00EEBB4: "settings_draw",      # screen 1 table entries
-               0xC00B9EC8: "settings_pack", 0xC00BD9E4: "settings_unpack"}  # settings.S trampolines
+               0xC00B9EC8: "settings_pack", 0xC00BD9E4: "settings_unpack",  # settings.S trampolines
+               0xC00EEFD4: "midi_key", 0xC00EEBE8: "midi_draw"}              # screen 14 table entries
 
 
 def test_pedal_input_hooks():
@@ -275,7 +303,7 @@ def test_pedal_input_names_settings_s_addresses():
     mvk = lambda a: (w(a + 4) >> 7 & 0xFFFF) << 16 | w(a) >> 7 & 0xFFFF
     draw = bt(sec["addr"] + 88)                                         # settings_draw
     keys = bt(bt(sec["addr"] + 80) + 12)                                # settings_keys_e's branch
-    want = {"SETTINGS_NAMES": mvk(draw + 16), "SETTINGS_ICONS": mvk(draw + 28),
+    want = {"SETTINGS_ICONS": mvk(draw + 28),
             "DRAW_LIST": bt(draw + 48), "SETTINGS_KEYS": keys,
             "PACK_HOOK": sec["addr"] + 128, "UNPACK_HOOK": sec["addr"] + 136}
     src = (ROOT / "asm/mixer/pedal_in.c").read_text()
@@ -291,6 +319,8 @@ def test_sections_match_a_fresh_ti_build():
         pytest.skip("TI CGT not installed (TI_CGT)")
     assert b.assemble(ROOT / SEC["source"], BASE) == _data(SEC)
     assert b.build_c() == _data(CSEC)                                # also: links without RTS, no B14
+    far = PATCH["section"][2]                                        # the C's zeroed variables
+    assert (far["addr"], _data(far)) == (b.FAR_ADDR, bytes(-(-b.FAR_LEN // 32) * 32))
 
 
 def test_m2_build_does_not_overlap():
@@ -307,7 +337,7 @@ def test_m2_build_does_not_overlap():
         chained = {0xC00C82D0: ["midi-clock write"]}                 # the poll trampoline
         chained.update(dict.fromkeys(PEDAL_HOOKS, ["midi-settings write"]))
         assert hit in ([], chained.get(a, [])), hex(a)
-    assert BASE + len(_data(SEC)) <= 0xC0102000                     # inside the 64 KB MOD code area (looper buffer above)
+    assert BASE + len(_data(SEC)) <= 0xC0106DC0                     # inside the MOD code area (R50_COPY, R50, looper above)
 
 
 def _spans(names):

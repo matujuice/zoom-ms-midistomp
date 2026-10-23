@@ -1,3 +1,4 @@
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -6,7 +7,7 @@ from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = patcher.load(ROOT / "patches/looper.yaml")
-HOOKS, BLOCK = PATCH["section"]
+HOOKS, BLOCK, LBOX = PATCH["section"]
 
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
@@ -15,7 +16,7 @@ def test_bytes_match_assembly_sources():
         if "source" not in site:
             continue
         assert asm.assemble(ROOT / site["source"], site["addr"]).hex() == site["data"]
-    for sec in PATCH["section"]:
+    for sec in (HOOKS, BLOCK):                      # LBOX is C: test_lbox_matches_a_fresh_ti_build
         code = asm.assemble(ROOT / sec["source"], sec["addr"], whole_packets=True)
         assert code == bytes.fromhex("".join(sec["data"].split()))
 
@@ -42,11 +43,11 @@ def callp_target(addr, data):
     return (addr & ~31) + 4 * (disp - (1 << 21) if disp >> 20 else disp)
 
 
-def test_draw_callsite_goes_to_draw_pre():
+def test_draw_callsite_goes_to_the_status_bar():
     draw = PATCH["write"][4]
     assert draw["addr"] == 0xC00BB0EC
     assert callp_target(draw["addr"], draw["expect"]) == 0xC00D5720
-    assert callp_target(draw["addr"], draw["data"]) == HOOKS["addr"] + 32
+    assert callp_target(draw["addr"], draw["data"]) == LBOX["addr"] == 0xC00F5400
     old, new = (int.from_bytes(bytes.fromhex(draw[k]), "little") for k in ("expect", "data"))
     assert old & ~(0x1FFFFF << 7) == new & ~(0x1FFFFF << 7)  # still callp .S2 b3, parallel bit kept
 
@@ -59,7 +60,29 @@ def test_block_layout():
     regions = [(word(8 + 8 * k), word(12 + 8 * k)) for k in range(3)]
     assert regions == [(0xC0636980, 0xC07D0000 - 0xC0636980),   # RAM test region 3
                        (0xC0198000, 0xC0200000 - 0xC0198000),   # region 2
-                       (0xC0102000, 0xC0198000 - 0xC0102000)]   # region 1 above 64 KB of code
+                       (0xC0116000, 0xC0198000 - 0xC0116000)]   # region 1 above MOD code, record 50 and MASTER
     assert word(40) == 0xFFFFFFFF  # no slot claimed
     hooks_end = HOOKS["addr"] + len(bytes.fromhex("".join(HOOKS["data"].split())))
     assert hooks_end <= BLOCK["addr"]
+
+
+def _data(sec):
+    return bytes.fromhex("".join(sec["data"].split()))
+
+
+def test_lbox_matches_a_fresh_ti_build():
+    spec = importlib.util.spec_from_file_location("build_looper_ui", ROOT / "scripts" / "build_looper_ui.py")
+    b = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(b)
+    if not b.available():
+        pytest.skip("TI CGT not installed (TI_CGT)")
+    assert b.build() == _data(LBOX)                                  # also: no RTS, no B14, below mixer.S
+
+
+def test_lbox_fits_between_m0_probe_and_mixer():
+    probe = patcher.load(ROOT / "patches/m0-probe.yaml")["section"]
+    mixer = patcher.load(ROOT / "patches/mixer-m2.yaml")["section"]
+    lo, hi = LBOX["addr"], LBOX["addr"] + len(_data(LBOX))
+    for sec in probe + mixer:
+        a = sec["addr"]
+        assert a + len(_data(sec)) <= lo or hi <= a, hex(a)

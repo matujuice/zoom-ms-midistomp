@@ -22,7 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MIX = ROOT / "asm/mixer"
 YAML = ROOT / "patches/mixer-m2.yaml"
 CGT = Path(os.environ.get("TI_CGT", Path.home() / "Downloads/ti-cgt-c6000_8.5.0.LTS"))
-C_ADDR, C_END = 0xC00F8000, 0xC0102000         # MOD code area, the looper buffer above
+C_ADDR, C_END = 0xC00F8000, 0xC0106DC0         # MOD code area, record 50 (R50, chain.h) above
+FAR_ADDR = 0xC00F7000                           # the C's zeroed variables (.far), after mixer.S, below C_ADDR
+PERF = ROOT / "asm/perform"
 CL = ["-mv6740", "--abi=eabi", "-q"]
 
 
@@ -49,8 +51,8 @@ def _alloc_sections(path):
     return sorted(out)
 
 
-def _image(elf, addr):
-    secs = _alloc_sections(elf)
+def _image(elf, addr, secs=None):
+    secs = secs if secs is not None else _alloc_sections(elf)
     end = max(a + len(b) for a, _, b in secs)
     img = bytearray(end - addr)
     for a, _, b in secs:
@@ -79,23 +81,34 @@ def build_c(stub: bool = False, listing: list | None = None) -> bytes:
     if stub or not draw.is_file():
         draw = MIX / "chain_draw_stub.c"
     srcs = [MIX / "chain_vec.asm", MIX / "chain_keys.c", draw, MIX / "pedal_in.c",
-            MIX / "engine.c", MIX / "pages.c"]
+            MIX / "engine.c", MIX / "pages.c", PERF / "perform_engine.c", PERF / "perform_store.c"]
+    ui = [PERF / "perform_keys.c", PERF / "perform_draw.c"]
+    srcs += ui if not stub and all(f.is_file() for f in ui) else [PERF / "perform_ui_stub.c"]
     with tempfile.TemporaryDirectory() as tmp:
-        _run(CL + ["-O2", "--mem_model:data=far", "--mem_model:const=far", f"-I{MIX}", "-c"]
-             + [str(s) for s in srcs], tmp)
+        # UI code for space (-ms0; push / pop without RTS helpers), the audio path for speed
+        fast = [s for s in srcs if s.name in ("engine.c", "perform_engine.c")]
+        for group, opt in ((fast, []), ([s for s in srcs if s not in fast], ["-ms0", "--disable_push_pop"])):
+            _run(CL + ["-O2", *opt, "--mem_model:data=far", "--mem_model:const=far", f"-I{MIX}", f"-I{PERF}", "-c"]
+                 + [str(s) for s in group], tmp)
         objs = [s.stem + ".obj" for s in srcs]
         Path(tmp, "l.cmd").write_text(
-            f"SECTIONS {{ GROUP: load = 0x{C_ADDR:08X} {{ .vectors .text .const .switch .fardata .far .bss .neardata .rodata }} }}\n")
+            f"SECTIONS {{ GROUP: load = 0x{C_ADDR:08X} {{ .vectors .text .const .switch .fardata .neardata .rodata }}\n"
+            f"  GROUP: load = 0x{FAR_ADDR:08X} {{ .far .bss }} }}\n")
         # no library: an RTS helper call (division, struct copy...) fails the link
         _run(CL + ["-z", *objs, "l.cmd", "-o", "c.out", "--ram_model", "--entry_point=chain_key",
                    "--unused_section_elimination=off", "--warn_sections"], tmp)
-        img, secs = _image(Path(tmp, "c.out"), C_ADDR)
+        secs = _alloc_sections(Path(tmp, "c.out"))
+        far = [s for s in secs if s[0] < C_ADDR]
+        img, _ = _image(None, C_ADDR, [s for s in secs if s[0] >= C_ADDR])
         dis = subprocess.run([str(CGT / "bin/dis6x"), "c.out"], cwd=tmp, check=True,
                              capture_output=True, text=True).stdout
     names = {n for _, n, _ in secs}
     assert names <= {".vectors", ".text", ".const", ".switch", ".fardata", ".far", ".bss", ".neardata", ".rodata"}, names
     assert not re.search(r"\bB14\b", dis), "the C must not use B14 (the OS's data pointer)"
-    assert C_ADDR + len(img) <= C_END
+    assert C_ADDR + len(img) <= C_END, hex(C_ADDR + len(img))
+    assert all(FAR_ADDR <= a and a + len(b) <= C_ADDR for a, _, b in far), far
+    global FAR_LEN
+    FAR_LEN = max((a + len(b) for a, _, b in far), default=FAR_ADDR) - FAR_ADDR
     if listing is not None:
         listing.append(dis)
     return img + b"\0" * (-(C_ADDR + len(img)) % 32)
@@ -110,9 +123,12 @@ def main(argv):
     sys.path.insert(0, str(ROOT))
     from zoomms import patcher
     builds = {"asm/mixer/mixer.S": lambda a: assemble(MIX / "mixer.S", a),
-              "asm/mixer/chain_keys.c": lambda a: build_c("--stub" in argv)}
+              "asm/mixer/chain_keys.c": lambda a: build_c("--stub" in argv),
+              "asm/mixer/far": lambda a: bytes(-(-FAR_LEN // 32) * 32)}   # after chain_keys.c in the yaml
     text, ok = YAML.read_text(), True
     for sec in patcher.load(YAML)["section"]:
+        if sec["source"] not in builds:   # asm/master/master.c: scripts/build_master_ui.py
+            continue
         code = builds[sec["source"]](sec["addr"])
         same = bytes.fromhex("".join(sec["data"].split())) == code
         print(sec["source"], f"0x{sec['addr']:08X}-0x{sec['addr'] + len(code):08X}", "OK" if same else "DIFF")

@@ -75,6 +75,11 @@ If something doesn't work, looks wrong, or you have an idea, please
 what you did and what happened. Reports from MS-50G and MS-70CDR owners are
 especially welcome.
 
+## Support
+
+MIDISTOMP is free. If it's useful to you, you can buy me a coffee:
+[GitHub Sponsors](https://github.com/sponsors/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · [PayPal](https://paypal.me/matujuice)
+
 ---
 
 ## For developers

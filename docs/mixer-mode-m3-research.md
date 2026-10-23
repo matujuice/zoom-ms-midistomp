@@ -242,8 +242,11 @@ RAM test region 1; the looper's buffer starts at `0xC0102000`; the last OS secti
 `0xC00F1364`). Users: scroll `0xC00F2100`, looper `0xC00F2200`, midi-cc `0xC00F2800`, looper
 services `0xC00F3000`, m0-probe `0xC00F3100`, mixer.S `0xC00F6000`-`0xC00F7280`. **The C
 section is at `0xC00F8000`** (about 19.5 KB with chain_draw.c and its 2 KB of buffers,
-ends `0xC00FCC40`). B14 is the constant `0xC00EF748`, so the C (far data) reads OS variables
+ends `0xC00FCC40` then; grown to `0xC0100520` by M3c, 6.9 KB left). B14 is the constant `0xC00EF748`, so the C (far data) reads OS variables
 at absolute addresses and never uses B14; built with no RTS (a helper call fails the link).
+The C's zeroed variables (`.far`, `.bss`, about 3.2 KB) are linked at `0xC00F7000`, between
+mixer.S (now ends `0xC00F68E0`) and the C, as a zero section of their own in mixer-m2.yaml
+(PERFORM10); the C itself ends `0xC0106360`, below R50_COPY `0xC0106DC0`.
 
 ## M3c: node knob pages, stock primitives (2026-10-19, TI dis6x of the 2.10 OS)
 

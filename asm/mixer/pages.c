@@ -28,7 +28,7 @@ static const char *const o_solo[] = { "Off", "A", "B" };
 
 static const Knob knobs[] = {      /* every node's knobs, in order */
     { S_IN, 150, FADER, "InLvl", 0 },
-    { S_SEND, 100, KNOB, "XFade", 0 }, { S_MODE, 3, KNOB, "Mode", o_mode }, { S_RA, 150, FADER, "BusA", 0 }, { S_RB, 150, FADER, "BusB", 0 },
+    { S_SEND, 100, FADER, "XFade", 0 }, { S_MODE, 3, KNOB, "Mode", o_mode }, { S_RA, 150, FADER, "BusA", 0 }, { S_RB, 150, FADER, "BusB", 0 },
     { S_XF, 100, FADER, "XFade", 0 }, { S_OUT, 2, KNOB, "Outpt", o_out }, { S_CURVE, 2, KNOB, "Curve", o_curve },
     { S_MA, 150, FADER, "MixA", 0 }, { S_MB, 150, FADER, "MixB", 0 }, { S_PHASE, 1, TOGGLE, "PhasB", o_phase },
     { S_MUTEA, 1, TOGGLE, "MuteA", o_off }, { S_MUTEB, 1, TOGGLE, "MuteB", o_off }, { S_SOLO, 2, KNOB, "Solo", o_solo },
@@ -81,7 +81,7 @@ static char *num(char *b, int v)    /* 0-255, no RTS division */
 
 void pages_build(Pages *p)
 {
-    static char buf[3][4];
+    static char buf[3][6];
     const Knob *kn;
     int pg = page(), k, v;
     p->name = node[pg];
@@ -98,6 +98,12 @@ void pages_build(Pages *p)
         p->max[k] = kn->max;
         p->type[k] = kn->t;
         p->text[k] = kn->opt ? kn->opt[v] : num(buf[k], v);
+        if (kn->s == S_XF || kn->s == S_SEND) {   /* crossfades read like a pan: A100 .. AB .. B100 */
+            buf[k][0] = v <= 50 ? 'A' : 'B';
+            if (v == 50) buf[k][1] = 'B', buf[k][2] = 0;
+            else num(buf[k] + 1, 2 * (v < 50 ? 50 - v : v - 50));
+            p->text[k] = buf[k];
+        }
         if ((kn->s == S_XF && LIVE[S_OUT] == 2) || (kn->s == S_SEND && eff_mode() == 2))
             p->text[k] = "-", p->val[k] = 0;   /* does nothing now: Split output / Split input */
     }
@@ -202,6 +208,9 @@ static unsigned r50_hash(const unsigned char *rec)
 /* rec = packed patch, n = its record (patch number; else >= 50). Returns 1 for
  * a patch saved by M3b5 / M3b6 (settings 0-11 in bytes 14, 15): mixer.S then
  * masks P8 back to 12 bits. */
+extern int perf_save(int patch); /* asm/perform/perform_store.c */
+unsigned r50_live_hash;          /* the patch played: Perform keys its record 50 entry on it */
+
 int mix_get(const unsigned char *rec, unsigned char *dst, int n)
 {
     unsigned h = r50_hash(rec), w = 0;
@@ -221,6 +230,7 @@ int mix_get(const unsigned char *rec, unsigned char *dst, int n)
     else
         for (i = 0; i < 50 && !src; i++)
             if (*(unsigned *)R50_ENT(i) == h) src = R50_ENT(i) + 4;
+    if ((void *)dst == (void *)LIVE) r50_live_hash = h;
     for (i = 0; i < 11; i++) dst[i] = src ? src[i] : DEFAULTS[i];
     dst[11] = MAGIC;
     dst[S_INR] = (w & 255) ^ 100;
@@ -254,6 +264,7 @@ int mix_put(unsigned char *rec, const unsigned char *src, int n)
         changed |= e[4 + i] != src[i];
         e[4 + i] = src[i];
     }
+    if ((const void *)src == (const void *)LIVE) changed |= perf_save(n);   /* STORE: Perform too */
     return changed;
 }
 
