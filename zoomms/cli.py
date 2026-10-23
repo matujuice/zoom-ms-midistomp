@@ -1,4 +1,5 @@
-"""zoomms command line. Nothing here talks to a pedal except `identify`, which only reads."""
+"""zoomms command line. Nothing here talks to a pedal except `identify` and
+`screenshot`, which only read."""
 
 from __future__ import annotations
 
@@ -21,6 +22,21 @@ def cmd_identify(args) -> int:
     match = models.by_sysex_id(ident.family) if ident.manufacturer == 0x52 else None
     label = match[1]["name"] if match else "unknown model"
     print(f"manufacturer 0x{ident.manufacturer:02X}  model 0x{ident.family:02X} ({label})  firmware {ident.version}")
+    return 0
+
+
+def cmd_screenshot(args) -> int:
+    from . import screenshot
+
+    if args.from_raw:
+        planes = Path(args.from_raw).read_bytes()
+    else:
+        planes = screenshot.capture(args.port, model=int(args.model, 0))
+    if args.raw:
+        Path(args.raw).write_bytes(planes)
+        print(f"wrote {args.raw} ({len(planes)} B: plane A, then plane B)")
+    Path(args.out).write_bytes(screenshot.png(screenshot.pixels(planes, args.plane), args.scale))
+    print(f"wrote {args.out}")
     return 0
 
 
@@ -263,6 +279,16 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("identify", help="ask the pedal for its model and firmware version")
     p.add_argument("--port")
     p.set_defaults(func=cmd_identify)
+    p = sub.add_parser("screenshot", help="read the LCD over SysEx and write a PNG (needs patches/screenshot.yaml)")
+    p.add_argument("--port")
+    p.add_argument("--out", default="screenshot.png")
+    p.add_argument("--scale", type=int, default=4, help="pixels per LCD pixel (default 4)")
+    p.add_argument("--plane", choices=["xor", "a", "b"], default="xor",
+                   help="xor: what the screen shows (default); a, b: one LCD plane")
+    p.add_argument("--raw", help="also save the 2 KiB dump (plane A, then B)")
+    p.add_argument("--from-raw", help="decode a saved dump instead of asking the pedal")
+    p.add_argument("--model", default="0x61", help="SysEx model id (default 0x61, the MS-70CDR OS)")
+    p.set_defaults(func=cmd_screenshot)
     p = sub.add_parser("updater-info", help="list files inside an official updater")
     p.add_argument("updater")
     p.set_defaults(func=cmd_updater_info)
