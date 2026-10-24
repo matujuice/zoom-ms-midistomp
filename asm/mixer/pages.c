@@ -217,7 +217,7 @@ int mix_get(const unsigned char *rec, unsigned char *dst, int n)
     const unsigned char *src = 0;
     unsigned char old[12];
     int i, was_old = 0;
-    int v2 = rec[18 * 5 + 17] >> 6 & 1;  /* 5-bit chunks; else a pre-beta2 save with 6-bit ones */
+    int v2 = rec[18 * 5 + 17] >> 6 & 1;  /* 5-bit chunks; else a save before b70dc01, 6-bit ones */
     for (i = 0; i < 6; i++) {
         dst[12 + i] = rec[18 * i + 17] & 3;
         w |= v2 ? (unsigned)(rec[18 * i + 17] >> 2 & 31) << 5 * i

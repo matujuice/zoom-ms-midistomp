@@ -21,8 +21,9 @@
 ;
 ; Saving (pages.c mix_get / mix_put): the bus of each slot and settings
 ; 18-23 ride in byte 17 of the six 18-byte slot blocks of the packed 122-byte
-; patch (free: bytes 0-16 are the effect's; bits 0-1 the bus, 2-6 five bits of
-; 18-23 each, bit 7 always 0: a SysEx round trip moves it), settings 0-10 in a table at the
+; patch (free: bytes 0-16 are the effect's; bits 0-1 the bus, bits 2-6 the next 5
+; of the 21 bits of 18-23, bit 6 of block 6 marks this layout, bit 7 always 0: a
+; SysEx round trip moves it), settings 0-10 in a table at the
 ; end of the global record 50 (R50, grown to 824 bytes, an entry per patch;
 ; then the Perform table, asm/perform/perform_store.c).
 ; LIVE holds the 24 bytes of the patch being played, SAVED the ones stored in
