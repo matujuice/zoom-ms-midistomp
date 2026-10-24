@@ -217,9 +217,11 @@ int mix_get(const unsigned char *rec, unsigned char *dst, int n)
     const unsigned char *src = 0;
     unsigned char old[12];
     int i, was_old = 0;
+    int v2 = rec[18 * 5 + 17] >> 6 & 1;  /* 5-bit chunks; else a pre-beta2 save with 6-bit ones */
     for (i = 0; i < 6; i++) {
         dst[12 + i] = rec[18 * i + 17] & 3;
-        w |= (unsigned)(rec[18 * i + 17] >> 2) << 6 * i;
+        w |= v2 ? (unsigned)(rec[18 * i + 17] >> 2 & 31) << 5 * i
+                : (unsigned)(rec[18 * i + 17] >> 2) << 6 * i;
         old[2 * i] = rec[18 * i + 14];
         old[2 * i + 1] = rec[18 * i + 15];
     }
@@ -254,7 +256,8 @@ int mix_put(unsigned char *rec, const unsigned char *src, int n)
     unsigned char *e;
     int i, changed;
     for (i = 0; i < 6; i++)
-        rec[18 * i + 17] = (src[12 + i] & 3) | (w >> 6 * i & 63) << 2;
+        rec[18 * i + 17] = (src[12 + i] & 3) | (w >> 5 * i & 31) << 2;
+    rec[18 * 5 + 17] |= 0x40;           /* bit 7 stays 0: a SysEx round trip moved it into other bytes */
     if ((unsigned)n >= 50) return 0;
     e = R50_ENT(n);
     h = r50_hash(rec);
