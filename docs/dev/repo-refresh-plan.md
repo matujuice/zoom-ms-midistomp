@@ -65,7 +65,9 @@ Order:
 ## Open
 - The effect type chart: TBD.
 - The text for the stereo effects waits until they are done in the other session.
-- Luca's cover photo and his new banner.
+- Redo the custom effects cover (README > Custom effects, `release/covers.png` in zoom-ms-zdl-effects-pack) in the
+  v2.0 look.
+- Redo the demo video (README > Demo): the current one is v1 on an MS-60B. Show v2.0 on the MS-70CDR.
 
 ## Order of work
 1. Docs move and link fixes (mechanical).
