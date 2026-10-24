@@ -1,7 +1,7 @@
 """Host check for asm/perform/perform_draw.c and perform_keys.c: build them with a host C compiler
 (gcc, clang, cl or `pip install ziglang`) against a fake LCD frame and fake stock knob / fader /
 switch / tab primitives, draw the preview states and write each as <name>.png (4x, the mockup's
-colors) plus <name>_mockup.png when Node is found: the same state drawn by docs/perform-ui-mockup.html's
+colors) plus <name>_mockup.png when Node is found: the same state drawn by docs/dev/perform-ui-mockup.html's
 own JavaScript (its FX parameters renamed Knob1 ... as the C names them). The pixel difference of
 each pair is printed. It then runs the gesture and SETUP key checks on the host.
 
@@ -19,7 +19,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 PERF = ROOT / "asm/perform"
-MOCKUP = ROOT / "docs/perform-ui-mockup.html"
+MOCKUP = ROOT / "docs/dev/perform-ui-mockup.html"
 BG, INK = (0xE2, 0xE5, 0xE8), (0x3A, 0x3C, 0x96)
 EXTRA = ["C:/msys64/ucrt64/bin/gcc.exe", "C:/msys64/mingw64/bin/gcc.exe", "C:/mingw64/bin/gcc.exe",
          "C:/Program Files/LLVM/bin/clang.exe"]

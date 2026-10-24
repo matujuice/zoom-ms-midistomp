@@ -1,6 +1,6 @@
 /* Perform mode, screen 11 keys: the gesture recognizer (play) and the SETUP lists (setup).
- * Design: docs/v2.0-brief.md Phase 3, docs/perform-ui-mockup.html (v14: setupKey(), the
- * input section). Event numbers: docs/perform-mode-p0-research.md Q1 (press / release
+ * Design: docs/dev/v2.0-brief.md Phase 3, docs/dev/perform-ui-mockup.html (v14: setupKey(), the
+ * input section). Event numbers: docs/dev/perform-mode-p0-research.md Q1 (press / release
  * 64-75, footswitch 32 / 33, knob 1 push 34 / 35, turns 160-162 with the step count).
  * perf_key() runs in the UI task, perf_poll() every 16 ms in the switch task. The rows
  * and their text are perform_draw.c's (pd_*). No libc, no RTS. */

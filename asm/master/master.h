@@ -1,4 +1,4 @@
-/* MASTER metering screen (docs/master-ui-mockup.html is the spec): fixed addresses.
+/* MASTER metering screen (docs/dev/master-ui-mockup.html is the spec): fixed addresses.
  * The section is 48 KB from 0xC010A000, lent by the looper (asm/looper/block.S region 1
  * starts at 0xC0116000). Code and small data first (scripts/build_master_ui.py END), then
  * the buffers below, which are not in the image: master.c clears them at first open. */
@@ -19,7 +19,7 @@
  * and the limiter gain (mixer.S GAINS +144, G_LIM = 5). */
 #define MS_F      ((const volatile float *)0x11F03738)
 #define MS_GLIM   (*(const volatile float *)(0xC00F6000u + 144 + 4 * 5))
-/* The stock post mix after the engine (docs/mixer-mode-m0.md step 10): F = ((F + Acc) * g1 + Snap * g2) * g3,
+/* The stock post mix after the engine (docs/dev/mixer-mode-m0.md step 10): F = ((F + Acc) * g1 + Snap * g2) * g3,
  * then out_to_int clamps to +-1. master_tap does the same sum, so the meters see the real output and its clipping. */
 #define MS_ACC    ((const volatile float *)0x11F03778)
 #define MS_SNAP   ((const volatile float *)0x11F037F8)

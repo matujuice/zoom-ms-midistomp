@@ -1,5 +1,5 @@
 """Host checks for asm/master/master.c (tests/master_host/): master_tap packing, the tuner, the loudness reading and
-the six pages' framebuffers bit for bit against docs/master-ui-mockup.html's own script (run with node).
+the six pages' framebuffers bit for bit against docs/dev/master-ui-mockup.html's own script (run with node).
 The C is built at the mockup's 50 ms frame (-DMS_FRAME_MS=50); the pedal's 64 ms scales the falls."""
 import importlib.util
 import json
@@ -46,7 +46,7 @@ def test_pages_match_the_mockup(exe, tmp_path):
     node = shutil.which("node")
     if not node:
         pytest.skip("node not found")
-    subprocess.run([node, str(HOST / "master_ref.js"), str(ROOT / "docs/master-ui-mockup.html"), str(tmp_path)], check=True)
+    subprocess.run([node, str(HOST / "master_ref.js"), str(ROOT / "docs/dev/master-ui-mockup.html"), str(tmp_path)], check=True)
     meta = json.loads((tmp_path / "meta.json").read_text())
     (tmp_path / "shots.txt").write_text("".join(f"{s['name']} {s['frame']}\n" for s in meta["shots"]))
     for s in meta["shots"]:

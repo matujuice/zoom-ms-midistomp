@@ -1,11 +1,11 @@
 /* GRDLOOP status bar (MS-70CDR 2.10 OS), drawn like Perform mode's top bar
- * (docs/perform-ui-mockup.html statusBar / drawPlay): fill over the cycle, the left text,
+ * (docs/dev/perform-ui-mockup.html statusBar / drawPlay): fill over the cycle, the left text,
  * bar.beat/cycle on the right, a gap in the edge and a dotted line at each bar line.
  * Replaces looper.S draw_pre at the callp 0xC00BB0EC (patches/looper.yaml); the poll's
  * redraw check stays in looper.S (S_PROG's bar/beat bits change every beat).
  * Cover: the GRDLOOP cover's bar (make_cover.py) x 0-127, y 17-34, pixel for pixel.
  * Knob pages: none (Luca, PERFORM11: it clashed with the page title).
- * Data: docs/looper-services.md (S_TEXT, S_PROG, S_LEFT). Built by scripts/build_looper_ui.py. */
+ * Data: docs/dev/looper-services.md (S_TEXT, S_PROG, S_LEFT). Built by scripts/build_looper_ui.py. */
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
 #define SV(off) (*(volatile unsigned *)(0xC00F3000u + (off)))

@@ -5,8 +5,8 @@
 #   flipping it, and a hold does nothing; its on/off CC counts a press for
 #   values 64-127. The looper drives the LED while it is under the cursor, and
 #   its Effect View gets a status box (text, progress bar and pulse from the ZDL).
-# Design and addresses: docs/os-reverse-engineering.md, "Looper services";
-# block layout: docs/looper-services.md.
+# Design and addresses: docs/dev/os-reverse-engineering.md, "Looper services";
+# block layout: docs/dev/looper-services.md.
 # Apply after midi-cc, midi-clock and tempo-hold (it retargets their trampolines).
 # With mixer-m2, apply this first: the mixer poll then chains poll_pre.
 # The hex below is generated from asm/looper/*.S with

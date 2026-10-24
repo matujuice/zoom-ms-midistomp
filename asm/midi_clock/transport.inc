@@ -2,7 +2,7 @@
 ;
 ; Transport block for custom effects (issue #24): 8 words at a fixed L2
 ; address, read by effects with plain loads. Loaded at boot with the magic
-; and 120 BPM; layout and reader rules in docs/transport-block.md.
+; and 120 BPM; layout and reader rules in docs/dev/transport-block.md.
         .equ    BLOCK, 0x1181FF00
         .equ    B_MAGIC, 0                  ; 0x5A4D5401 ("ZMT", version 1)
         .equ    B_SEQ, 4                    ; +1 before and after each update

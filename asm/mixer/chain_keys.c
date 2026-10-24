@@ -1,6 +1,6 @@
 /* Mixer Mode M3b: the Effect Chain screen (stock screen 3) model, keys and
- * hooks. Design: docs/mixer-ui-mockup.html v20 (knob(), cursor handlers),
- * addresses: docs/mixer-mode-m3-research.md "M3b". Entry points (chain_vec.asm
+ * hooks. Design: docs/dev/mixer-ui-mockup.html v20 (knob(), cursor handlers),
+ * addresses: docs/dev/mixer-mode-m3-research.md "M3b". Entry points (chain_vec.asm
  * at the section start): chain_key, chain_draw_h, chain_poll, s33_keys.
  *
  * Slots stay sorted by zone (PRE, A, B, POST), so a zone's effects are

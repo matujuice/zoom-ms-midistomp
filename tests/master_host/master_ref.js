@@ -1,4 +1,4 @@
-// Runs docs/master-ui-mockup.html's script headless for the host test: 60 s of the made-up music at 50 ms frames, then the
+// Runs docs/dev/master-ui-mockup.html's script headless for the host test: 60 s of the made-up music at 50 ms frames, then the
 // shots (like scratchpad shots.js). Writes <out>/audio.bin (per frame: int32 page, int32 scope span, then 2205 x (L, R, limiter, input L, input R)
 // float32) and <out>/meta.json (the shots: name, frame, framebuffer string of 0 / 1).
 const fs = require("fs");

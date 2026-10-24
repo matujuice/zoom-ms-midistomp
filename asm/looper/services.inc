@@ -1,5 +1,5 @@
 ; Looper services block (v2.0 step 2), MS-70CDR 2.10 OS. Layout and rules:
-; docs/looper-services.md. The Looper ZDL reads and writes it with plain loads
+; docs/dev/looper-services.md. The Looper ZDL reads and writes it with plain loads
 ; and stores; nothing calls into the firmware.
         .equ    SV, 0xC00F3000              ; RAM test region 1, after the MOD code
         .equ    S_MAGIC, 0                  ; 0x5A4C5301 ("ZLS", version 1)
@@ -18,7 +18,7 @@
         .equ    S_PROG, 76                  ; ZDL: 0-15 fill 0..256, 16-21 cycle, 22-27 bar, 28-29 beat-1, 30 no clock
         .equ    S_INV, 80                   ; ZDL: 1 = box inverted (pulse, blink)
         .equ    S_CYCLE, 84                 ; Perform: CYCLE in bars, 0 = none (zero at boot)
-        .equ    S_LEFT, 120                 ; ZDL: left text code (lbox.c, docs/looper-services.md)
+        .equ    S_LEFT, 120                 ; ZDL: left text code (lbox.c, docs/dev/looper-services.md)
         .equ    S_LASTHB, 96                ; firmware private: heartbeat seen last poll
         .equ    S_STALE, 100                ; firmware private: polls without a heartbeat
         .equ    S_WASMINE, 104              ; firmware private: S_MINE last poll

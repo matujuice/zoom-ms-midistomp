@@ -1,6 +1,6 @@
 /* Mixer Mode: the node knob pages (stock screen 15, the MIXER screen) and the
  * settings in the packed patch. Each node's knobs fill pages 3 at a time with no
- * gaps, as stock effect pages (docs/v2.0-brief.md "Node knob pages"):
+ * gaps, as stock effect pages (docs/dev/v2.0-brief.md "Node knob pages"):
  *   IN      InLvl                  (Split: InL, InR)
  *   [ROUTE] XFade, Mode, BusA      BusB
  *   [MIX]   XFade, Outpt, Curve    MixA, MixB, PhasB    MuteA, MuteB, Solo

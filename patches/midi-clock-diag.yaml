@@ -6,7 +6,7 @@
 #   rates follow a DAW or drum machine. Start/stop/continue are ignored.
 #   The tempo follows after about 2 beats; a step of 1 BPM needs two matching
 #   measurements (2 beats each), so jittery USB clock does not wobble it.
-# Design and addresses: docs/os-reverse-engineering.md, "MIDI clock patch".
+# Design and addresses: docs/dev/os-reverse-engineering.md, "MIDI clock patch".
 # The hex below is generated from asm/midi_clock/*.S with
 #   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_clock_patch.py checks it still matches the source.

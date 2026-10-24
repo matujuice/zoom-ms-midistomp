@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User guide
+    url: https://github.com/matujuice/zoom-ms-midistomp/blob/main/docs/user-guide.md
+    about: Install, recovery, every screen and the MIDI CC chart.
+  - name: Effects pack
+    url: https://github.com/matujuice/zoom-ms-zdl-effects-pack/issues
+    about: Problems with GRDLOOP, GridDly or other pack effects go here.

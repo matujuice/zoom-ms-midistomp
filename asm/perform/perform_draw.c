@@ -1,5 +1,5 @@
 /* Perform mode, screen 11 pixels: the play screen and the SETUP lists and move pages.
- * A port of drawPlay() / list() / drawMove() in docs/perform-ui-mockup.html (v14), drawn
+ * A port of drawPlay() / list() / drawMove() in docs/dev/perform-ui-mockup.html (v14), drawn
  * straight into the LCD frame (page format, like pages.c) with the mockup's fonts; the
  * knob, fader, switch and tabs are the stock primitives (stock.h). Keys and the
  * navigation state: perform_keys.c. No libc, no RTS (no / % by variables), no B14. */
@@ -11,7 +11,7 @@
 #endif
 
 #ifndef SVC
-#define SVC(i) (*(volatile int *)(0xC00F3000u + 4 * (i)))   /* looper services block (docs/looper-services.md) */
+#define SVC(i) (*(volatile int *)(0xC00F3000u + 4 * (i)))   /* looper services block (docs/dev/looper-services.md) */
 #endif
 #define P ((volatile unsigned char *)LCD0)
 /* fxid 497 as the patch stores it (effects pack extract_effect_db.py patch_id), gid bits masked */

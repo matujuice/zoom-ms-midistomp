@@ -1,4 +1,4 @@
-; Mixer Mode M0 hardware probes P1-P6, v2 (docs/mixer-mode-m0.md), MS-70CDR 2.10 OS.
+; Mixer Mode M0 hardware probes P1-P6, v2 (docs/dev/mixer-mode-m0.md), MS-70CDR 2.10 OS.
 ; Diagnostic build only, never released. Reads only: no flash write, and the
 ; audio path runs the same effect calls in the same order as stock.
 ;

@@ -1,4 +1,4 @@
-# Mixer Mode M2 + M3a (docs/mixer-mode-plan.md): the bus engine with the node
+# Mixer Mode M2 + M3a (docs/dev/mixer-mode-plan.md): the bus engine with the node
 # settings, saved per patch, on the MIXER screen and MIDI CC 85-101. MS-70CDR 2.10
 # OS. Test builds only. M3a: every slot has a bus saved per patch, which follows
 # the effect when it is moved, added or deleted. M3b: the Effect Chain screen

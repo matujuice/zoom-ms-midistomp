@@ -41,7 +41,7 @@ def test_regions_skip_code_and_used_ram():
     regions = [(words[i + 3 * k], words[i + 3 * k + 1]) for k in range(5)]
     assert 0xC00F1364 <= BASE and BASE + len(sec) <= 0xC00F2000  # after the OS image, below our other sections
     assert regions[0][0] - 0x08000000 >= 0xC00F3080  # region 1 above our DDR sections (looper block ends here)
-    # the unreferenced ranges on the 70CDR OS (docs/ms70cdr-addresses.md, ramtest.S), SDRAM through the uncached alias
+    # the unreferenced ranges on the 70CDR OS (docs/dev/ms70cdr-addresses.md, ramtest.S), SDRAM through the uncached alias
     audit = [(0xC00F1364, 0xC0198000), (0xC0198000, 0xC0200000), (0xC0636980, 0xC07D0000),
              (0xC07F4000, 0xC0800000), (0x80000000, 0x80020000)]
     for (s, e), (a, b) in zip(regions, audit):

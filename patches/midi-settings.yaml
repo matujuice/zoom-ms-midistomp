@@ -1,10 +1,10 @@
-# MIDI SETTINGS menu (issue #26, v0.5). MS-70CDR 2.10 OS (addresses: docs/ms70cdr-addresses.md).
+# MIDI SETTINGS menu (issue #26, v0.5). MS-70CDR 2.10 OS (addresses: docs/dev/ms70cdr-addresses.md).
 # Apply after midi-cc.yaml and midi-clock.yaml (it reroutes the CC call site
 # those set up, and clock.S and poll.S use the word and vector kept here).
 #   Menu gets a MIDI SETTINGS entry (CLOCK, TRANSPORT, PROG CH and CC
 #   RECEIVE, PROG CH START NO., MIDI CHANNEL), saved in flash record 51;
 #   SETTINGS gets TEMPO LOCK, saved with the stock settings.
-# Design and addresses: docs/os-reverse-engineering.md, "MIDI SETTINGS".
+# Design and addresses: docs/dev/os-reverse-engineering.md, "MIDI SETTINGS".
 # The hex below is generated from asm/midi_settings/*.S with
 #   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_settings_patch.py checks it still matches the source.

@@ -1,8 +1,8 @@
 /* Perform mode: shared by perform_engine.c (grid, moves, targets, LED, audio
  * block), perform_keys.c (gestures, play and setup keys), perform_draw.c
  * (screen 11 pixels) and perform_store.c (record 50 table).
- * Design: docs/v2.0-brief.md Phase 3, docs/perform-ui-mockup.html (v14),
- * docs/perform-mode-p0.md (decisions), docs/perform-mode-plan.md (build plan).
+ * Design: docs/dev/v2.0-brief.md Phase 3, docs/dev/perform-ui-mockup.html (v14),
+ * docs/dev/perform-mode-p0.md (decisions), docs/dev/perform-mode-plan.md (build plan).
  * Build: TI cl6x, C6740 EABI, far data, no RTS, never touch B14
  * (scripts/build_mixer_ui.py links it with the mixer C). */
 #ifndef PERFORM_H

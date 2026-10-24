@@ -5,7 +5,7 @@
 #   does the stock end bump with a 30 ms pause (stock 125 ms).
 #   Top/bottom keys, holds, combos and menus are unchanged; the move still
 #   happens on release, as stock.
-# Design and addresses: docs/os-reverse-engineering.md, "Effect scrolling".
+# Design and addresses: docs/dev/os-reverse-engineering.md, "Effect scrolling".
 # The hex below is generated from asm/scroll/scroll.S with
 #   zoomms asm asm/scroll/scroll.S --addr 0xC00F2100 --section
 # and tests/test_scroll_patch.py checks it still matches the source.

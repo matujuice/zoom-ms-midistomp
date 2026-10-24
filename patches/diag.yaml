@@ -1,4 +1,4 @@
-# DIAGNOSTICS (docs/diagnostics-plan.md): a CPU badge on the MENU title bar and a
+# DIAGNOSTICS (docs/dev/diagnostics-plan.md): a CPU badge on the MENU title bar and a
 # 4-page dashboard (LOAD, EFFECTS, MODS, ABOUT) on the VERSION screen, renamed
 # DIAGNOSTICS. Test builds only; it takes the m0 probe's place (never both).
 # The audio timing is in asm/mixer/engine.c (mixer-m2.yaml, apply that first): it calls
@@ -163,7 +163,7 @@ section:
       62018101860592c2168507c5ba85d2b95bf5ef0570a5100062418a011c80c0e3
       26060795e0650003d80f2c05060592c207c516853aa6f2395bf3ef05c38520ef
       70a510006241840126060795e0650003876677c5ef0177d5f7766e6c300580ee
-      28201802e90760022b3aa400f7252c00eb07e000274477956fd86e0c801800ed
+      28141802e90760022b3aa400f7252c00eb07e000274477956fd86e0c801800ed
       670c7725ce900c0c6e4c672f9200c67552dcff07661c9000a7059291e314e0ed
       47116e4cf8328c01415c0c02d9c98800a006040366a29081c085c18c001020e8
       0c001d10aa0000058aff2b056e0c06f59018402bdbc98000a0168402010220e3

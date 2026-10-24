@@ -2,7 +2,7 @@
  * engine_run, then goes on at the stock post mix). The stock loop calls slots
  * 0-5 in order on one shared stereo buffer F (16 floats, LLLLLLLL RRRRRRRR);
  * effects work in place. F is changed by content, never by pointer: two OS
- * slot functions hard-code it. Signal flow (docs/v2.0-brief.md):
+ * slot functions hard-code it. Signal flow (docs/dev/v2.0-brief.md):
  *   IN       F x Input Level (Split: Input L on L, Input R on R)
  *   PRE      the PRE slots
  *   [ROUTE]  Serial: the other slots in order, no [MIX].

@@ -1,4 +1,4 @@
-# Mixer Mode M0 hardware probes P1-P6, v2 (docs/mixer-mode-m0.md, "Probe build:
+# Mixer Mode M0 hardware probes P1-P6, v2 (docs/dev/mixer-mode-m0.md, "Probe build:
 # how to read it"). Diagnostic build only, never released. MS-70CDR 2.10 OS.
 # Build: the release set (scripts/midistomp_builder.py PATCHES) plus this patch,
 # then m0-probe-chain.yaml (the slot-loop hook; left out in mixer builds).

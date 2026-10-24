@@ -1,4 +1,4 @@
-/* MS-70CDR 2.10 OS addresses chain_keys.c uses (docs/mixer-mode-m3-research.md
+/* MS-70CDR 2.10 OS addresses chain_keys.c uses (docs/dev/mixer-mode-m3-research.md
  * "M3b"). Stock functions are plain C ABI (args A4, B4, A6, B6, A8, B8). */
 #ifndef STOCK_H
 #define STOCK_H
@@ -43,7 +43,7 @@
 #define PAGE (*(volatile int *)(0xC00F6000 + 128))   /* node knob page PG_* (screen 15, pages.c) */
 
 /* node knob pages: the stock Effect View knob page primitives (0xC00CAFA0 draws an effect's
- * page with them; docs/mixer-mode-m3-research.md "M3c"). frame 0 = the LCD frame buffer
+ * page with them; docs/dev/mixer-mode-m3-research.md "M3c"). frame 0 = the LCD frame buffer
  * LCD0, page format; every primitive marks the rows it touches dirty. */
 #define LCD0 ((volatile unsigned *)0x11816800)        /* frame 0: 1024 bytes */
 #define LCD_DIRTY FN(0xC00A13C0, void, (int frame))   /* every row of the frame to the LCD */

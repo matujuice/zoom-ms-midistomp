@@ -1,0 +1,57 @@
+name: Bug report
+description: Something doesn't work, sounds wrong, or the pedal froze or won't boot
+title: "[bug] "
+labels: [bug]
+body:
+  - type: dropdown
+    id: pedal
+    attributes:
+      label: Pedal
+      options: [MS-70CDR, MS-60B, MS-50G, Other]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MIDISTOMP version
+      description: MENU > SYSTEM, first page (version and label), or the updater's file name for a test build.
+      placeholder: V2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Install / updater, Effect chain routing, Perform mode, Looper, MASTER / KALEIDO, MIDI, Settings, Effects, Other]
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: Step by step. Include the patch's routing and effects if it matters, and any MIDI gear or app.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened instead
+      description: Screen text, sound, freeze, reboot. A phone photo of the screen helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: boot
+    attributes:
+      label: Does it boot?
+      options:
+        - Boots normally
+        - Boots but misbehaves
+        - Does not boot (recovered with update mode)
+        - Does not boot (not recovered)
+  - type: dropdown
+    id: repro
+    attributes:
+      label: Can you make it happen again?
+      options: [Always, Sometimes, Once]

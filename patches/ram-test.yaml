@@ -1,5 +1,5 @@
 # RAM canary test (issue #19), diagnostic build only, never released.
-# MS-70CDR 2.10 OS (addresses: docs/ms70cdr-addresses.md).
+# MS-70CDR 2.10 OS (addresses: docs/dev/ms70cdr-addresses.md).
 # Fills the RAM the space audit (issue #19) found unreferenced with a pattern once
 # after boot; the VERSION screen (renamed RAMTEST) shows, per region, how
 # many words changed since. Apply after midi-clock.yaml (it takes over that

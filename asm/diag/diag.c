@@ -1,5 +1,5 @@
 /* SYSTEM (MS-70CDR 2.10 OS): DSP and CPU meters in the MENU title bar and 4 pages on the
- * VERSION screen (screen 9, menu entry SYSTEM). docs/diagnostics-plan.md.
+ * VERSION screen (screen 9, menu entry SYSTEM). docs/dev/diagnostics-plan.md.
  * Audio side: diag_end, called by asm/mixer/engine.c at the end of each block, sums 4096
  * blocks (0.74 s) and publishes the averages. TSCL stops while the OS idles, so the TSCL
  * period between two block starts counts busy cycles only: period / 54422 = CPU load.
@@ -28,7 +28,7 @@
 #define FX_EMPTY 0xC00E0780u
 #define FX_MUTE 0xC00E0784u                               /* an effect is loading */
 #define DESC(s) (*(volatile unsigned *)(0xC0064E04u + 28 * (s)))   /* ZDL descriptor */
-#define LOOPER_SLOT (*(volatile int *)(0xC00F3040u))      /* looper services +40: GRDLOOP slot, -1 none */
+#define LOOPER_SLOT (*(volatile int *)(0xC00F3028u))      /* looper services +40: GRDLOOP slot, -1 none */
 #define STAMP(i) ((const char *)(0xC00F3140u + 16 * (i))) /* diag_vec.asm: version, commit, date, label */
 
 extern __cregister volatile unsigned int TSCL;

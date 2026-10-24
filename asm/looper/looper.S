@@ -23,7 +23,7 @@
 ;              says so (pulse, blink). The poll asks the UI for a redraw when the
 ;              text, the progress (in 64ths) or the inversion changes.
 ; Everything else goes on to the hooks the trampolines called before.
-; Design and addresses: docs/os-reverse-engineering.md, "Looper services".
+; Design and addresses: docs/dev/os-reverse-engineering.md, "Looper services".
 ;
 ; In DDR at 0xC00F2200, RAM test region 1, after scroll.S.
 

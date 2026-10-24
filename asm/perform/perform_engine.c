@@ -5,7 +5,7 @@
  * reset, load) turn interrupts off around their slot writes. Effect parameters
  * are written by the 16 ms poll, as the MIDI CC path does (an effect's edit
  * callback is not safe from the audio block: it froze the pedal).
- * Design: docs/v2.0-brief.md Phase 3, docs/perform-mode-p0-research.md Q2/Q3.
+ * Design: docs/dev/v2.0-brief.md Phase 3, docs/dev/perform-mode-p0-research.md Q2/Q3.
  * No RTS: no division, no struct copies, no libc. */
 #include "perform.h"
 #include "chain.h"

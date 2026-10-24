@@ -1,11 +1,11 @@
-; Mixer Mode M3c (docs/mixer-mode-plan.md), MS-70CDR 2.10 OS. Test builds only.
+; Mixer Mode M3c (docs/dev/mixer-mode-plan.md), MS-70CDR 2.10 OS. Test builds only.
 ;
 ; The asm half of Mixer Mode: fixed entry points, the mixer data, saving
 ; (the settings ride in the packed patch), the bus-follows-effect hooks, the
 ; poll and MIDI CC 85-95. The engine, the settings packing and the node knob
 ; pages (screen 15) are C (the section at 0xC00F8000, chain_vec.asm vectors):
 ;   engine.c  the bus engine (replaces the stock slot loop, packet 0x1181BE00
-;             jumps to +0, chain_jump.S), signal flow as docs/v2.0-brief.md
+;             jumps to +0, chain_jump.S), signal flow as docs/dev/v2.0-brief.md
 ;   pages.c   IN / [ROUTE] / [MIX] / OUT knob pages, mix_get / mix_put
 ; Settings (chain.h S_*): 24 bytes, 0-10 the node settings, 11 MAGIC, 12-17
 ; LAYOUT (the bus of each slot), 18-23 Input R, Master R, Output Mode, Mute A,
@@ -16,7 +16,7 @@
 ; through the hooks below). It follows the effect when the Effect Chain
 ; screen moves it (mv_swap), or an effect is added (mv_add) or deleted
 ; (mv_delete): each wraps the stock function at its only call site and moves
-; the buses just before stock moves the effects (docs/mixer-mode-m3-research.md,
+; the buses just before stock moves the effects (docs/dev/mixer-mode-m3-research.md,
 ; "M3a hooks").
 ;
 ; Saving (pages.c mix_get / mix_put): the bus of each slot and settings

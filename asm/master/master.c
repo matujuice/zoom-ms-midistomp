@@ -1,4 +1,4 @@
-/* MASTER metering screen (MENU > MASTER): a port of the script in docs/master-ui-mockup.html (v8),
+/* MASTER metering screen (MENU > MASTER): a port of the script in docs/dev/master-ui-mockup.html (v8),
  * and KALEIDO (MENU > KALEIDO), a full-screen visualizer on the same tap.
  * Six pages (SPECTRUM, SCOPE + tuner, STEREO, LOUDNESS, IN METER, OUT METER) that watch the pedal's output after
  * the limiter, and its input (IN METER). Four entry points (master_vec.asm): master_tap (audio, once per 8-frame block while
@@ -846,7 +846,7 @@ static void draw_in(void)
 #define KT 162.97466f                                       /* sine table steps per radian */
 #define KS(x) T[(int)((x) + 65536.0f) & 1023]               /* sin of x table steps, x > -65536 */
 #ifndef MS_ZT
-#define MS_ZT ((volatile const unsigned *)0x1181FF00u)      /* MIDI transport block (docs/transport-block.md) */
+#define MS_ZT ((volatile const unsigned *)0x1181FF00u)      /* MIDI transport block (docs/dev/transport-block.md) */
 #endif
 
 static void kal_poll(St *s)         /* every 16 ms: band levels and L/R balance of the new frames */

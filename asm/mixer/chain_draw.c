@@ -1,6 +1,6 @@
 /* Mixer Mode: draws the Effect Chain screen (stock screen 3) into a 128 x 64 frame buffer
  * (the node knob pages are drawn by stock code: pages.c). A port of drawChain() / columns() in
- * docs/mixer-ui-mockup.html (v20): mono / stereo input, the four modes, the three Output
+ * docs/dev/mixer-ui-mockup.html (v20): mono / stereo input, the four modes, the three Output
  * Modes, Mute (dotted lanes), the silent "!". No Smart Warning, no popup (M3c).
  * Pure: reads Chain, writes only fb. No libc, no floats, no RTS (no / % by variables).
  * fb: row-major, bit 7 of byte 0 = pixel (0,0), 1 = ink. */

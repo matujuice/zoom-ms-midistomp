@@ -1,6 +1,6 @@
 /* Mixer Mode: shared by the C section (chain_keys.c model and keys, chain_draw.c
  * pixels, engine.c audio, pages.c node knob pages, pedal_in.c PEDAL INPUT).
- * Design: docs/mixer-ui-mockup.html v20, docs/v2.0-brief.md "Effect Chain screen".
+ * Design: docs/dev/mixer-ui-mockup.html v20, docs/dev/v2.0-brief.md "Effect Chain screen".
  * Build: TI cl6x, C6740 EABI, far data, no RTS (scripts/build_mixer_ui.py). */
 #ifndef CHAIN_H
 #define CHAIN_H

@@ -26,7 +26,7 @@
 ;
 ; Everything here is reached through vectors at fixed offsets, from
 ; trampolines in DDR (tempo-hold.yaml). Design and addresses:
-; docs/os-reverse-engineering.md, "Tempo screen, HOLD FOR and combos".
+; docs/dev/os-reverse-engineering.md, "Tempo screen, HOLD FOR and combos".
 
         .include "hold.inc"
 
