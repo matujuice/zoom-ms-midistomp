@@ -1,30 +1,37 @@
 # Roadmap: Luca's feature list, scoped
 
-Base: the MS-50G v3.10 OS, which Luca's MS-60B already runs. Every feature is
-a patch file applied to Zoom's OS and must apply to the MS-50G, MS-60B and
-MS-70CDR builds. Only the MS-60B hardware is available for testing.
+Base: from v2.0 every pedal runs one build made from Zoom's **MS-70CDR 2.10 OS**.
+The MS-50G and MS-60B run it as a 70CDR with only the L input plugged in (see
+[ms70cdr-base.md](ms70cdr-base.md)). v1.2 was the last release on the MS-50G 3.10 OS.
+Every feature is a patch file applied to Zoom's OS. Tested pedals: MS-70CDR, MS-50G
+(via a tester) and MS-60B.
 
-Feasibility is an estimate from the disassembly so far, not a promise.
+Status is as of the v2.0 release candidate. Details: [v2.0-brief.md](v2.0-brief.md),
+[HANDOFF.md](HANDOFF.md), [repo-refresh-plan.md](repo-refresh-plan.md).
 
-| Feature | Where it lives in the OS | Feasibility | Notes |
+| Feature | Where it lives in the OS | Status | Notes |
 |---|---|---|---|
-| Flash a modified OS and boot it | build pipeline | **done, tested on MS-60B** | `patches/hello.yaml`, see flashing.md |
-| MIDI: program change loads patch, CC controls parameters and on/off, MIDI clock sets tempo | `Task_MIDI`, USB MIDI | high | MS pedals only have USB MIDI, so this needs a computer or a USB-MIDI host box |
-| Performance mode: remap buttons and knobs, faster toggling | `Task_UpdateUI`, button/knob handlers | high | |
-| Better screen feedback (levels, LFO/tempo, what an effect is doing) | `Semaphore_LCDUpdate`, display driver | medium | needs the drawing routines mapped |
-| More controls | knob pages, button combos, MIDI CC | medium | physical controls are fixed; more control comes from pages, combos and MIDI |
-| Lift per-effect DSP limits | effect loader / DSP budget table | medium | the OS budget can be relaxed; the real CPU ceiling stays, so it needs measuring |
-| Routing: parallel pairs, sub-chains, dry mixed back at the end | audio chain loop | medium-hard | core audio path; highest audio-glitch risk |
-| Effects that talk to each other (modulation bus) | audio chain + custom effects | hard | builds on routing and custom ZDLs |
-| Better looping | new audio buffer + UI | hard | depends on free RAM, not yet measured |
-| MS-70CDR stereo mixer / independent L-R chains | audio chain, stereo I/O | hard | cannot be tested on an MS-60B |
+| Flash a modified OS and boot it | build pipeline | **done** | `patches/hello.yaml`, see [flashing.md](../flashing.md) |
+| MIDI: program change, CC for parameters and on/off, clock sets tempo, Start/Stop | `Task_MIDI`, USB MIDI | **done** (v1.x) | MS pedals only have USB MIDI, so this needs a computer or a USB-MIDI host box |
+| Button combos, HOLD FOR, Tempo Lock, faster scrolling | `Task_UpdateUI` | **done** (v1.2) | |
+| MS-70CDR base OS for all three pedals, PEDAL INPUT setting | whole OS | **done** (v2.0) | |
+| Routing: parallel buses, split, mono serial, `[ROUTE]` / `[MIX]` nodes, limiter | audio chain loop | **done** (v2.0), beta | the new Effect Chain screen; saved per patch |
+| PERFORM MODE: every knob, cursor key and the footswitch assignable, with beat/bar/cycle waits, Lag and Follow | UI handlers + new screen | **done** (v2.0), beta | saved per patch |
+| Looper (GRDLOOP): tempo-synced, whole bars | new buffer + firmware services | **done** (v2.0), beta | |
+| MASTER meters (spectrum, scope + tuner, stereo, LUFS, in/out) and KALEIDO | display driver | **done** (v2.0) | zero CPU while closed |
+| DSP limit 225 -> 300, CPU shown in the MENU title bar | effect loader / DSP budget | **done** (v2.0) | the real CPU ceiling stays, so heavy patches can still click |
+| SYSTEM page (version, CPU, per-effect load, MODS) | menu | in progress (v2.0) | |
+| Stereo versions of the effects pack | effects repo | in progress (v2.0) | |
+| Better Mac updater | `scripts/midistomp_builder.py` | in progress (v2.0) | much easier install |
+| PERFORM: one effect per control, a parameter per gesture | PERFORM store + UI | research | after v2.0 |
+| More than 6 effects per patch (limited only by DSP) | patch format, chain arrays | research | after v2.0 |
+| Browser build and flash with Modwerk | builder | research | no Zoom code hosted; see `docs/dev/modwerk-research.md` once written |
+| Effects that talk to each other | transport block + custom effects | partly done | the tempo/transport block (`0x1181FF00`) exists; a modulation bus does not |
+| Effect select screen with 5 categories like the MS-50G | UI | planned | not researched yet |
 
 ## Order
 
-1. Flash test with `hello` (proves build, flash, boot and recovery).
-2. Map the MIDI task, button/knob handlers, patch loading and the audio chain
-   loop in the MS-50G 3.10 build, with addresses for all three builds.
-3. MIDI program change and CC, then MIDI clock.
-4. Performance mode.
-5. Screen feedback.
-6. Routing, then effect intercommunication and looping.
+1. Finish the v2.0 "Before release" list in [repo-refresh-plan.md](repo-refresh-plan.md).
+2. Pedal tests of the beta items, then release v2.0 (title `MIDISTOMP v2.0`, notes in
+   [../releases/v2.0.md](../releases/v2.0.md)).
+3. v2.1: the research items above.

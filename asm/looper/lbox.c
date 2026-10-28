@@ -9,11 +9,14 @@
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
 #define SV(off) (*(volatile unsigned *)(0xC00F3000u + (off)))
+#define S_CLAIM 32
+#define S_SLOT 40
 #define S_MINE 48
 #define S_TEXT 68
 #define S_PROG 76
 #define S_LEFT 120
 #define MODE (*(volatile int *)(0xC00EF748u + 320))      /* 0 play; S_MINE lags it by one poll */
+#define CUR_PATCH (*(volatile int *)(0xC00EF748u + 324))  /* patch played, 0-49 */
 #define PENDING (*(volatile int *)(0xC00EF748u + 340))   /* a prompt over the Effect View */
 #define VIEW_KNOBS (*(volatile int *)0xC009D398)          /* 1 knob pages, 0 cover */
 #define FB ((volatile unsigned char *)0x11816800)         /* page format: 128 bytes per 8 rows */
@@ -69,7 +72,7 @@ static int left_text(char *t)
     }
     k = put_n(t, put(t, 0, "REC "), n);                   /* 5 "REC 3", 6 "REC 3/8" */
     if (kind == 6) { t[k++] = '/'; k = put_n(t, k, m); }
-    if (c >> 17 & 1) k = put(t, k, " MONO");
+    if (c >> 17 & 1) k = put(t, k, kind == 6 ? " M" : " MONO");   /* "REC 14/16 MONO" ran into the bar.beat */
     return k;
 }
 
@@ -146,6 +149,11 @@ static void bar(int x0, int y0, int x1, int y1, int s, int margin)
 /* the callp at 0xC00BB0EC: A4 = the stock call's argument */
 int lbox_draw(int a4)
 {
+    static int seen = -1;
+    if (CUR_PATCH != seen) {                              /* a patch load: drop the old claim (a new effect in the same slot can share its pointer); the ZDL re-claims */
+        seen = CUR_PATCH;
+        SV(S_CLAIM) = 0; SV(S_SLOT) = (unsigned)-1; SV(S_MINE) = 0;
+    }
     if (SV(S_MINE) && !MODE && !PENDING && !VIEW_KNOBS && OVL_GET(0) == -1)
         bar(0, 17, 127, 34, 2, 4);                        /* the cover only */
     return LCD_GATE(a4);

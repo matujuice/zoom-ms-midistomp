@@ -143,7 +143,7 @@ static void grid(void)
     while (g.gf >= 1.0f) { g.gf -= 1.0f; g.gu++; }
     perf_grid.beat = g.gu < 0 ? -1 : g.gu >> 3;
     perf_grid.frac = g.gu < 0 ? 0 : (int)(((float)(g.gu & 7) + g.gf) * 8191.875f);
-    perf_grid.running = g.run;
+    perf_grid.running = g.run || (perf_on && !g.anchor);   /* no clock: tap tempo drives the grid, the first FOOTSW press (bar 1) starts it */
     perf_grid.bpm_x10 = (int)(g.bpm * 10.0f);
 }
 
@@ -377,6 +377,10 @@ void perf_turn(int ctl, int steps)
     int t = perf_patch.target[ctl], i, n;
     unsigned f = perf_patch.move[ctl][M_TURN_F];
     Tgt x = tgt(t);
+    if (x.k == K_FTSW) {                        /* a turn sets the effect's on / off (right on, left off); on the looper only a press counts */
+        if (SV_OK && (int)SV[W_SLOT] == x.a) return;
+        x = tgt(14 + 10 * x.a);
+    }
     if (x.k != K_MIX && x.k != K_FX) return;
     DINT;
     cancel(ctl);
@@ -479,7 +483,7 @@ void perf_poll16(void)
             perf_patch.target[C_FTSW] = s >= 0 && s < 6 ? T_FTSW + s : T_NONE;
             perf_patch.move[C_FTSW][M_PRESS_A] = perf_patch.move[C_FTSW][M_HOLD_A] = MV(127, NX_NOW, LG_OFF);
         }
-        SV[W_CYCLE] = perf_patch.cycle;
+        SV[W_CYCLE] = perf_patch.loop_on ? perf_patch.cycle : 0;   /* PERFORM's looper off: the GRDLOOP keeps its own Cycle */
         st = SV[W_STATE] & 255;
         pass = SV[W_PASS];
         if (perf_on && perf_patch.loop_on) {
@@ -499,6 +503,7 @@ void perf_poll16(void)
         pass = ftsw_q;
         ftsw_q = 0;
         RINT;
+        dirty = 1;                  /* the knob column shows the new state */
         for (s = 0; s < COUNT && s < 6; s++)
             if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }
     }

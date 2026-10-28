@@ -341,7 +341,7 @@ static int left_text(char *o)                   /* the looper's left text (S_LEF
     } else {                                     /* 5 "REC 3", 6 "REC 3/8" */
         e = ncat(scat(o, "REC "), n);
         if (kind == 6) e = ncat(scat(e, "/"), c >> 10 & 63);
-        if (c >> 17 & 1) scat(e, " MONO");
+        if (c >> 17 & 1) scat(e, kind == 6 ? " M" : " MONO");   /* "REC 14/16 MONO" runs into the bar.beat */
         return kind;
     }
     if (n > 1) scat(e, "S");
@@ -369,6 +369,7 @@ static void play(void)
         w = udiv(126u * (umod(perf_grid.beat, 4 * k) * 65536u + perf_grid.frac), 4u * k * 65536u);
         if (lp >= 0 && !blinkon(PEND_MS(lp))) w = 0;     /* an action waits: the fill blinks faster as it comes */
         if (lp < 0 && (lk == 5 || lk == 6) && umod(gms(), 2 * b) < (unsigned)b / 2) w = 0;   /* recording: off an 1/8 every 2 beats */
+        if (lp < 0 && lk && SVC(22) >> 8 & 255 && !(SVC(19) & 0xFFFF)) w = 0;   /* the GRDLOOP's own action waits (its Next): it zeroes the fill while its bar blinks off */
         o = ncat(right, 1 + (C ? umod(perf_grid.beat >> 2, C) : perf_grid.beat >> 2));
         o = ncat(scat(o, "."), 1 + (perf_grid.beat & 3));
         if (C) ncat(scat(o, "/"), C);
@@ -391,7 +392,7 @@ static void play(void)
         small(a, 42 * i + 22 - ((softw(a) - 1) >> 1), 13);
         small(l, 42 * i + 22 - ((softw(l) - 1) >> 1), 19);
         pinfo(t, &p);
-        d = perf_value(t);
+        d = IS_FTSW(t) ? (ftsw_on(t) ? 127 : 0) : perf_value(t);   /* a Footsw target shows its effect's state */
         ctl(t, d, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
         val_text(t, d, v); upper(v);
         small(v, 42 * i + 22 - ((softw(v) - 1) >> 1), 50);

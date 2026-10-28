@@ -2,9 +2,13 @@
 
 Set these in the repository's About box (the gear next to About) and in Settings > General.
 
-**Description** (current: "Custom firmware bringing full MIDI control and clock sync to the Zoom MultiStomp platform."):
+**Set this on v2.0 release day, not before.** It describes v2.0 as shipped. Until then the About box stays on the
+v1.2 text (current: "Custom firmware bringing full MIDI control and clock sync to the Zoom MultiStomp platform."),
+which is all v1.2 does.
 
-> Custom firmware for the Zoom MS-50G, MS-60B and MS-70CDR: effect chain routing, Perform mode, a synced looper, mastering meters, and full MIDI control and clock sync.
+**Description:**
+
+> MIDISTOMP 2.0: custom firmware for the Zoom MS-50G, MS-60B and MS-70CDR (on the MS-70CDR 2.10 OS). Parallel and split effect chain routing, PERFORM MODE, a synced looper, MASTER meters, KALEIDO, and full MIDI control and clock sync.
 
 **Website:** https://github.com/matujuice/zoom-ms-midistomp/blob/main/docs/user-guide.md
 

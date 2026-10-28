@@ -315,7 +315,8 @@ control never has two. Each gesture moves its target and can schedule a follow m
 
 - **Top bar:** the looper state on the left (EMPTY, REC, PLAY, STOPPED) and bar.beat / cycle on the right. Bar lines
   are marked across the bar. What is about to happen shows here too, for example `REC IN 3 BEATS`. `NO CLK` means
-  no MIDI clock is running.
+  no MIDI clock is running and the grid hasn't started yet: the first footswitch press starts it at bar 1, at the
+  tap tempo.
 - **Knob columns:** like a stock knob page: the effect, the parameter, the control and the value. The column of the
   knob you touch lights up.
 - **Softkeys:** the targets of cursor ◄, ▼ and ►. A softkey is inverted while its target is away from its default.
@@ -356,7 +357,8 @@ The knobs tell a turn, a press and a hold apart even if you click while turning 
 - **The newest move wins:** a move that comes due while an earlier one is still gliding takes over from wherever
   the value is.
 - **Stepped targets** (on/off, modes) take the step, as when the CC comes over MIDI.
-- **No clock running:** moves with a Next fire at once.
+- **No MIDI clock:** the grid runs at the tap tempo from the first footswitch press (bar 1). Before that press,
+  moves with a Next fire at once.
 - **MIDI Start or Stop, or a patch change,** cancel waiting moves and restart the grid. A tempo change just moves
   the grid with it.
 
@@ -372,8 +374,9 @@ MENU > PERFORM MODE > **SETUP**:
 2. Open a control: **TARGET**, then one row per gesture with its values (`100>38`: the Action goes to 100, the
    Follow back to 38).
 3. **TARGET** is picked in two steps: the module (an effect `FX1`-`FX6`, `ROUTE`, `MIX`, `IN`, `OUT`), then its
-   parameter. `*` marks the current target. Every effect has **OnOff**; the looper also has **Ftsw** (its
-   footswitch) and **Roll**.
+   parameter. `*` marks the current target. Every effect has **Footsw**: it does what the footswitch does to
+   that effect (on/off; on the looper, its footswitch). The looper also has **Roll**. A knob on Footsw: a press
+   toggles the effect, a turn right switches it on and a turn left off (on the looper only the press counts).
 4. Open a gesture to see its moves (ACTION, RELEASE, FOLLOW), and open a move: the three knobs set **Value**,
    **Next** and **Lag**.
 
@@ -427,7 +430,7 @@ on the LED.
   line and repeats the first slice of that bar. Turning it further while rolling makes the repeats shorter, each
   change on the grid.
 - **Next** sets when a press lands: at once, or on the next beat, bar or cycle line.
-- **Cycle** is the loop length in bars. With a CYCLE set in Perform mode, that one wins.
+- **Cycle** is the loop length in bars. While Perform mode's LOOPER row is ON, its CYCLE wins.
 - **Sync:** **OWN** records until the line after your second press, so a loop is always whole cycles. **SLAVE**
   records one cycle, then plays by itself.
 - **Stop:** what MIDI Stop and losing the clock do. **KEEP** (default): the loop keeps playing at the last tempo,
@@ -471,12 +474,14 @@ from the tempo and the cycle length:
 
 | Length | Stereo | Mono |
 |---|---|---|
-| 1-2 bars | any tempo | |
-| 4 bars | 48 BPM and up | 40-47 BPM |
-| 8 bars | 96 BPM and up | 49-95 BPM |
+| 1-4 bars | any tempo | |
+| 8 bars | 79 BPM and up | 40-78 BPM |
+| 16 bars | 158 BPM and up | 81-157 BPM |
+| 32 bars | | 161 BPM and up |
 
 If the cycle doesn't fit, the looper records what fits, halving the length, and the status says so (for example
-`REC 4/8`). A mono loop stores L + R. Loops are lost on a patch change.
+`REC 4/8`, or `REC 14/16 M` when it also went mono). At 120 BPM a 32-bar cycle records 16 bars mono; the counter
+still shows the 32-bar cycle, not the loop. A mono loop stores L + R. Loops are lost on a patch change.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 

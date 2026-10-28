@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import ais, asm, flash, macapp, models, parts, patcher, updater, zdl
+from . import __version__, ais, asm, flash, macapp, models, parts, patcher, updater, zdl
 
 
 def cmd_identify(args) -> int:
@@ -259,6 +259,7 @@ def cmd_zdl_info(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="zoomms", description=__doc__)
+    ap.add_argument("--version", action="version", version=f"zoomms {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("identify", help="ask the pedal for its model and firmware version")
     p.add_argument("--port")

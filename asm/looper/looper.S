@@ -159,9 +159,11 @@ slot_done:
         xor     .L1     1, a4, a4
         stw     .D1T1   a4, *a3
 poll_redraw:
-        ; on the looper: redraw when the status text or the box's fill step changed
+        ; on the looper: redraw when the status text or the box's fill step changed;
+        ; and once when it just left it (A7 = 1), so the stock view repaints the box
         ldw     .D1T1   *+a0(S_MINE), a1
         nop     4
+        or      .L1     a1, a7, a1
   [!a1] b       .S1     poll_out
         nop     5
         ldw     .D1T1   *+a0(S_TEXT), a3
@@ -171,9 +173,11 @@ poll_redraw:
         ldw     .D1T1   *+a0(S_DTEXT), a6
         ldw     .D1T1   *+a0(S_DTEXT + 4), a7
         ldw     .D1T1   *+a0(S_DKEY), a8
-        nop     4
+        shl     .S1     a7, 31, a2          ; just left: a key that never matches (A7 is still the flag)
+        nop     3
         shru    .S1     a5, 2, a5
         shl     .S1     a9, 8, a9
+        xor     .L1     a8, a2, a8
         or      .L1     a5, a9, a5          ; progress / 4 + inverted x 256
         cmpeq   .L1     a3, a6, a1
         cmpeq   .L1     a4, a7, a2

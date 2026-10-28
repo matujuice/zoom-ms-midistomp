@@ -1,6 +1,6 @@
 [project]
 name = "zoomms"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Tools for modding Zoom MultiStomp MS-50G / MS-60B / MS-70CDR firmware and effects"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -19,3 +19,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["zoomms"]
+
+[tool.setuptools.dynamic]
+version = { attr = "zoomms.__version__" }
