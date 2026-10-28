@@ -477,13 +477,17 @@ else 225. Costs are in each `manifest_pedal.json` (`dsp_cost`; Choral 122 is the
 7. Effect ids in the pack against stock ids (Sweep clashes with stock ANA234Cho 496) and a
    range in their ledger (separate plan item).
 
-## Needs Luca
+## Luca's decisions (2026-10-28)
 
-- OK to answer with the hello proposal; decide step A, step B, or both.
-- Words 6/7 of the transport block: confirm they land in v2.0 before telling Modwerk they
-  are in the base (not built yet).
-- OK to capture a stock updater flash for them (needs the pedal).
-- Whether to publish the byte-17 / record 50 table for their editor.
+- Hello: **step A in v2.0** (MIDISTOMP version tag in the identity reply), step B (own SysEx
+  on 7D with feature bits) after v2.0 if they need it. Firmware: find the 70CDR identity
+  template, write `version-2.0.yaml` with the tag; test with and without Effect Manager.
+- DSP 300 ships in v2.0.
+- Byte 17 / record 50 table: **publish** as `docs/dev/patch-routing-bytes.md` (section 2),
+  once the `pages.c`/`mixer.S` comments are fixed.
+- Stock flash capture: **yes**, on Luca's pedal before they flash; firmware data bytes
+  removed from the log.
+- Still open: words 6/7 of the transport block are planned, not built; say "planned".
 
 ## Draft replies for Luca
 
@@ -491,42 +495,40 @@ Short, plain, ready to paste. Edit freely.
 
 **1. Detection over MIDI**
 
-> A hello is possible, but MIDISTOMP has no SysEx code today, so it needs a firmware build.
-> My proposal: use manufacturer id 7D so Zoom's own commands never see it. You send
-> `F0 7D 4D 53 54 01 <nonce> F7`. I answer first with the version
-> (`F0 7D 4D 53 54 41 <nonce> <major> <minor> <patch> F7`), then the status
-> (`F0 7D 4D 53 54 42 <nonce> <3 bytes of feature bits> <state> F7`). Feature bits say what is
-> in the image (CC, clock and transport, settings, tempo-hold, looper, mixer, PERFORM, MASTER,
-> KALEIDO, DSP 300); state says editor mode on or looper busy, so you do not flash then.
-> A cheaper first step: I put a MIDISTOMP version tag in the four version bytes of the normal
-> identity reply, so your identity request already works. Tell me which you want and if the
-> bytes suit you, then I build it. It is not built or tested on a pedal yet.
+> For v2.0 I'll make the normal identity reply tell you it's MIDISTOMP: the four version
+> bytes, which say "2.10" on stock, will hold a MIDISTOMP tag with the version (for example
+> "V200"). Your identity request works as it is: if the tag is there, it's MIDISTOMP, and you
+> know which version. No new SysEx needed. After v2.0, if you need to know which features are
+> in the image (looper, mixer, DSP 300 and so on), I can add a small "hello" message of our
+> own on manufacturer id 7D that answers with the version and a set of feature bits. Not
+> built or tested on a pedal yet; I'll send you the exact bytes once it is.
 
 **2. Routing and PERFORM in a patch**
 
 > Routing is in byte 17 of each of the six 18-byte slot blocks of the packed 122-byte patch.
-> Bits 0-1 are the slot's bus (0 PRE, 1 A, 2 B). Bits 2-6 hold a 5-bit piece of the extra
-> mixer settings; that piece belongs to the block position, not to the effect, so keep it
-> where it is if you move effects. Bit 7 must stay 0. If you read the patch from the pedal
-> and write it back with only your changes, you lose nothing. Zeroed byte 17 just means no
-> routing. The other mixer settings and all PERFORM data are not in the patch: they are in the
-> pedal's global record 50, matched to the patch by a hash of the six effect ids and the name.
-> So if you rename a patch or change, add, remove or reorder its effects, that patch goes
-> back to default mixer and PERFORM settings. Params and on/off do not matter. Please never
-> write or delete records 50 and 51 with the file commands. I can send the byte table as a
-> one-page doc if it helps.
+> Bits 0-1 are the slot's bus (0 PRE, 1 A, 2 B). Bits 2-6 hold a piece of the extra mixer
+> settings; that piece belongs to the block position, not to the effect, so keep it where it
+> is if you move effects. Bit 7 must stay 0. If you read the patch from the pedal and write it
+> back with only your changes, nothing is lost; a zeroed byte 17 just means no routing.
+> The other mixer settings and all PERFORM data are not in the patch: they live in the
+> pedal's global record 50, matched to the patch by a hash of its six effect ids and its
+> name. So renaming a patch or changing, adding, removing or reordering its effects sends it
+> back to default mixer and PERFORM settings; params and on/off don't matter. Please never
+> write or delete records 50 and 51 with the file commands. I'll send you the full byte table
+> as a one-page doc for your editor, and I'll keep that format stable.
 
 **3. Dependencies**
 
 > Independent today: MIDI CC, MIDI clock with the transport block, scroll, boot logo.
 > A chain, in this order: CC, clock, MIDI settings, tempo-hold, then the looper services.
-> Mixer, PERFORM, MASTER and KALEIDO are one block that shares menu, patch hooks and record
-> 50; please treat them as one mod ("Mixer suite"). DSP 300 is a single 4-byte change and
-> could be its own switch; it is test-build only for now and I still need to decide on it.
-> Diag is a test build, not for your base. The transport block (0x1181FF00, magic 0x5A4D5401)
-> goes in the base. Two more words are planned for v2.0 without a version change: word 6 =
-> footswitch is down, word 7 = a hold claim for an effect. Older firmware reads both as 0. I
-> will send the address table and the dependency list as a file.
+> Mixer, PERFORM, MASTER and KALEIDO are one block that shares the menu, the patch hooks and
+> record 50; please treat them as one mod ("Mixer suite"). DSP 300 is in v2.0: a single
+> 4-byte change, so it can be its own switch. Diag is a test build, not for your base. The
+> transport block (0x1181FF00, magic 0x5A4D5401) goes in the base. Two more words are planned
+> for v2.0 with the same magic: word 6 = footswitch is down, word 7 = a hold claim for an
+> effect; older firmware reads both as 0. The patches must be applied in a fixed order; a
+> wrong order fails the build instead of making a bad image. I'll send the address table and
+> the dependency list as a file.
 
 **4. Flash steps**
 
@@ -540,6 +542,25 @@ Short, plain, ready to paste. Edit freely.
 > Main.bin must have exactly the stock size, with its tail (version text and the Zoom marker)
 > unchanged; I do not know of a checksum, and the Mac updater checks MD5 only for its own
 > files. (4) I have no record of the update protocol bytes (your 0A, 02, 04, chunking,
-> acks), so I cannot check them; I can capture a stock flash with a MIDI monitor and send
-> you the log. Please do the first write on a pedal with Up+Down update mode and the stock
-> updater ready.
+> acks), so I cannot check them. I'll capture a stock Zoom update on my pedal with a MIDI
+> monitor and send you the log (firmware data removed) before you flash anything. Please do
+> the first write on a pedal that you know enters update mode (Up+Down while plugging in USB),
+> with the stock updater ready.
+
+**5. Browser build, Zoom code, effect IDs**
+
+> Building in the browser is easy: every patch already carries its machine code as hex, so no
+> TI tools are needed. The browser takes Main.bin (and Preset.bin only for the logo) from the
+> user's own Zoom updater, checks it by sha256, adds our patches in order and gets a Main.bin
+> of the stock size. Our Python code for that is small and pure Python (it runs in Pyodide),
+> or about 250 lines to port to JS. You don't need the updater rewrite or MD5 steps.
+> Zoom code: the firmware patches contain no Zoom code except the few stock bytes each hook
+> checks before it writes (about 900 bytes); I can change that to a hash. My effects pack does
+> contain Zoom code today: the linker copies a stock knob-handler block and a division
+> routine into every ZDL. I'll replace them with our own before they go into your base.
+> Effect IDs: all my effects are category 8 with ids 480-500. Two numbers equal stock ones
+> (480 CRN_CHO, 496 ANA234Cho) but in category 6, and the pedal keys effects by category and
+> number, so there is no clash. Could you reserve category 8, ids 480-511 for me in your
+> ledger? Without MIDISTOMP my tempo effects run at 120 BPM, the others work the same, and a
+> patch above the stock DSP limit of 225 gets effects bypassed, so please check against 300
+> only on a pedal that reports MIDISTOMP v2.0.
