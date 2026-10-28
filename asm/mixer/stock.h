@@ -22,6 +22,8 @@
 #define SW_KNOB2 1                                   /* bit 0: events 64 / 65 */
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
+#define V_PDOWN (*(volatile int *)0x1181EA38)        /* hold.inc HV+20: PERFORM footswitch down (looper.S poll) */
+#define ZMT_FTSW (*(volatile int *)0x1181FF18)       /* transport word 6: footswitch down; word 7 (+4) the hold claim */
 #define SET_SCREEN FN(0xC00A75E0, void, (int screen, int row))
 #define EVENT_POST FN(0xC00CBF40, void, (int mailbox, int bits))  /* display task Event flags: 0x40 = redraw */
 #define KEY_POST FN(0xC00D1324, void, (int ev))  /* a key event into the UI mailbox B14[202] (as the timer task) */

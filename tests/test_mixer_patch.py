@@ -19,7 +19,7 @@ JUMP = WRITES[0x1181BE00]
 spec = importlib.util.spec_from_file_location("builder", ROOT / "scripts" / "midistomp_builder.py")
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: release set, probe P1, mixer
+M2_SET = builder.BASE + ["m0-probe", "mixer-m2"]  # the M2 test build: release set, probe P1, mixer
 
 # mixer.S fixed offsets
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,

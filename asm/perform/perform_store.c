@@ -15,7 +15,6 @@
 #define ENT(n) ((volatile unsigned char *)R50 + 24 + 16 * (n))
 
 extern unsigned r50_live_hash;  /* pages.c mix_get */
-extern int perf_defaults;       /* perform_engine.c */
 extern __cregister volatile unsigned int CSR;
 
 static void check(void)
@@ -45,18 +44,12 @@ void perf_load(int patch)
     CSR = c & ~1u;
     if (n >= 0) {
         for (i = 0; i < PT_SIZE; i++) d[i] = PT(n)[i];
-        perf_defaults = 0;
-    } else {                    /* none: the footswitch plays the GRDLOOP (aimed by the poll) */
+    } else {                    /* none: an empty patch, no looper defaults */
         for (i = 0; i < PT_SIZE; i++) d[i] = 0;
         for (i = 0; i < NCTL; i++) perf_patch.target[i] = T_NONE;
         for (i = 0; i < NLOOP; i++) perf_patch.loop_target[i] = T_NONE;
         for (i = 0; i < NCTL * NMOVE_CTL; i++) perf_patch.move[0][i] = MV_UNUSED;
         for (i = 0; i < NLOOP; i++) perf_patch.loop_move[i] = MV_UNUSED;
-        perf_patch.loop_target[L_REC_END] = 86;           /* MIX XFade B100 over 1 BAR */
-        perf_patch.loop_move[L_REC_END] = MV(127, NX_NOW, 10);
-        perf_patch.loop_target[L_DELETE] = 86;            /* MIX XFade A100, MICRO */
-        perf_patch.loop_move[L_DELETE] = MV(0, NX_NOW, LG_MICRO);
-        perf_defaults = 8;
     }
     CSR = c;
 }
@@ -78,6 +71,5 @@ int perf_save(int patch)
         changed |= e[i] != b;
         e[i] = b;
     }
-    perf_defaults = 0;
     return changed;
 }

@@ -41,9 +41,11 @@ def test_hooks_call_the_diag_vectors():
 
 def test_probe_hooks_and_dsp_limit_unchanged():
     probe = {w["addr"]: w for w in PROBE["write"]}
-    for addr in (0xC00BB52C, 0xC00C6998, 0xC00A93D0, 0xC00A8364):
+    for addr in (0xC00C6998, 0xC00A93D0, 0xC00A8364):
         assert _site(addr)["expect"] == probe[addr]["expect"]
-    assert _site(0xC00BB52C)["data"] == probe[0xC00BB52C]["data"]
+    (dsp,) = patcher.load(ROOT / "patches/dsp-limit.yaml")["write"]                # shipped in v2.0, not in diag
+    assert (dsp["expect"], dsp["data"]) == (probe[0xC00BB52C]["expect"], probe[0xC00BB52C]["data"])
+    assert all(w["addr"] != 0xC00BB52C for w in PATCH["write"])
 
 
 def test_section_layout():

@@ -88,6 +88,7 @@ static void press(int c)
     st[c] = c < 3 && pu_t - tt[c] < TURN_GUARD_MS ? 3 : 1;
     td[c] = pu_t;
     moved[c] = 0;
+    if (c == C_FTSW) perf_gesture(c, G_PRESS, 0);   /* the footswitch acts on the press, as on the effect screen */
 }
 
 static void release(int c)
@@ -95,7 +96,7 @@ static void release(int c)
     int s = st[c];
     st[c] = 0;
     if (s == 2) perf_gesture(c, G_HOLD, 1);
-    else if (s == 1 && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
+    else if (s == 1 && c != C_FTSW && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
 }
 
 /* ---- SETUP -------------------------------------------------------------------------------- */
@@ -178,6 +179,7 @@ void perf_key(int ev, int steps)
 {
     int c;
     sync();
+    if ((ev | 1) == 33) V_PDOWN = ZMT_FTSW = !(ev & 1);   /* footswitch down: RISER's word 6, the poll keeps it on this screen */
     if ((ev | 1) == 69) { if (ev == 69 && perf_on == 1) quit(); return; }   /* Cursor up leaves the play screen only, on release: the press would reach the effect screen */
     if (perf_on != 1) {                          /* lists: knob 1 press opens, as stock; knob 3 press does nothing */
         if (ev == 67 || ev == 35) return;

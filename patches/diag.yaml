@@ -2,20 +2,14 @@
 # 4-page dashboard (LOAD, EFFECTS, MODS, ABOUT) on the VERSION screen, renamed
 # DIAGNOSTICS. Test builds only; it takes the m0 probe's place (never both).
 # The audio timing is in asm/mixer/engine.c (mixer-m2.yaml, apply that first): it calls
-# diag_end only while the magic word at 0xC00F3128 is there. The DSP Full limit is
-# raised from 225 to 300 as in the probe build.
+# diag_end only while the magic word at 0xC00F3128 is there.
+# The DSP Full limit 300 is its own patch now (dsp-limit.yaml, shipped in v2.0).
 # The hex below is built from asm/diag/ by scripts/build_diag_ui.py (--write);
 # tests/test_diag_patch.py checks it still matches.
 name: diag
-description: DIAGNOSTICS dashboard and MENU CPU badge (test builds), DSP limit 300
+description: DIAGNOSTICS dashboard and MENU CPU badge (test builds)
 builds: [ms70cdr-2.10]
 write:
-  # DSP Full check 0xC00BB4E0: the limit 225.0f -> 300.0f (mvkh .S2 0x4361 -> 0x4396, b4)
-  - model: ms70cdr-2.10
-    addr: 0xC00BB52C
-    expect: "eab02102"
-    data: "6acb2102"
-    source: asm/m0_probe/dsp_limit.S
   # Task_SwitchNrmlSpdRead's 16 ms round: callp poll trampoline -> diag_poll (vec +8)
   - model: ms70cdr-2.10
     addr: 0xC00C6998

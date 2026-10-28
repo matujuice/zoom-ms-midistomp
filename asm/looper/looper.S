@@ -14,14 +14,10 @@
 ;   hold_pre   footswitch hold (event 224): nothing while on the looper.
 ;   cc_pre     MIDI CC: the looper slot's on/off CC (10n+4) counts a press
 ;              for values 64-127 and is dropped for 0-63.
-;   draw_pre   every screen draw, before the LCD send (call at 0xC00BB0EC):
-;              on the looper's Effect View, the status box (knob pages: x 74-127,
-;              y 0-10; cover: x 68-126, y 19-32): a white box with a black
-;              border, filled black from the left with the ZDL's progress, its
-;              text centred in the screen's bold font (proportional) and drawn
-;              inverted over the fill; the whole inside inverted while the ZDL
-;              says so (pulse, blink). The poll asks the UI for a redraw when the
-;              text, the progress (in 64ths) or the inversion changes.
+;   The poll also writes transport words 6 (footswitch down) and 7 (hold
+;   claim, cleared every round): docs/dev/transport-block.md.
+; The status box is drawn by lbox.c; the poll asks the UI for a redraw when the
+; text, the progress (in 64ths) or the inversion changes.
 ; Everything else goes on to the hooks the trampolines called before.
 ; Design and addresses: docs/dev/os-reverse-engineering.md, "Looper services".
 ;
@@ -32,6 +28,9 @@
         .equ    TOGGLE_HOOK, 0x1181FA98     ; hold.S toggle_hook (MOMENTARY), then the flip
         .equ    HOLD_HOOK, 0x1181FF20       ; hold2.S hold_hook, then the stock hold
         .equ    CC_HANDLER, 0xC00F2800      ; midi_cc handler.S (DDR)
+        .equ    HOLDV, 0x1181EA24           ; hold.inc HV: +0 V_HOLDM, +12 V_MARM, +20 V_PDOWN
+        .equ    SCREEN, 352                 ; B14 offset, 11 (with MODE 11) = PERFORM MODE
+        .equ    ZMT_FTSW, 0x1181FF18        ; transport word 6 (transport.inc B_FTSW), word 7 after it
 
         .macro  FCALL target
         mvkl    .S2     \target, b5
@@ -59,8 +58,6 @@ vectors:
         nop     5
         b       .S2     cc_pre              ; +24
         nop     5
-        b       .S2     draw_pre            ; +32
-        nop     5
 
 ; Called instead of poll.S; same contract: returns A4 = ticks, keeps every
 ; callee-saved register. Uses A0-A9, B0-B9.
@@ -73,6 +70,24 @@ poll_pre:
         addkpc  .S2     polled, b3, 4
 polled:
         stw     .D2T1   a4, *+b15(8)
+        ; word 6 = a MOMENTARY press held (V_MARM) or, in PERFORM MODE, its
+        ; footswitch down (V_PDOWN); word 7 = 0 (a loaded RISER writes it back)
+        mvkl    .S1     HOLDV, a3
+        mvkh    .S1     HOLDV, a3
+        ldw     .D1T1   *+a3(12), a5
+        ldw     .D1T1   *+a3(20), a6
+        ldw     .D2T2   *+b14(MODE), b2
+        ldw     .D2T2   *+b14(SCREEN), b3
+        mvkl    .S1     ZMT_FTSW, a7
+        mvkh    .S1     ZMT_FTSW, a7
+        mvk     .L1     0, a8
+        cmpeq   .L2     11, b2, b0
+        cmpeq   .L2     11, b3, b2
+        and     .L2     b0, b2, b0          ; PERFORM MODE: screen 11 in the menus
+  [!b0] mvk     .L1     0, a6
+        or      .L1     a5, a6, a5
+        stw     .D1T1   a5, *a7
+        stw     .D1T1   a8, *+a7(4)
         mvkl    .S1     SV, a0
         mvkh    .S1     SV, a0
         ldw     .D1T1   *+a0(S_CLAIM), a1
@@ -223,6 +238,13 @@ toggle_pre:
         cmpeq   .L1     a1, a4, a2
   [a2]  b       .S1     toggle_press
         nop     5
+        mvkl    .S1     HOLDV, a0           ; word 6 = MOMENTARY: the flag lands with the flip
+        mvkh    .S1     HOLDV, a0
+        ldw     .D1T1   *a0, a1
+        mvkl    .S1     ZMT_FTSW, a2
+        mvkh    .S1     ZMT_FTSW, a2
+        nop     3
+        stw     .D1T1   a1, *a2
         JUMP    TOGGLE_HOOK
 toggle_press:
         COUNT_PRESS
@@ -264,205 +286,3 @@ cc_ours:
         b       .S2     b3
         nop     5
 
-; Called instead of 0xC00D5720 (A4 = its argument, B3 = return) after every
-; screen draw, before the LCD send. On the looper's Effect View with no overlay
-; or prompt, draws the status box; then on to 0xC00D5720. (The 50G hooked
-; the setter 0xC00B5794 one call earlier; the 70CDR OS has no such setter.)
-; Uses A0-A9, A16-A31, B0-B5, B16-B19 (caller-saved).
-draw_pre:
-        addk    .S2     -96, b15            ; +4 B3, +8 A4, +16 the text, a byte a column
-        stw     .D2T2   b3, *+b15(4)
-        stw     .D2T1   a4, *+b15(8)
-        mvkl    .S1     SV, a0
-        mvkh    .S1     SV, a0
-        ldw     .D1T1   *+a0(S_MINE), a1
-        ldw     .D2T2   *+b14(PENDING), b0
-        nop     4
-  [b0]  mvk     .L1     0, a1
-  [!a1] b       .S1     draw_out
-        nop     5
-        mvk     .L1     0, a4
-        FCALL   OVL_GET
-        cmpeq   .L1     -1, a4, a1          ; no overlay (tempo box, tuner ...)
-  [!a1] b       .S1     draw_out
-        nop     5
-
-        ; where: knob pages (A1 = 1) or cover. The box's bits are relative to
-        ; 8-pixel row A22: M all of it, TB its top and bottom line, I inside.
-        mvkl    .S1     VIEW_KNOBS, a3
-        mvkh    .S1     VIEW_KNOBS, a3
-        ldw     .D1T1   *a3, a1
-        nop     4
-        mvk     .S1     74, a20             ; X0
-        mvk     .S1     53, a21             ; X1 - X0
-        mvk     .L1     0, a22              ; row
-        mvk     .L1     2, a23              ; text: y 2-8
-        mvk     .S1     0x7FF, a24          ; y 0-10
-        mvk     .S1     0x401, a25
-        mvk     .S1     0x3FE, a26
-  [!a1] mvk     .S1     68, a20
-  [!a1] mvk     .S1     58, a21
-  [!a1] mvk     .L1     2, a22              ; y 16-39
-  [!a1] mvk     .L1     6, a23              ; text: y 22-28
-  [!a1] mvkl    .S1     0x1FFF8, a24        ; y 19-32
-  [!a1] mvkh    .S1     0x1FFF8, a24
-  [!a1] mvkl    .S1     0x10008, a25
-  [!a1] mvkh    .S1     0x10008, a25
-  [!a1] mvkl    .S1     0xFFF0, a26
-  [!a1] mvkh    .S1     0xFFF0, a26
-
-        ; the text's columns, proportional: each character's inked columns and a
-        ; gap, a space 2 columns; A28 = width
-        mvkl    .S1     SV + S_TEXT, a16
-        mvkh    .S1     SV + S_TEXT, a16
-        mvkl    .S1     FONT7, a17
-        mvkh    .S1     FONT7, a17
-        add     .D2     b15, 16, b16
-        mv      .L2     b16, b17
-        mvk     .L1     8, a2
-        mvk     .L1     0, a28
-ch_loop:
-        ldbu    .D1T1   *a16++, a19
-        nop     4
-        shl     .S1     a19, 3, a5
-        sub     .L1     a5, a19, a5
-        add     .L1     a17, a5, a5         ; FONT7 + 7 x code
-        mvk     .L1     -1, a6              ; first inked column
-        mvk     .L1     0, a7               ; last
-        mvk     .L1     0, a8
-        mvk     .L1     7, a1
-scan_loop:
-        ldbu    .D1T1   *a5++, a9
-        nop     4
-        mv      .L2X    a9, b1
-        cmpltu  .L2     0, b1, b2
-        cmpgt   .L1     0, a6, a0
-        and     .L1X    a0, b2, a0
-  [a0]  mv      .L1     a8, a6
-  [b2]  mv      .L1     a8, a7
-        add     .L1     1, a8, a8
-        sub     .L1     a1, 1, a1
-  [a1]  b       .S1     scan_loop
-        nop     5
-        mvk     .L1     0, a9
-        cmpgt   .L1     0, a6, a0           ; blank
-  [a0]  stb     .D2T1   a9, *b17++
-  [a0]  stb     .D2T1   a9, *b17++
-  [a0]  add     .L1     2, a28, a28
-  [a0]  b       .S1     ch_next
-        nop     5
-        sub     .L1     a5, 7, a5
-        add     .L1     a5, a6, a5
-        sub     .L1     a7, a6, a1
-        add     .L1     1, a1, a1
-emit_loop:
-        ldbu    .D1T1   *a5++, a9
-        nop     4
-        stb     .D2T1   a9, *b17++
-        add     .L1     1, a28, a28
-        sub     .L1     a1, 1, a1
-  [a1]  b       .S1     emit_loop
-        nop     5
-        mvk     .L1     0, a9
-        stb     .D2T1   a9, *b17++          ; gap
-        add     .L1     1, a28, a28
-ch_next:
-        sub     .L1     a2, 1, a2
-  [a2]  b       .S1     ch_loop
-        nop     5
-trim_loop:                                  ; drop the trailing gaps and spaces
-        mv      .L1     a28, a1
-  [!a1] b       .S1     trimmed
-        nop     5
-        add     .L2X    b16, a28, b18
-        ldbu    .D2T2   *-b18(1), b0
-        nop     4
-  [b0]  b       .S1     trimmed
-        nop     5
-        sub     .L1     a28, 1, a28
-        b       .S1     trim_loop
-        nop     5
-trimmed:
-        sub     .L1     a21, 1, a3          ; inside width
-        sub     .L1     a3, a28, a4
-        shr     .S1     a4, 1, a4           ; text start inside
-        cmpgt   .L1     0, a4, a0
-  [a0]  mvk     .L1     0, a4
-        mvkl    .S1     SV, a0
-        mvkh    .S1     SV, a0
-        ldw     .D1T1   *+a0(S_PROG), a5
-        ldw     .D1T1   *+a0(S_INV), a29
-        nop     4
-        mpy     .M1     a3, a5, a5
-        nop     1
-        shr     .S1     a5, 8, a5           ; fill width
-        mvkl    .S1     FB, a27
-        mvkh    .S1     FB, a27
-        shl     .S1     a22, 7, a6
-        add     .L1     a27, a6, a27
-        add     .L1     a27, a20, a27       ; FB + 128 x row + X0
-        mvk     .S1     128, a18
-        mvk     .S1     256, a19
-        mvk     .L1     0, a8               ; column
-        add     .L1     1, a21, a9
-        mv      .L2X    a9, b0
-px_loop:
-        ldbu    .D1T1   *a27, a9
-        ldbu    .D1T1   *+a27[a18], a30
-        ldbu    .D1T1   *+a27[a19], a31
-        nop     4
-        shl     .S1     a30, 8, a30
-        shl     .S1     a31, 16, a31
-        or      .L1     a9, a30, a9
-        or      .L1     a9, a31, a9         ; the 3 rows' pixels
-        cmpeq   .L1     0, a8, a0
-        cmpeq   .L1     a8, a21, a1
-        or      .L1     a0, a1, a0
-        mv      .L1     a24, a6             ; side: all border
-  [a0]  b       .S1     px_put
-        nop     5
-        sub     .L1     a8, 1, a7           ; column inside
-        mv      .L1     a25, a6             ; top and bottom border
-        cmplt   .L1     a7, a5, a1
-  [a1]  or      .L1     a6, a26, a6         ; the fill
-        sub     .L1     a7, a4, a16         ; column in the text
-        cmplt   .L1     a16, a28, a1
-        cmpgt   .L1     0, a16, a2
-        xor     .L1     1, a2, a2
-        and     .L1     a1, a2, a1
-        mv      .L2X    a16, b19
-  [a1]  ldbu    .D2T1   *+b16[b19], a17
-  [!a1] mvk     .L1     0, a17
-        nop     4
-        shl     .S1     a17, a23, a17
-        and     .L1     a17, a26, a17
-        xor     .L1     a6, a17, a6         ; text inverted over the fill
-        mv      .L1     a29, a1
-  [a1]  xor     .L1     a6, a26, a6         ; the pulse / blink
-px_put:
-        andn    .L1     a9, a24, a9
-        or      .L1     a9, a6, a9
-        stb     .D1T1   a9, *a27
-        shru    .S1     a9, 8, a9
-        stb     .D1T1   a9, *+a27[a18]
-        shru    .S1     a9, 8, a9
-        stb     .D1T1   a9, *+a27[a19]
-        add     .L1     1, a27, a27
-        add     .L1     1, a8, a8
-        sub     .L2     b0, 1, b0
-  [b0]  b       .S1     px_loop
-        nop     5
-        mvk     .L1     7, a3
-        shl     .S1     a3, a22, a3         ; send the box's 3 rows
-        mvkl    .S1     FB_DIRTY, a6
-        mvkh    .S1     FB_DIRTY, a6
-        ldbu    .D1T1   *a6, a4
-        nop     4
-        or      .L1     a3, a4, a4
-        stb     .D1T1   a4, *a6
-draw_out:
-        ldw     .D2T2   *+b15(4), b3
-        ldw     .D2T1   *+b15(8), a4
-        nop     4
-        addk    .S2     96, b15
-        JUMP    LCD_GATE

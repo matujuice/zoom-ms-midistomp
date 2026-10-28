@@ -4,10 +4,10 @@ and it writes the MIDISTOMP updater next to it.
 Same output as `zoomms build` with the patch set (docs/flashing.md).
 Refuses any file that is not the stock updater (sha256 in models/ms70cdr.yaml).
 Frozen into MIDISTOMP-builder.exe by .github/workflows/builder.yml.
-The MS-50G build is frozen at tag v1.1; v1.2 is built from the MS-70CDR 2.10 OS.
+The MS-50G build is frozen at tag v1.1; v1.2 and v2.0 are built from the MS-70CDR 2.10 OS.
 
 Also takes Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) and then writes
-MIDISTOMP V1.2 Updater.app, same as `zoomms build-mac`.
+MIDISTOMP V2.0 Updater.app, same as `zoomms build-mac`.
 """
 
 from __future__ import annotations
@@ -19,10 +19,11 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V1.2"
-PATCHES = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
-OUT_NAME = "MIDISTOMP V1.2 Updater.exe"
-OUT_NAME_MAC = "MIDISTOMP V1.2 Updater.app"
+NAME = "MIDISTOMP V2.0"
+BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
+PATCHES = BASE + ["looper", "mixer-m2", "dsp-limit"]   # looper before mixer-m2; diag and m0-probe stay test-only
+OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
+OUT_NAME_MAC = "MIDISTOMP V2.0 Updater.app"
 
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:

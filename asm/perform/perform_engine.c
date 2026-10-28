@@ -49,7 +49,6 @@ extern __cregister volatile unsigned int CSR;
 PerfPatch perf_patch;
 PerfGrid perf_grid;
 volatile int perf_on;
-int perf_defaults;              /* polls left to aim a default footswitch (perform_store.c sets it) */
 void chain_poll(void);
 
 /* ---- Grid: units of 1/8 beat from bar 1 (looper.c lp_block, zmt.h) ------- */
@@ -477,12 +476,6 @@ void perf_poll16(void)
         perf_load(CUR_PATCH);
     }
     if (SV_OK) {
-        if (perf_defaults > 0) {                /* the default footswitch: the GRDLOOP's */
-            perf_defaults--;
-            s = (int)SV[W_SLOT];
-            perf_patch.target[C_FTSW] = s >= 0 && s < 6 ? T_FTSW + s : T_NONE;
-            perf_patch.move[C_FTSW][M_PRESS_A] = perf_patch.move[C_FTSW][M_HOLD_A] = MV(127, NX_NOW, LG_OFF);
-        }
         SV[W_CYCLE] = perf_patch.loop_on ? perf_patch.cycle : 0;   /* PERFORM's looper off: the GRDLOOP keeps its own Cycle */
         st = SV[W_STATE] & 255;
         pass = SV[W_PASS];

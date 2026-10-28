@@ -177,7 +177,8 @@ void pages_draw_h(void)
  * packed patch are the effect's (P8 reaches byte 15: effects with many params
  * use it), byte 17 is free:
  *   byte 17 bits 0-1: the bus of the slot (settings 12-17)
- *   byte 17 bits 2-7 of the six blocks (36 bits, 22 used): Input R ^ 100 (8),
+ *   byte 17 bits 2-6 of the six blocks (30 bits, 22 used; bit 6 of block 6 marks
+ *     this layout, bit 7 stays 0: a SysEx round trip moves it): Input R ^ 100 (8),
  *     Master R ^ 100 (8), Output (2), Mute A, Mute B, Solo (2). The ^ 100:
  *     a stock patch (0 there) reads back as unity and Stereo / Off.
  * Settings 0-10 do not fit: they go in the global record 50, grown to 824 bytes
