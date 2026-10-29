@@ -118,6 +118,12 @@ void host_box(int, int, int, int, int);
 #define KP_TAB host_tab
 #define KP_BOX host_box
 #define KP_DIVD(a, b) ((double)(a) / (double)(b))
+extern int host_hw[4];
+#define V_PDOWN host_hw[0]
+#define ZMT_FTSW host_hw[1]
+#define ZMT_CLAIM host_hw[3]
+#define SLOT_PARAMS(s) 0
+#define LOOPER_SLOT (-1)
 #endif
 '''
 
@@ -127,7 +133,7 @@ HOST_C = r'''#include <math.h>
 #include "perform.h"
 #include "perf_host.h"
 unsigned char host_lcd[1024];
-int host_count = 4, host_posts, host_fx[6][2], host_svc[32], host_screen;
+int host_hw[4], host_count = 4, host_posts, host_fx[6][2], host_svc[32], host_screen;
 const char *host_names[6] = { "DELAY", "TREMOLO", "HALL", "LOOPER", "REVERB", "CHORUS" };
 static int host_d[6][11][12];
 const char *host_desc(int s, int p)              /* descriptor entries: the name, then Knob1-9 (max 127, the last flagged) */

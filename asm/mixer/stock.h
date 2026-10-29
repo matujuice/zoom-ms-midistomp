@@ -23,6 +23,9 @@
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
 #define V_PDOWN (*(volatile int *)0x1181EA38)        /* hold.inc HV+20: PERFORM footswitch down (looper.S poll) */
+#define ZMT_CLAIM (*(volatile int *)0x1181FF1C)      /* transport word 7: the hold claim (looper.S poll clears it) */
+#define SLOT_PARAMS(s) (*(volatile int *)(0x11F03004 + 212 * (s) + 4))   /* SLOT_STATE word 1 */
+#define LOOPER_SLOT (*(volatile unsigned *)0xC00F3000 == 0x5A4C5301u ? ((volatile int *)0xC00F3000)[10] : -1)
 #define ZMT_FTSW (*(volatile int *)0x1181FF18)       /* transport word 6: footswitch down; word 7 (+4) the hold claim */
 #define SET_SCREEN FN(0xC00A75E0, void, (int screen, int row))
 #define EVENT_POST FN(0xC00CBF40, void, (int mailbox, int bits))  /* display task Event flags: 0x40 = redraw */

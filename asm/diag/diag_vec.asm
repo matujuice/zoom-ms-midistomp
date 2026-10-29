@@ -24,7 +24,7 @@
         .space  10
         .string "<label>"               ; +112
         .space  9
-        .string "SYSTEM"                ; +128 the menu entry (mixer.S MENU7 word 4)
+        .string "SYSTEM"                ; +128 the menu entry (mixer.S MENU7 word 5)
         .space  10
         B       .S2     diag_mw         ; +144 callp at 0xC00AECCC (Task_MIDI wakes up)
         NOP     5

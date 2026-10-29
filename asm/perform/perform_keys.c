@@ -16,6 +16,7 @@
 #define CLICK_MIN_MS 30         /* a shorter click is bounce or a bump: ignored */
 #define TURN_GUARD_MS 150       /* a click this soon after the knob turned is ignored */
 #define HOLD_MS 400             /* held still this long: a hold */
+#define FTSW_HOLD_MS 500        /* the footswitch: as HOLD FOR MOMENTARY (asm/tempo_hold/hold.inc HOLD_MS) */
 #define DETENT 1                /* encoder counts per detent (probe) */
 #define WOBBLE 1                /* detents ignored while a knob is held; one more cancels the press and counts as a turn */
 #define REDRAW_POLLS 4          /* the play screen redraws every 4th poll (blink, countdown, values) */
@@ -39,7 +40,7 @@ extern unsigned char *pd_tgt(void);
 extern unsigned short *pd_move(void);
 
 static int seen = -1, polls;
-static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released */
+static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released, 4 MOMENTARY held */
 static int td[NCTL], moved[NCTL], tt[3];
 
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -95,6 +96,7 @@ static void release(int c)
 {
     int s = st[c];
     st[c] = 0;
+    if (s == 4) perf_gesture(c, G_PRESS, 0);    /* MOMENTARY: the release flips it back */
     if (s == 2) perf_gesture(c, G_HOLD, 1);
     else if (s == 1 && c != C_FTSW && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
 }
@@ -203,6 +205,18 @@ void perf_key(int ev, int steps)
     if (ev & 1) release(c); else press(c);
 }
 
+/* A footswitch hold on a Footsw target (not the looper) works as HOLD FOR MOMENTARY on the effect
+ * screen, whatever HOLD FOR is (never TAP or the tuner): the release flips it back. Nothing while
+ * the effect claims the hold (transport word 7, written within the last 16 ms: looper.S clears it
+ * after this poll). Else the hold gesture. */
+static int ftsw_hold(int c)
+{
+    int t = perf_patch.target[C_FTSW], s = t & 7;
+    if (c != C_FTSW || !IS_FTSW(t) || s == LOOPER_SLOT) return 2;
+    if (ZMT_CLAIM && ZMT_CLAIM == SLOT_PARAMS(s)) return 3;
+    return 4;
+}
+
 void perf_poll(void)
 {
     int c;
@@ -210,6 +224,6 @@ void perf_poll(void)
     sync();
     if (perf_on != 1) return;
     for (c = 0; c < NCTL; c++)
-        if (st[c] == 1 && pu_t - td[c] >= HOLD_MS) { st[c] = 2; perf_gesture(c, G_HOLD, 0); }
+        if (st[c] == 1 && pu_t - td[c] >= (c == C_FTSW ? FTSW_HOLD_MS : HOLD_MS) && (st[c] = ftsw_hold(c)) == 2) perf_gesture(c, G_HOLD, 0);
     if (++polls >= REDRAW_POLLS) { polls = 0; EVENT_POST(MAILBOX, 0x40); }
 }

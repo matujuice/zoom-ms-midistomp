@@ -174,14 +174,14 @@ vectors:
         .byte   0, 0, BUS_A, 0, NONE, 0, 0, PG_OUT ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .word   0, 0, 0, 0, 0, F_ONE, 0, 0  ; +144 GAINS: In, SendA, SendB, cA, cB, limiter, InR, MasterR
         .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, then free to +184
-        ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 SETTINGS (1),
-        ; 4 the version entry (9), 5 MASTER (11), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
+        ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 MASTER (11), 4 SETTINGS (1),
+        ; 5 the version entry (9), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
         ; MIDI SETTINGS is the last SETTINGS row (pedal_in.c).
-        .byte   0, 0, 11, 1, 9, 11, 11, 0
+        .byte   0, 0, 11, 11, 1, 9, 11, 0
         .word   0                           ; +192 free
-        ; +196 MENU7: the stock menu entries with PERFORM MODE after EFFECT CHAIN
-        ; then MASTER and KALEIDO (all 7 used)
-        .word   0xC00E8FE4, 0xC00E8FF7, s_perform, 0xC00E9004, 0xC00E900D, s_master, s_kaleido
+        ; +196 MENU7: the stock menu entries with PERFORM MODE and MASTER after EFFECT CHAIN,
+        ; KALEIDO last (all 7 used)
+        .word   0xC00E8FE4, 0xC00E8FF7, s_perform, s_master, 0xC00E9004, 0xC00E900D, s_kaleido
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +224 LIVE
         .byte   PRE, PRE, PRE, PRE, PRE, PRE, 100, 100, 0, 0, 0, 0
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +248 SAVED

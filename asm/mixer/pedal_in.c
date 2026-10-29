@@ -27,6 +27,7 @@
 #define LIST_SCROLL FN(0xC00A72D4, void, (int delta, int rows))
 #define SAVE_SETTINGS FN(0xC00BA3E4, void, (int *words))       /* writes record 50 */
 #define SAVE_LAST_PATCH FN(0xC00B8410, void, (int patch))      /* writes record 51 */
+#define DRAW_ARROWS FN(0xC00A7400, void, (int knob))          /* the turn arrows over a softkey */
 #define BACKLIGHT_APPLY FN(0xC00DC048, void, (void))
 #define CONTRAST_APPLY FN(0xC00BA5F4, void, (int))
 #define SETTINGS_WORDS ((int *)0xC009D8F8)
@@ -194,6 +195,8 @@ void settings_draw(void)
         names[i] = row_text(i, set_names[i], val);
     }
     DRAW_LIST(STR_SETTINGS, names, ROWS, icons, 7, LIST_INDEX() == ROW_MIDI ? STR_ENTER : STR_BLANK);
+    if (LIST_INDEX() != ROW_MIDI)
+        DRAW_ARROWS(2);              /* knob 3 changes the value */
 }
 
 int midi_key(int ev, int steps)
@@ -226,6 +229,7 @@ void midi_draw(void)
                                               : i == 3 ? number(v) : OFF_ON[v]);
     }
     DRAW_LIST("MIDI", names, MROWS, plug + 7, 0, STR_BLANK);
+    DRAW_ARROWS(2);
 }
 
 /* Called instead of settings.S pack_hook / unpack_hook (their DDR trampolines). */

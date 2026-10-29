@@ -22,6 +22,11 @@
 #ifndef MS_ON
 #define MS_ON (*(volatile int *)0xC010A020)
 #endif
+#ifndef MS_LOAD
+#define MS_LOAD ((volatile int *)0xC010A024)  /* master_vec.asm +36: [0] MASTER, [1] KALEIDO */
+extern __cregister volatile unsigned int TSCL;
+#define CYC TSCL
+#endif
 #define P ((volatile unsigned char *)LCD0)
 
 #define scols ds_scols
@@ -65,6 +70,9 @@ typedef struct {
     float kb, km, kh, kra, kring, kt, krot;   /* bass mid high, kick, ring phase, time, turn */
     int ksi, ksh, kinv;             /* segments step, frames to the next change, inverted */
     int kzs, krs, kmi;              /* KALEIDO knobs: zoom -10..10, spin -10..10, mirrors 0 AUTO or 4 6 8 10 12 16 */
+    volatile unsigned aud, own;     /* busy cycles: whole audio blocks, master_tap's part (master_tap) */
+    unsigned ui;                    /* master_poll's cycles, audio taken out */
+    int np, lk;                     /* polls in this CPU window, its menu entry */
 } St;
 
 #ifndef MS_ST
@@ -983,9 +991,10 @@ static void init(void)
 #ifndef MS_HOST
 #pragma FUNCTION_OPTIONS(master_tap, "-ms0 --opt_for_speed=5")
 #endif
-void master_tap(void)
+void master_tap(unsigned t0)        /* t0: TSCL at the block's start (engine.c) */
 {
     St *s = ST;
+    unsigned ta = CYC;
     unsigned w = s->w;
     unsigned *m = (unsigned *)(MS_RING_M + (w & 4095)), *d = (unsigned *)(MS_RING_S + (w & 2047));
     const float *f = (const float *)MS_F, *ac = (const float *)MS_ACC, *sn = (const float *)MS_SNAP;
@@ -1018,12 +1027,13 @@ void master_tap(void)
     s->ims[1] += KI * (q1 * 0.125f - s->ims[1]);
     s->over |= ov;
     s->w = w + 8;
+    s->own += CYC - ta;
+    s->aud += CYC - t0;
 }
 
-void master_poll(void)
+static void poll(St *s)
 {
-    St *s = ST;
-    if (MS_MODE != 11 || MS_SCREEN != 11 || MS_MENU_ENTRY < 5) { MS_ON = 0; return; }
+    if (MS_MODE != 11 || MS_SCREEN != 11 || (MS_MENU_ENTRY != 3 && MS_MENU_ENTRY != 6)) { MS_ON = 0; return; }
     if (MS_MENU_ENTRY == 6) {
         kal_poll(s);
         if ((++s->tick & 3) == 0) { kal_frame(s); EVENT_POST(MAILBOX, 0x40); }
@@ -1037,6 +1047,25 @@ void master_poll(void)
     }
 }
 
+/* 16 ms while open: the poll, and every 64 polls (1.02 s) MASTER's or KALEIDO's CPU load (its polls with
+ * the audio blocks that interrupted them taken out, plus master_tap) for the SYSTEM MODS page.
+ * ponytail: the screen's draw (UI task) is not counted; small next to the poll's frame work. */
+void master_poll(void)
+{
+    St *s = ST;
+    unsigned a = s->aud, t = CYC;
+    int k = MS_MENU_ENTRY == 6;
+    poll(s);
+    if (!MS_ON) return;
+    if (k != s->lk) { s->lk = k; s->np = 0; s->ui = s->own = 0; }
+    s->ui += CYC - t - (s->aud - a);
+    if (++s->np == 64) {
+        MS_LOAD[k] = (int)((float)(s->ui + s->own) * (1000.0f / 307.2e6f) + 0.5f);   /* 64 x 16 ms x 300 MHz */
+        s->np = 0;
+        s->ui = s->own = 0;
+    }
+}
+
 void master_key(int ev, int steps)
 {
     St *s = ST;
@@ -1047,7 +1076,7 @@ void master_key(int ev, int steps)
         else if (k && steps) { i = *k + (steps > 0 ? 1 : -1); if (i >= (ev == 162 ? 0 : -10) && i <= hi) *k = i; }
         return;
     }
-    if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 5); return; }
+    if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 3); return; }
     if (ev == 67 || (ev == 162 && steps > 0)) s->page = p == 5 ? 0 : p + 1;     /* knob 3 press or turn: next page */
     else if (ev == 162 && steps < 0) s->page = p == 0 ? 5 : p - 1;             /* knob 3 turn back */
     else if (ev == 34) {

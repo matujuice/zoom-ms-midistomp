@@ -53,7 +53,7 @@ def test_section_layout():
     assert img[40:44] == (0x47414944).to_bytes(4, "little")       # the magic engine.c checks
     for key, off in SEC["stamp"].items():
         assert img[off:off + 16].rstrip(b"\0") == f"<{key}>".encode()
-    menu = _site(0xC00F60D4)
+    menu = _site(0xC00F60D8)
     name = int.from_bytes(bytes.fromhex(menu["data"]), "little") - VEC
     assert img[name:name + 7] == b"SYSTEM\0"
     assert VEC + len(img) <= 0xC00F5400                             # below lbox.c

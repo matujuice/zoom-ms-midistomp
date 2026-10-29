@@ -31,6 +31,6 @@
 #define MS_SCREEN     (*(volatile int *)(MS_B14 + 352))
 #define MS_CUR_PATCH  (*(volatile int *)(MS_B14 + 324))
 #define MS_MAILBOX    (*(volatile int *)(MS_B14 + 656))
-#define MS_MENU_ENTRY (*(volatile unsigned char *)0xC00F60BF)   /* MENUSCR[7] (menu_enter.S): 5 = MASTER, 6 = KALEIDO */
+#define MS_MENU_ENTRY (*(volatile unsigned char *)0xC00F60BF)   /* MENUSCR[7] (menu_enter.S): 3 = MASTER, 6 = KALEIDO */
 
 #endif

@@ -1,6 +1,7 @@
 /* SYSTEM (MS-70CDR 2.10 OS): DSP and CPU meters in the MENU title bar and 4 pages on the
  * VERSION screen (screen 9, menu entry SYSTEM). docs/dev/diagnostics-plan.md.
- * Audio side: diag_end, called by asm/mixer/engine.c at the end of each block, sums 4096
+ * Audio side: diag_end, called by asm/mixer/engine.c at the end of each block while the
+ * SYSTEM screen or the MENU list is open (diag_poll sets MAGIC; zero cost otherwise), sums 4096
  * blocks (0.74 s) and publishes the averages. TSCL stops while the OS idles, so the TSCL
  * period between two block starts counts busy cycles only: period / 54422 = CPU load.
  * Built by scripts/build_diag_ui.py. No libc, no RTS (no / % by variables), no B14. */
@@ -29,6 +30,8 @@
 #define FX_MUTE 0xC00E0784u                               /* an effect is loading */
 #define DESC(s) (*(volatile unsigned *)(0xC0064E04u + 28 * (s)))   /* ZDL descriptor */
 #define LOOPER_SLOT (*(volatile int *)(0xC00F3028u))      /* looper services +40: GRDLOOP slot, -1 none */
+#define MAGIC (*(volatile unsigned *)0xC00F3128u)       /* diag_vec.asm +40: engine.c calls diag_end while "DIAG" */
+#define MS_LOAD(k) (*(volatile int *)(0xC010A024u + 4 * (k)))   /* master_vec.asm +36: MASTER, KALEIDO CPU, tenths of % */
 #define STAMP(i) ((const char *)(0xC00F3140u + 16 * (i))) /* diag_vec.asm: version, commit, date, label */
 
 extern __cregister volatile unsigned int TSCL;
@@ -39,11 +42,13 @@ extern __cregister volatile unsigned int TSCL;
 
 /* ---- audio side ------------------------------------------------------------------------ */
 static unsigned w_n, w_per, w_ch, w_chmax, w_own, w_cyc[7], w_late;
-static unsigned prev, own, blocks, late_total;
+static unsigned prev, own, late_total, polls;
+static volatile int restart;            /* diag_poll turned the timing on: skip a block */
 static struct { unsigned per, ch, chmax, own, cyc[7], late, win, midi; } pub;
 static volatile unsigned aud_total;     /* busy cycles of all blocks so far (chain + diag) */
 static volatile unsigned m_acc;         /* Task_MIDI's cycles so far, audio taken out */
 static unsigned m_last, m_t, m_aud;
+static int m_on;                        /* m_t is from this timing run */
 unsigned diag_b3;                       /* diag_vec.asm: Task_MIDI's return address */
 
 /* t0: TSCL at engine_run's start. cyc: [0] perf_block, [1 + s] slot s this block. */
@@ -52,7 +57,12 @@ void diag_end(unsigned t0, unsigned *cyc)
     unsigned t1 = TSCL, per = t0 - prev, ch = t1 - t0;
     int i;
     prev = t0;
-    if (blocks++) {             /* the first block has no period */
+    if (restart) {              /* the first block after the timing turned on has no period */
+        restart = 0;
+        w_n = w_per = w_ch = w_chmax = w_own = w_late = 0;
+        for (i = 0; i < 7; i++) w_cyc[i] = 0;
+        m_last = m_acc;
+    } else {
         if (per > LATE) { w_late++; late_total++; }
         w_per += per;
         w_ch += ch;
@@ -88,12 +98,20 @@ static unsigned now(unsigned *a)
     return t;
 }
 
-void diag_mwake(void) { m_t = now(&m_aud); }
+void diag_mwake(void)
+{
+    m_on = MAGIC != 0;
+    if (m_on) m_t = now(&m_aud);
+}
 
 void diag_mend(void)
 {
-    unsigned a, t = now(&a), d = t - m_t - (a - m_aud);
-    if ((int)d > 0) m_acc += d;
+    unsigned a, t, d;
+    if (!MAGIC) { m_on = 0; return; }
+    t = now(&a);
+    d = t - m_t - (a - m_aud);
+    if (m_on && (int)d > 0) m_acc += d;
+    m_on = 1;
     m_t = t;
     m_aud = a;
 }
@@ -102,7 +120,7 @@ void diag_mend(void)
 static int page, top, tick, open, nrow;
 static unsigned peak, seen;
 static char b1[12], b2[12];
-static const int NR[4] = { 5, 8, 6, 7 };    /* rows of each page; 4 fit, knob 1 scrolls */
+static const int NR[4] = { 5, 8, 6, 9 };    /* rows of each page; 4 fit, knob 1 scrolls */
 
 static unsigned udiv(unsigned a, unsigned b)
 {
@@ -166,8 +184,8 @@ static int dsp_total(void)
 
 static void page_version(void)
 {
-    /* ponytail: blocks wraps after 9 days of uptime */
-    unsigned t = (unsigned)(int)(blocks * (1.0f / 5512.5f)), h = udiv(t, 3600), m;
+    /* ponytail: polls x 16 ms (the poll's nominal period) */
+    unsigned t = (unsigned)(int)(polls * 0.016f), h = udiv(t, 3600), m;
     t -= 3600 * h;
     m = udiv(t, 60);
     t -= 60 * m;
@@ -204,11 +222,12 @@ static void page_effects(void)
     }
 }
 
-/* the parts of the CPU load, most to least; LOOPER BUFFER last ("-") with no GRDLOOP */
+/* the parts of the CPU load, most to least; LOOPER BUFFER last ("-") with no GRDLOOP. Then
+ * MASTER and KALEIDO, which run only on their own screen: their load when last open ("-" never). */
 static void page_mods(void)
 {
     static const char *const N[7] = { "EFFECT CHAIN", "PERFORM MODE", "LOOPER BUFFER", "MIDI",
-                                      "DIAGNOSTICS", "EFFECTS", "OS" };
+                                      "SYSTEM", "EFFECTS", "OS" };
     int v[7], o[7], s, i, j, fx = 0, l = LOOPER_SLOT, lc = 0;
     for (s = 0; s < 6; s++) fx += pub.cyc[1 + s];
     if ((unsigned)l < 6) lc = pub.cyc[1 + l];
@@ -222,6 +241,8 @@ static void page_mods(void)
     for (i = 0; i < 7; i++)
         for (o[i] = i, j = i; j && v[o[j]] > v[o[j - 1]]; j--) { s = o[j]; o[j] = o[j - 1]; o[j - 1] = s; }
     for (i = 0; i < 7; i++) put(N[o[i]], v[o[i]] == -0x7FFFFFFF ? "-" : pc(b1, v[o[i]]), 0);
+    put("MASTER", MS_LOAD(0) < 0 ? "-" : dec(b1, MS_LOAD(0), "%"), 0);
+    put("KALEIDO", MS_LOAD(1) < 0 ? "-" : dec(b1, MS_LOAD(1), "%"), 0);
 }
 
 void diag_draw(void)
@@ -259,13 +280,17 @@ int diag_keys(int ev, int steps)
     return 1;
 }
 
-/* 16 ms: a redraw about twice a second on the menu and the DIAGNOSTICS screen. */
+/* 16 ms: the timing on only while the SYSTEM screen or the MENU list (its CPU badge) is open,
+ * and a redraw about twice a second there. */
 int diag_poll(void)
 {
-    int menu = MODE == 11, v = menu && SCREEN == 9;
+    int menu = MODE == 11, v = menu && SCREEN == 9, on = menu && (v || SCREEN == 0);
+    polls++;
+    if (on && !MAGIC) { restart = 1; MAGIC = 0x47414944u; }   /* "DIAG" */
+    else if (!on) MAGIC = 0;
     if (v && !open) { page = top = 0; peak = 0; }
     open = v;
-    if (menu && (v || SCREEN == 0) && !(++tick & 31)) EVENT_POST(UI_EVENT, 64);
+    if (on && !(++tick & 31)) EVENT_POST(UI_EVENT, 64);
     return POLL_TRAMP();
 }
 

@@ -98,6 +98,10 @@ Zoom's Mac updater holds the same firmware files as the Windows one and runs the
 version of it can be built too. The build has been checked byte for byte against the Windows MIDISTOMP updater and
 flashed to an MS-50G from an Apple Silicon Mac.
 
+If you have **MIDISTOMP V2.0 Updater.zip** (the Mac build), unzip it and double-click **Install MIDISTOMP.command**
+next to the app: it signs the app for your Mac and opens it, then go to step 4. It is not notarized, so the first time
+macOS may refuse to open it: right-click it > Open, then Open. Otherwise, build the app yourself:
+
 1. Download Zoom's **MS-70CDR v2.10** updater **for Mac** from the
    [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    (a file like `MS-70CDR_v2.10_Mac_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
@@ -151,7 +155,8 @@ use the knobs the same way. The softkey above each knob names what its press doe
 | Knob 3 | next page (the right softkey names it) |
 
 In lists (MENU, SETTINGS, MIDI, PERFORM MODE), turn knob 1 to scroll, press knob 1 (**ENTER**) to open a row, turn
-knob 3 to change a row that has a value, and press knob 2 to go back.
+knob 3 to change a row that has a value (in SETTINGS and MIDI, arrows over knob 3 show it), and press knob 2 to go
+back.
 
 The Effect Chain screen itself and KALEIDO have their own keys, explained in [Moving around](#moving-around) and
 [KALEIDO](#kaleido).
@@ -170,7 +175,7 @@ The Effect Chain screen itself and KALEIDO have their own keys, explained in [Mo
 
 Press knob 1 in the effect view to open the MENU:
 
-**DELETE EFFECT UNIT, EFFECT CHAIN, PERFORM MODE, SETTINGS, SYSTEM, MASTER, KALEIDO.**
+**DELETE EFFECT UNIT, EFFECT CHAIN, PERFORM MODE, MASTER, SETTINGS, SYSTEM, KALEIDO.**
 
 - The title bar shows the patch's DSP use on the left (`DSP 135/300`: what the effects declare, out of the new limit
   of 300; stock stops at 225) and the pedal's CPU load on the right (`CPU 47%`).
@@ -339,6 +344,10 @@ control never has two. Each gesture moves its target and can schedule a follow m
 | Hold | Action, Release, Follow |
 
 The knobs tell a turn, a press and a hold apart even if you click while turning or turn a little while pressing.
+
+**Footswitch hold on an effect.** When the footswitch's target is an effect's on/off (not GRDLOOP), holding it works
+like HOLD FOR MOMENTARY, whatever HOLD FOR is set to: the effect flips when you press and flips back when you let go.
+In Perform mode the hold never opens TAP or the tuner.
 
 ### Every move: Value, Next, Lag
 
@@ -654,10 +663,11 @@ MENU > **SYSTEM** has 4 pages. Knob 1 scrolls, knob 3 press goes to the next pag
 | 1 **VERSION** | MIDISTOMP version, commit, date and label of the build |
 | 2 **LOAD** | CPU (all of it), CPU PEAK since the page opened, AUDIO (the effect chain) and AUDIO MAX, the free headroom, late audio blocks, and the patch's declared DSP out of 300 |
 | 3 **EFFECTS** | per effect: name, CPU share and declared DSP |
-| 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MASTER, KALEIDO, MIDI and DIAGNOSTICS itself |
+| 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MIDI and SYSTEM itself; then MASTER and KALEIDO, with their load from the last time they were open (`-` if not opened since power-on) |
 
 LOAD and MODS help you find what makes a heavy patch heavy. A late block means the CPU was full for a moment; a
-patch change makes one or two, which is normal. MASTER and KALEIDO cost nothing while closed.
+patch change makes one or two, which is normal. MASTER and KALEIDO cost nothing while closed, and SYSTEM's
+measuring runs only while SYSTEM or the MENU is open.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 
@@ -671,6 +681,12 @@ around MIDISTOMP. They follow the pedal's tempo, lock to the clock's grid, resta
 and keep going after Stop. The looper, GRDLOOP ([LOOPER](#6-looper-grdloop)), comes from the pack too, and new effects keep coming.
 
 See [what each knob does](https://github.com/matujuice/zoom-ms-zdl-effects-pack/blob/main/docs/EFFECTS.md).
+
+**Effect categories.** The category screen (when you add or change an effect) is the MS-50G's: **DYN/FLTR**,
+**OD/DIST**, **AMP** on top, **MOD/SFX**, **DLY/REV**, **EXIT** below. ENTER on a category gives its first effect; turn the
+effect knob to scroll on, as on an MS-50G: filters follow DYN, SFX follow MOD, reverbs follow DLY. The pack effects
+are delays, so you find them under DLY/REV. OD/DIST and AMP hold drives and amps only when you load them (from an
+MS-50G or MS-60B set); ENTER on a category with nothing loaded does nothing.
 
 **Effect Manager.** Zoom's Effect Manager and Zoom Effect Manager 2 work in **normal mode** (adding, removing and
 ordering effects); MIDISTOMP stays installed. **Never use an Effect Manager's firmware update mode** on a MIDISTOMP

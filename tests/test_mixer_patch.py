@@ -154,13 +154,11 @@ def test_menu_writes_match_the_settings_section():
     menu = sb[0x1181EB80 - 0x1181EA00:][:20]                         # settings.S menu_names
     m7 = _data(SEC)[MENU7:MENU7 + 28]
     stock = [menu[4 * i:4 * i + 4] for i in range(5)]
-    got = [m7[4 * i:4 * i + 4] for i in range(5)]
-    assert got[:2] + got[3:] == stock[:3] + stock[4:]                # stock without MIDI; PERFORM MODE 2
-    got.append(m7[20:24])
-    got.append(m7[24:28])
+    got = [m7[4 * i:4 * i + 4] for i in range(7)]
+    assert got[:2] + got[4:6] == stock[:3] + stock[4:]               # stock without MIDI; PERFORM MODE 2, MASTER 3
     sec = _data(SEC)
-    assert sec[MENUSCR + 2:MENUSCR + 8] == bytes([11, 1, 9, 11, 11, 0])   # PERFORM, SETTINGS (stock row 2), version, MASTER, KALEIDO
-    for i, name in ((2, b"PERFORM MODE\0"), (5, b"MASTER\0"), (6, b"KALEIDO\0")):
+    assert sec[MENUSCR + 2:MENUSCR + 8] == bytes([11, 11, 1, 9, 11, 0])   # PERFORM, MASTER, SETTINGS (stock row 2), version, KALEIDO
+    for i, name in ((2, b"PERFORM MODE\0"), (3, b"MASTER\0"), (6, b"KALEIDO\0")):
         off = _word(got[i]) - BASE
         assert sec[off:off + len(name)] == name
 
@@ -336,6 +334,7 @@ def test_m2_build_does_not_overlap():
         hit = [p for s, t, p in other_writes if s < e and a < t]
         chained = {0xC00C82D0: ["midi-clock write"]}                 # the poll trampoline
         chained.update(dict.fromkeys(PEDAL_HOOKS, ["midi-settings write"]))
+        chained[0xC00A7638] = ["midi-settings write"]               # version EXIT row, moved again
         assert hit in ([], chained.get(a, [])), hex(a)
     assert BASE + len(_data(SEC)) <= 0xC0106DC0                     # inside the MOD code area (R50_COPY, R50, looper above)
 

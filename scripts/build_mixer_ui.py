@@ -24,7 +24,7 @@ YAML = ROOT / "patches/mixer-m2.yaml"
 CGT = Path(os.environ.get("TI_CGT", Path.home() / "Downloads/ti-cgt-c6000_8.5.0.LTS"))
 C_ADDR, C_END = 0xC00F8000, 0xC0106DC0         # MOD code area, record 50 (R50, chain.h) above
 FAR_ADDR = 0xC00F7000                           # the C's zeroed variables (.far), after mixer.S, below C_ADDR
-LOW_ADDR = 0xC00F6900                           # the C's .switch and .fardata: right after mixer.S, below FAR_ADDR
+LOW_ADDR = 0xC00F6900                           # the C's .switch, .fardata, some .const (C space is full): right after mixer.S, below FAR_ADDR
 LOW_IMG = b""
 PERF = ROOT / "asm/perform"
 CL = ["-mv6740", "--abi=eabi", "-q"]
@@ -95,7 +95,8 @@ def build_c(stub: bool = False, listing: list | None = None) -> bytes:
         objs = [s.stem + ".obj" for s in srcs]
         Path(tmp, "l.cmd").write_text(
             f"SECTIONS {{ GROUP: load = 0x{C_ADDR:08X} {{ .vectors .text .const .neardata .rodata }}\n"
-            f"  GROUP: load = 0x{LOW_ADDR:08X} {{ .switch .fardata }}\n"
+            f"  GROUP: load = 0x{LOW_ADDR:08X} {{ .switch .fardata\n"
+            f"    .lconst {{ pages.obj(.const) pedal_in.obj(.const) perform_engine.obj(.const) }} }}\n"
             f"  GROUP: load = 0x{FAR_ADDR:08X} {{ .far .bss }} }}\n")
         # no library: an RTS helper call (division, struct copy...) fails the link
         _run(CL + ["-z", *objs, "l.cmd", "-o", "c.out", "--ram_model", "--entry_point=chain_key",
@@ -107,7 +108,7 @@ def build_c(stub: bool = False, listing: list | None = None) -> bytes:
         dis = subprocess.run([str(CGT / "bin/dis6x"), "c.out"], cwd=tmp, check=True,
                              capture_output=True, text=True).stdout
     names = {n for _, n, _ in secs}
-    assert names <= {".vectors", ".text", ".const", ".switch", ".fardata", ".far", ".bss", ".neardata", ".rodata"}, names
+    assert names <= {".vectors", ".text", ".const", ".switch", ".fardata", ".far", ".bss", ".neardata", ".rodata", ".lconst"}, names
     assert not re.search(r"\bB14\b", dis), "the C must not use B14 (the OS's data pointer)"
     assert C_ADDR + len(img) <= C_END, hex(C_ADDR + len(img))
     assert all(FAR_ADDR <= a and a + len(b) <= C_ADDR for a, _, b in far), far

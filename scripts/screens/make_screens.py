@@ -57,6 +57,7 @@ SHOTS = {
     "tempo-turn-tap.png": ("fw", "tempo_turn_tap", "ascii"),
     "tempo-midi-clock.png": ("fw", "tempo_clock", "ascii"),
     "hold-for.png": ("fw", "hold_for", "ascii"),
+    "effect-select.png": ("fw", "effect_select", "ascii"),
     "menu-2.png": ("fw", "menu_2", "ascii"),
     "settings-2.png": ("fw", "settings_2", "ascii"),
     "settings-3.png": ("fw", "settings_3", "ascii"),

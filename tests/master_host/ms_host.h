@@ -22,6 +22,9 @@ static unsigned host_zt[8];
 #define SET_SCREEN(a, b) (host_scr_calls++)
 #define MAILBOX 0
 #define MS_ON host_on
+static int host_load[2];
+#define MS_LOAD host_load
+#define CYC 0u
 #define MS_FFT host_fft
 #define MS_SIN host_sin
 #define MS_RING_M host_rm

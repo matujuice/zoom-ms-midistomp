@@ -206,8 +206,12 @@ def cmd_build_mac(args) -> int:
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
     print("flash steps: " + "; ".join(s.describe() for s in steps))
     app_name = f"{out.stem}.app" if as_zip else str(out)
-    print(f"wrote {out}\nOn the Mac{', after unzipping' if as_zip else ''}, re-sign it before running: "
-          f"xattr -cr \"{app_name}\" && codesign --force --deep --sign - \"{app_name}\"")
+    if as_zip:
+        print(f"wrote {out}\nOn the Mac, unzip it and double-click {macapp.INSTALL} (the first time, "
+              "right-click > Open): it re-signs the app and opens it.")
+    else:
+        print(f"wrote {out}\nOn the Mac, re-sign it before running: "
+              f"xattr -cr \"{app_name}\" && codesign --force --deep --sign - \"{app_name}\"")
     return 0
 
 

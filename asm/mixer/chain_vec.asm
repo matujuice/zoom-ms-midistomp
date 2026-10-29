@@ -115,12 +115,14 @@ perf_draw_e:
         MVKH    .S2     perf_draw, B5
         MVKL    .S1     0xC010A018, A0  ; master_draw
         MVKH    .S1     0xC010A018, A0
-ms_or:                                  ; B5 = PERFORM's, A0 = MASTER's: MASTER when the menu entry was 5 or 6 (KALEIDO)
+ms_or:                                  ; B5 = PERFORM's, A0 = MASTER's: MASTER when the menu entry was 3 or 6 (KALEIDO)
         MVKL    .S1     0xC00F60BF, A1  ; MENUSCR[7] (mixer.S, menu_enter.S)
         MVKH    .S1     0xC00F60BF, A1
         LDBU    .D1T1   *A1, A1
         NOP     4
-        CMPLT   .L1     4, A1, A1
+        CMPEQ   .L1     3, A1, A2       ; A2 is free: the C we branch to may clobber it anyway
+        CMPEQ   .L1     6, A1, A1
+        OR      .L1     A1, A2, A1
   [A1]  MV      .L2X    A0, B5
         B       .S2     B5
         NOP     5

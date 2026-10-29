@@ -13,3 +13,5 @@
         B       .S2     master_draw     ; +24 screen 11 draw, the same
         NOP     5
 ms_on:  .word   0                       ; +32 the screen is open (0 at boot)
+        .word   0xFFFFFFFF, 0xFFFFFFFF  ; +36 / +40 MASTER / KALEIDO CPU, tenths of %, last measured while open
+                                        ; (-1 = not yet); asm/diag/diag.c MODS shows them
