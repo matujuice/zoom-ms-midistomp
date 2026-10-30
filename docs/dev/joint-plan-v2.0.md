@@ -45,7 +45,7 @@ else: static cover. The meter stays switched off on the pedal for this build (NE
   when free and EMPTY). If the patch-load hook costs more than a few lines, check the slot's effect id
   instead. Test: host or pedal, GRDLOOP -> StompDly patch change, bar gone; cursor off GRDLOOP, bar gone.
 
-**GRDELAY (GridDly) ~1 s dropout on footswitch with stereo input:** the effect. The firmware's flip path
+**GRDELAY ~1 s dropout on footswitch with stereo input:** the effect. The firmware's flip path
 is the same for every effect and stock effects don't drop out. Fixed in the effects stereo port
 (reproduce in a host test first, per STEREO.md). Only if the host test can't reproduce it and the pedal
 still does after the port does it come back to the firmware.

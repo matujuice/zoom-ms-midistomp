@@ -5,4 +5,4 @@ contact_links:
     about: Install, recovery, every screen and the MIDI CC chart.
   - name: Effects pack
     url: https://github.com/matujuice/zoom-ms-zdl-effects-pack/issues
-    about: Problems with GRDLOOP, GridDly or other pack effects go here.
+    about: Problems with GRDLOOP, GRDELAY or other pack effects go here.

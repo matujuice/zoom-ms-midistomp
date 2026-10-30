@@ -406,9 +406,9 @@ gid 8. Pack numbers equal to a stock number:
 |---|---|---|---|
 | DualShft | 8/480 | CRN_CHO 6/480 | no: other category, other 32-bit id |
 | Sweep | 8/496 | ANA234CH 6/496 | no: same reason (effects pack `docs/STEREO.md:177-178`) |
-| DubSiren 485, Choral 486, WaveFold 487, EuGate 488, S.GN_L 489, Scrub 490, DirtBox 491, Breather 493, GridDly 495, Looper 497 | 8/... | none | no |
+| DubSiren 485, Choral 486, WaveFold 487, EuGate 488, S.GN_L 489, Scrub 490, DirtBox 491, Breather 493, GRDELAY 495, Looper 497 | 8/... | none | no |
 
-Inside the pack, on purpose: GridDly/BarDelay 495, Breather/Pump 493, GRDLOOP/Looper 497
+Inside the pack, on purpose: GRDELAY/BarDelay 495, Breather/Pump 493, GRDLOOP/Looper 497
 (replacements; the old builds still sit in `dist/`). Probes 498-500 are never released. New
 effects take 481-484, 492, 494, 498+ (`NEW-EFFECTS.md:17`); 512 (CRN_TRI) is the only stock
 number above 496.
@@ -422,7 +422,7 @@ hardware test with CRN_CHO and DualShft both installed found).
 - Address and layout match on the MS-70CDR 2.10: `asm/midi_clock/transport.inc` (block
   `0x1181FF00`, magic `0x5A4D5401`, words 0-5), poll site `0xC00C6998`
   (`patches/midi-clock.yaml`). The pack reads it through `src/custom/common/zmt.h` (same
-  address, magic and sequence rule): Breather, DualShft, DubSiren, EuGate, Choral, GridDly,
+  address, magic and sequence rule): Breather, DualShft, DubSiren, EuGate, Choral, GRDELAY,
   Looper, Scrub, Sweep. The Looper also reads the looper services block `0xC00F3000`, magic
   `0x5A4C5301`.
 - Words 6 and 7 (footswitch down, hold claim): planned for v2.0, same magic
@@ -437,7 +437,7 @@ hardware test with CRN_CHO and DualShft both installed found).
 
 | Effect | Needs from MIDISTOMP | On stock firmware |
 |---|---|---|
-| DualShft, Choral, EuGate, DubSiren, Scrub, Breather, GridDly, Sweep | transport block (any MIDISTOMP) | 120 BPM, no clock sync (`zmt.h`) |
+| DualShft, Choral, EuGate, DubSiren, Scrub, Breather, GRDELAY, Sweep | transport block (any MIDISTOMP) | 120 BPM, no clock sync (`zmt.h`) |
 | WaveFold, S.GN_L, DirtBox | nothing | same as on MIDISTOMP |
 | Looper (GRDLOOP) | transport + looper services (v2.0) | ~10 s mono, every flip a press, LED means nothing (`EFFECTS.md:196-200`); not in a release |
 | RISER (planned) | words 6/7 (v2.0) | press-only sweep |

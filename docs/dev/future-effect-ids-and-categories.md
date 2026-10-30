@@ -45,7 +45,7 @@ With new groups, the pack effects would go:
 | DRV | DirtBox, WaveFold |
 | AMP | (none; amps only if loaded from an MS-50G / MS-60B set) |
 | MOD | Takeoff, Choral, SGNL, DualShft, Sweep |
-| DLY | GRDLOOP, GridDly, DubSiren, Scrub |
+| DLY | GRDLOOP, GRDELAY, DubSiren, Scrub |
 | REV | Washout |
 
 The code for this was written and passed the emulator (the key jump table was widened to take event 65,
@@ -64,7 +64,7 @@ the firmware's own drawing code (`asm/mixer/chain_draw.c`):
 
 Give every pack effect an ID from 900 up, clear of every stock ID, with the group that matches what it does.
 The list that was proposed (900-916, in this order): LOUDER, Gooey, DJFilter, EuGate, Breather (DYN);
-DirtBox, Wavefold (DRV); Takeoff, Choral, SGNL, DualShft, Sweep (MOD); GRDLOOP, GridDly, DubSiren, Scrub
+DirtBox, Wavefold (DRV); Takeoff, Choral, SGNL, DualShft, Sweep (MOD); GRDLOOP, GRDELAY, DubSiren, Scrub
 (DLY); Washout (REV). It breaks every beta1 patch with a pack effect (see above), which is why v2.0 went back.
 
 ## Finding the stock IDs
