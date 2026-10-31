@@ -167,9 +167,8 @@ The Effect Chain screen itself and KALEIDO have their own keys, explained in [Mo
 - In the effect chain or effect view, hold **down + right** about 1 s for the tuner, and **down + left** for the tempo
   screen. The pedal already marks them: the tuning fork sits under down + right, the note icon under down + left.
 - In the tuner, press knob 2 (**EXIT**) to go back to the effects.
-- Left and right move between the effects of a patch several times faster than stock. At the last effect, one more
-  press slides back to the first one, and the other way round. The effect select (carousel) screen scrolls faster
-  and wraps around the same way.
+- On the effect select (carousel) screen, left and right scroll several times faster than stock. At the last
+  effect, one more press slides back to the first one, and the other way round.
 
 ### The MENU
 

@@ -12,8 +12,8 @@ effect chain routing, a looper, Perform mode, mastering meters, and full MIDI co
 <a href="#custom-effects">Effects</a> ·
 <a href="#feedback-and-support">Feedback</a></p>
 
-<p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:<br>
-<a href="https://paypal.me/matujuice">PayPal</a> · <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · <a href="https://github.com/sponsors/matujuice">GitHub Sponsors</a></p>
+<p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:</p>
+<h3 align="center">☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · 💙 <a href="https://paypal.me/matujuice">PayPal</a> · 💖 <a href="https://github.com/sponsors/matujuice">GitHub Sponsors</a></h3>
 
 <p align="center"><img src="docs/img/cover.jpg" alt="A Zoom MS-70CDR running MIDISTOMP, KALEIDO on the screen, wrapped in orange cables" width="720"></p>
 
@@ -65,7 +65,7 @@ Small things that make the stock pedal nicer to live with.
 |---|---|
 | **Tempo Lock** | set the tempo by turning the knob or tapping, and keep one tempo across patches |
 | **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or works as a momentary switch |
-| **Faster scrolling** | in the effect chain and on the effect select (carousel) screen, left/right move faster and wrap around from the last item to the first |
+| **Faster scrolling** | on the effect select (carousel) screen, left/right scroll faster and wrap around from the last effect to the first |
 | **Button combos** | down + right = tuner, down + left = tempo |
 | **EXIT goes back** | EXIT returns to the MENU entry you left |
 | **INPUT MONO/STEREO** | tell the pedal which input it has, in SETTINGS |
@@ -145,7 +145,8 @@ or you have an idea, please [open an issue](https://github.com/matujuice/zoom-ms
 MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free. If it's useful to you, you can buy me a coffee:
-[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · [GitHub Sponsors](https://github.com/sponsors/matujuice)
+
+### ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · 💙 [PayPal](https://paypal.me/matujuice) · 💖 [GitHub Sponsors](https://github.com/sponsors/matujuice)
 
 ---
 
@@ -171,7 +172,7 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - [Zoom-Firmware-Editor](https://github.com/Barsik-Barbosik/Zoom-Firmware-Editor) by Barsik-Barbosik: the updater
   flash layout.
 - [zoom-zt2](https://github.com/mungewell/zoom-zt2) by mungewell: SysEx file transfer.
-- Testers: Jannik Aßfalg, rusinov.ro, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
+- Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 
