@@ -53,7 +53,7 @@ One build runs on all three pedals:
 |---|---|
 | MS-70CDR | tested, with stereo input |
 | MS-60B | tested (v1.2), mono input |
-| MS-50G | tested (v1.2, from a Mac), mono input |
+| MS-50G | tested (v2.0, and v1.2 from a Mac), mono input |
 | MS-50G+, MS-70CDR+, MS-200D+ and the Four series | not supported: different hardware |
 
 You get 6 effects per patch, on every pedal. If you try it on a pedal not listed as tested, please

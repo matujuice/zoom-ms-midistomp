@@ -105,7 +105,7 @@ Synced gates, pitch shifters, delays, filters, the looper, a choir and more. New
 |---|---|
 | **MS-70CDR** | tested, with stereo input |
 | **MS-60B** | tested (v1.2), mono input |
-| **MS-50G** | tested (v2.0 beta, and v1.2 from a Mac), mono input |
+| **MS-50G** | tested (v2.0, and v1.2 from a Mac), mono input |
 | MS-50G+, MS-70CDR+, MS-200D+ and the Four series | not supported: different hardware |
 
 One build runs on all three pedals. It is made from Zoom's MS-70CDR 2.10 firmware, so after the update every pedal
