@@ -14,7 +14,7 @@ effect chain routing, a looper, Perform mode, mastering meters, and full MIDI co
 <a href="#feedback-and-support">Feedback</a></p>
 
 <p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:</p>
-<h3 align="center">☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · 💙 <a href="https://paypal.me/matujuice">PayPal</a></h3>
+<h3 align="center">💙 <a href="https://paypal.me/matujuice">PayPal</a> (preferred) · ☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a></h3>
 
 <p align="center"><img src="docs/img/cover.jpg" alt="A Zoom MS-70CDR running MIDISTOMP, KALEIDO on the screen, wrapped in orange cables" width="720"></p>
 
@@ -32,7 +32,8 @@ updater.
 
 ## What 2.0 adds
 
-<p align="center"><img src="docs/img/mixer-chain.png" alt="Effect Chain screen with ROUTE, two parallel buses and MIX" width="200"> <img src="docs/img/perform.png" alt="PERFORM MODE" width="200"> <img src="docs/img/master.png" alt="MASTER SPECTRUM page" width="200"> <img src="docs/img/kaleido.png" alt="MASTER KALEIDO visual" width="200"></p>
+<p align="center"><img src="docs/img/mixer-chain.png" alt="Effect Chain screen with ROUTE, two parallel buses and MIX" width="200"> <img src="docs/img/perform.png" alt="PERFORM MODE" width="200"> <img src="docs/img/looper.png" alt="GRDLOOP recording, with the loop bar MIDISTOMP draws" width="200"></p>
+<p align="center"><img src="docs/img/master.png" alt="MASTER SPECTRUM page" width="200"> <img src="docs/img/kaleido.png" alt="MASTER KALEIDO visual" width="200"> <img src="docs/img/system-load.png" alt="SYSTEM LOAD page" width="200"></p>
 
 | Feature | What it does |
 |---|---|
@@ -158,7 +159,7 @@ MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free. If it's useful to you, you can buy me a coffee:
 
-### ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · 💙 [PayPal](https://paypal.me/matujuice)
+### 💙 [PayPal](https://paypal.me/matujuice) (preferred) · ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
 
 ---
 
