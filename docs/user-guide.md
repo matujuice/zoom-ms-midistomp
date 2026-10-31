@@ -92,15 +92,16 @@ bootloader, so update mode is always there.
 
 ### On a Mac
 
-> A much easier Mac install is on the way. The steps below work today, but they need Python and Terminal.
-
 Zoom's Mac updater holds the same firmware files as the Windows one and runs the same flash steps, so a MIDISTOMP
 version of it can be built too. The build has been checked byte for byte against the Windows MIDISTOMP updater and
 flashed to an MS-50G from an Apple Silicon Mac.
 
-If you have **MIDISTOMP V2.0 Updater.zip** (the Mac build), unzip it and double-click **Install MIDISTOMP.command**
-next to the app: it signs the app for your Mac and opens it, then go to step 4. It is not notarized, so the first time
-macOS may refuse to open it: right-click it > Open, then Open. Otherwise, build the app yourself:
+The easy way: download **MIDISTOMP V2.0 Updater.zip** (the Mac build) from the
+[release page](https://github.com/matujuice/zoom-ms-midistomp/releases), unzip it and double-click
+**Install MIDISTOMP.command** next to the app: it signs the app for your Mac and opens it, then go to step 4. It is not
+notarized, so the first time macOS may refuse to open it: right-click it > Open, then Open.
+
+If you'd rather build the app yourself (needs Python and Terminal):
 
 1. Download Zoom's **MS-70CDR v2.10** updater **for Mac** from the
    [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
@@ -167,7 +168,8 @@ The Effect Chain screen itself and KALEIDO have their own keys, explained in [Mo
   screen. The pedal already marks them: the tuning fork sits under down + right, the note icon under down + left.
 - In the tuner, press knob 2 (**EXIT**) to go back to the effects.
 - Left and right move between the effects of a patch several times faster than stock. At the last effect, one more
-  press slides back to the first one, and the other way round.
+  press slides back to the first one, and the other way round. The effect select (carousel) screen scrolls faster
+  and wraps around the same way.
 
 ### The MENU
 
