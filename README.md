@@ -75,6 +75,7 @@ Small things that make the stock pedal nicer to live with.
 | **EXIT goes back** | EXIT returns to the MENU entry you left |
 | **INPUT MONO/STEREO** | tell the pedal which input it has, in SETTINGS |
 | **Levels up to 150** | Input and Master levels go past unity (100) |
+| **MS-50G effect select** | the category screen is the MS-50G's: DYN/FLTR, OD/DIST, AMP, MOD/SFX, DLY/REV and EXIT |
 
 ## Custom effects
 

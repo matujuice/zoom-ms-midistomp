@@ -404,8 +404,8 @@ In SETUP > **LOOPER** (when the patch has GRDLOOP):
 - One row per loop event: **REC START, REC END, PLAY, STOP, DELETE, LOOP START** (every pass). Each has one target
   and one move (Value, Next, Lag), no Follow.
 
-A new patch with the looper starts with: footswitch → looper Ftsw; REC END → MIX XFade to B100 over 1 BAR;
-DELETE → MIX XFade to A100, MICRO.
+A new patch starts with PERFORM blank: no targets, no looper rows. Set the footswitch to the looper (Ftsw)
+yourself if you want it to drive GRDLOOP.
 
 ### Example: a transition
 
@@ -686,7 +686,8 @@ See [what each knob does](https://github.com/matujuice/zoom-ms-zdl-effects-pack/
 **OD/DIST**, **AMP** on top, **MOD/SFX**, **DLY/REV**, **EXIT** below. ENTER on a category gives its first effect; turn the
 effect knob to scroll on, as on an MS-50G: filters follow DYN, SFX follow MOD, reverbs follow DLY. The pack effects
 are delays, so you find them under DLY/REV. OD/DIST and AMP hold drives and amps only when you load them (from an
-MS-50G or MS-60B set); ENTER on a category with nothing loaded does nothing.
+MS-50G or MS-60B set); ENTER on a category with nothing loaded puts a blank unit in, as on an MS-50G, and the
+effect knob then picks an effect. ENTER on EXIT leaves the screen.
 
 **Effect Manager.** Zoom's Effect Manager and Zoom Effect Manager 2 work in **normal mode** (adding, removing and
 ordering effects); MIDISTOMP stays installed. **Never use an Effect Manager's firmware update mode** on a MIDISTOMP
