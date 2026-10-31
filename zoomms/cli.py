@@ -81,7 +81,7 @@ def build_stamp(patch_paths: list[str], given: list[str] = ()) -> dict:
         commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
                                 cwd=Path(__file__).parent, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
-        commit = "?"
+        commit = "RELEASE"  # the frozen builder runs without git
     stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": "DEV"}
     stamp.update(kv.split("=", 1) for kv in given)
     return stamp
