@@ -683,6 +683,8 @@ and keep going after Stop. The looper, GRDLOOP ([LOOPER](#6-looper-grdloop)), co
 
 See [what each knob does](https://github.com/matujuice/zoom-ms-zdl-effects-pack/blob/main/docs/EFFECTS.md).
 
+<img src="img/effect-select.png" alt="ADD EFFECT UNIT: DYN/FLTR, OD/DIST, AMP, MOD/SFX, DLY/REV, EXIT" width="300">
+
 **Effect categories.** The category screen (when you add or change an effect) is the MS-50G's: **DYN/FLTR**,
 **OD/DIST**, **AMP** on top, **MOD/SFX**, **DLY/REV**, **EXIT** below. ENTER on a category gives its first effect; turn the
 effect knob to scroll on, as on an MS-50G: filters follow DYN, SFX follow MOD, reverbs follow DLY. The pack effects
@@ -727,7 +729,6 @@ confusing, or an idea. Say which pedal and MIDISTOMP version you have (MENU > SY
 happened. A phone photo of the screen helps. Reports from MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free and made by one person. If it's useful to you, you can buy me a coffee:
-[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice) ·
-[GitHub Sponsors](https://github.com/sponsors/matujuice)
+[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>

@@ -10,10 +10,11 @@ effect chain routing, a looper, Perform mode, mastering meters, and full MIDI co
 <a href="docs/user-guide.md#8-midi-and-the-cc-chart">MIDI chart</a> ·
 <a href="#demo">Demo</a> ·
 <a href="#custom-effects">Effects</a> ·
+<a href="#whats-next">Roadmap</a> ·
 <a href="#feedback-and-support">Feedback</a></p>
 
 <p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:</p>
-<h3 align="center">☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · 💙 <a href="https://paypal.me/matujuice">PayPal</a> · 💖 <a href="https://github.com/sponsors/matujuice">GitHub Sponsors</a></h3>
+<h3 align="center">☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · 💙 <a href="https://paypal.me/matujuice">PayPal</a></h3>
 
 <p align="center"><img src="docs/img/cover.jpg" alt="A Zoom MS-70CDR running MIDISTOMP, KALEIDO on the screen, wrapped in orange cables" width="720"></p>
 
@@ -60,6 +61,8 @@ Everything is saved in the patch: routing, levels, the looper settings and the P
 ## QOL improvements
 
 Small things that make the stock pedal nicer to live with.
+
+<p align="center"><img src="docs/img/effect-select.png" alt="ADD EFFECT UNIT: the MS-50G category screen" width="260"> <img src="docs/img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"></p>
 
 | Change | What it does |
 |---|---|
@@ -138,6 +141,15 @@ Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and
 - **Something is wrong.** [Open an issue](https://github.com/matujuice/zoom-ms-midistomp/issues) with your pedal, your
   MIDISTOMP version, what you did and what happened.
 
+## What's next
+
+- **More than 6 effects per patch**, limited only by the DSP.
+- **PERFORM per gesture:** a different effect and parameter for each press, hold or turn (to be tested).
+- **Install from the browser (Modwerk):** flash MIDISTOMP and effects without Python or a builder.
+- **More stereo effects** in the pack.
+
+Want something else? [Open an issue](https://github.com/matujuice/zoom-ms-midistomp/issues) and tell me.
+
 ## Feedback and support
 
 MIDISTOMP is made by one person with one pedal, so every report helps a lot. If something doesn't work, looks wrong,
@@ -146,7 +158,7 @@ MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free. If it's useful to you, you can buy me a coffee:
 
-### ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · 💙 [PayPal](https://paypal.me/matujuice) · 💖 [GitHub Sponsors](https://github.com/sponsors/matujuice)
+### ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · 💙 [PayPal](https://paypal.me/matujuice)
 
 ---
 
