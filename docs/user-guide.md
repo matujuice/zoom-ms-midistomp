@@ -729,6 +729,6 @@ confusing, or an idea. Say which pedal and MIDISTOMP version you have (MENU > SY
 happened. A phone photo of the screen helps. Reports from MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free and made by one person. If it's useful to you, you can buy me a coffee:
-[PayPal](https://paypal.me/matujuice) (preferred) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
+[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
