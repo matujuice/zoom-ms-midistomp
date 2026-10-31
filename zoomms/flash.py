@@ -87,8 +87,9 @@ def boot_steps(steps: list[Step], keep_133: bool = False) -> list[Step]:
 
 
 def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = True,
-                  new_133: bytes | None = None) -> bytes:
-    """new_133: modified BIN/133 (boot logo); its erase/write steps then stay on."""
+                  new_133: bytes | None = None, title: str | None = None) -> bytes:
+    """new_133: modified BIN/133 (boot logo); its erase/write steps then stay on.
+    title: the new window title."""
     exe = bytearray(open(exe_path, "rb").read())
     for rid, new in ((129, new_os), (133, new_133)):
         if new is None:
@@ -101,7 +102,26 @@ def build_updater(exe_path: str, new_os: bytes | None = None, skip_boot: bool = 
         for s in boot_steps(find_script(bytes(exe)), keep_133=new_133 is not None):
             struct.pack_into("<I", exe, s.offset, SKIP)
     accept_models(exe)
+    if title is not None:
+        set_title(exe, title)
     return _unsign(bytes(exe))
+
+
+def set_title(exe: bytearray, new: str) -> None:
+    """Change Zoom's window title ("ZOOM MS-70CDR v2.10 Updater", also with
+    " (%d)" for a second instance), every copy, written over the old one."""
+    import re
+
+    olds = set(re.findall(rb"\0(ZOOM [ -~]{1,40} Updater)(?:\0| \(%d\)\0)", exe))
+    if not olds:
+        raise ValueError("window title not found")
+    new_b = new.encode("ascii")
+    for old in olds:
+        if len(new_b) > len(old):
+            raise ValueError(f"title {new!r} is longer than {old.decode()!r}")
+        pad = bytes(len(old) - len(new_b))
+        for tail in (b"\0", b" (%d)\0"):
+            exe[:] = exe.replace(b"\0" + old + tail, b"\0" + new_b + tail + pad)
 
 
 # The updater's model check (Luca's go-ahead 2026-10-15): the model byte the
