@@ -56,7 +56,7 @@ def test_writes_point_at_the_section():
     assert code[160:164] == bytes.fromhex("f654bc01")                 # draw: stw b3
     assert code[256:260] == bytes.fromhex("29249501")                 # next: mvkl nxt, a3
     assert code[272:276] == bytes.fromhex("28309501")                 # prev: mvkl prv, a3
-    assert code[320:324] == bytes.fromhex("29009501")                 # enter: mvkl tbl, a3
+    assert code[320:324] == bytes.fromhex("2b823d00")                 # enter: mvkl GO, b0
     assert _disp(0xC00A90D4, W[0xC00A90D4]["expect"]) == 0xC00A0144
     assert _disp(0xC00A90D4, W[0xC00A90D4]["data"]) == draw
     assert _disp(0xC00A7B00, W[0xC00A7B00]["data"]) == enter

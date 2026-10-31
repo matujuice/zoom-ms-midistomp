@@ -84,21 +84,29 @@ static void turn(int k, int steps)
     perf_turn(k, steps);
 }
 
+/* A control works as the footswitch: the footswitch itself, or any control aimed at a Footsw target */
+static int sw(int c) { return c == C_FTSW || IS_FTSW(perf_patch.target[c]); }
+
 static void press(int c)
 {
+    if (st[c]) return;                           /* already down: a second press event is not a new press */
     st[c] = c < 3 && pu_t - tt[c] < TURN_GUARD_MS ? 3 : 1;
     td[c] = pu_t;
     moved[c] = 0;
-    if (c == C_FTSW) perf_gesture(c, G_PRESS, 0);   /* the footswitch acts on the press, as on the effect screen */
+    if (st[c] == 1 && sw(c)) {                   /* acts on the press, as on the effect screen */
+        if (c != C_FTSW) V_PDOWN = ZMT_FTSW = 1; /* down while held: an effect can claim the hold (word 6) */
+        perf_gesture(c, G_PRESS, 0);
+    }
 }
 
 static void release(int c)
 {
     int s = st[c];
     st[c] = 0;
+    if (c != C_FTSW && sw(c)) V_PDOWN = ZMT_FTSW = 0;
     if (s == 4) perf_gesture(c, G_PRESS, 0);    /* MOMENTARY: the release flips it back */
     if (s == 2) perf_gesture(c, G_HOLD, 1);
-    else if (s == 1 && c != C_FTSW && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
+    else if (s == 1 && !sw(c) && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
 }
 
 /* ---- SETUP -------------------------------------------------------------------------------- */
@@ -205,14 +213,14 @@ void perf_key(int ev, int steps)
     if (ev & 1) release(c); else press(c);
 }
 
-/* A footswitch hold on a Footsw target (not the looper) works as HOLD FOR MOMENTARY on the effect
+/* A hold of the footswitch, or of a control aimed at a Footsw target (not the looper), works as HOLD FOR MOMENTARY on the effect
  * screen, whatever HOLD FOR is (never TAP or the tuner): the release flips it back. Nothing while
  * the effect claims the hold (transport word 7, written within the last 16 ms: looper.S clears it
  * after this poll). Else the hold gesture. */
 static int ftsw_hold(int c)
 {
-    int t = perf_patch.target[C_FTSW], s = t & 7;
-    if (c != C_FTSW || !IS_FTSW(t) || s == LOOPER_SLOT) return 2;
+    int t = perf_patch.target[c], s = t & 7;
+    if (!IS_FTSW(t) || s == LOOPER_SLOT) return 2;
     if (ZMT_CLAIM && ZMT_CLAIM == SLOT_PARAMS(s)) return 3;
     return 4;
 }

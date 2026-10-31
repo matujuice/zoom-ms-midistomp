@@ -132,7 +132,7 @@ record size table entry):
 |---|---|---|
 | 0 | 24 | stock globals |
 | 24 + 16n | 16 | mixer entry for patch n: 4 B hash, settings 0-10, pad (`pages.c:179,251-272`) |
-| 824 | 4 | magic `PRF1` (`asm/perform/perform_store.c:11,13`) |
+| 824 | 4 | magic `PRF2` (`asm/perform/perform_store.c:11,13`) |
 | 828 + 112n | 112 | PERFORM entry for patch n (`perform_store.c:14`, `perform.h:91`) |
 
 - The hash is FNV-1a over the six effect ids (bits 1-28 of each block: `b[0]&0xFE, b[1], b[2],

@@ -6,8 +6,8 @@
 #   ENTER on a spot puts the first effect of its gid in the unit; the effect
 #   knob then scrolls on through the sorted list, so filters (gid 2) follow
 #   DYN, SFX (7) follow MOD and reverbs (9) follow DLY, as on the MS-50G.
-#   ENTER on EXIT leaves; ENTER on a category with no effect loaded does
-#   nothing (the MS-50G would put effect 0 in the unit).
+#   ENTER on EXIT leaves; ENTER on a category with no effect loaded puts
+#   effect 0 in the unit, a blank unit, as the MS-50G.
 # Design: asm/fx_category/fxcat.S. The hex below is generated from it with
 #   scripts/build_mixer_ui.py's assemble (TI CGT) at 0xC00F2A00, and
 #   tests/test_fx_category_patch.py checks it still matches the source.
@@ -112,7 +112,7 @@ write:
     addr: 0xC00A9138
     expect: "6a07e002"
     data: "ea07e002"
-  # ENTER: [B0] bnop 0xC00A7BE6 (cursor 4 = EXIT) -> b enter (cursor 5 = EXIT, an empty category does nothing); the next packets (B1 = screen, B0 = 33) run in its delay slots
+  # ENTER: [B0] bnop 0xC00A7BE6 (cursor 4 = EXIT) -> b enter (cursor 5 = EXIT, an empty category gives effect 0); the next packets (B1 = screen, B0 = 33) run in its delay slots
   - model: ms70cdr-2.10
     addr: 0xC00A7B00
     expect: "20a17320"
@@ -151,6 +151,4 @@ section:
       59a30002aa2b0002291300032a3e0003291e00045aa304040020000000000000
       2924950112030000e807e0010060000028309501e807e001d81f900264aa0c02
       2af83d006a056000004000007c5900026203000058a304020060000000000000
-      290095012afc5200e907e0016a066000d91f90025aaa90002af33d406a056040
-      65aa0c02620300002aba9501ea07e00100400000d90f90002a823d006a056000
-      2af83d906a0560906f5900026203000058a30492006000000000000000000000
+      2b823d005aaa90006a0560002af33d406a056040620300000080000000000000

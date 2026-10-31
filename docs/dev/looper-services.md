@@ -29,6 +29,7 @@ code), 128 bytes, loaded at boot.
 | 19 | 76 | ZDL | bits 0-15 box fill 0..256 (blink applied); 16-21 cycle C in bars; 22-27 bar 1..32 in the cycle; 28-29 beat - 1; 30 = no clock ("NO CLK"). Older ZDLs write the fill only (C = 0: no bar lines, no right text) |
 | 20 | 80 | ZDL | 1 = status box inverted (pulse, blink); GRDLOOP writes 0 and the new bar ignores it |
 | 21 | 84 | Perform | the patch's Perform CYCLE in bars (1-32), 0 = none: the looper's Cycle knob is used. Zero at boot; Perform writes it every poll while its LOOPER row is ON, else 0 |
+| 22 | 88 | firmware | params pointer (`ctx[1]`) of the effect under the cursor in play mode, 0 = none. The effect whose `ctx[1]` matches may drive the LED with words 13-15 (Takeoff; the looper uses word 12). When it changes, the firmware has the LED task write the stock LED again |
 | 24-26 | 96 | firmware | private (last heartbeat, polls without one, "was under the cursor") |
 | 27-29 | 108 | firmware | private (status text, progress / 4 + inverted x 256 last drawn) |
 | 30 | 120 | ZDL | left text as a code (the firmware spells it): bits 0-3 kind (0 = an older ZDL, use words 17-18; 1 EMPTY, 2 REC IN, 3 STOP IN, 4 PLAY IN, 5 REC n, 6 REC n/m, 7 PLAY n BARS, 8 STOPPED), 4-9 n, 10-15 m, 16 = n in beats (else bars), 17 = MONO |

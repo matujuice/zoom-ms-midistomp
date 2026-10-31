@@ -18,6 +18,7 @@
         .equ    S_PROG, 76                  ; ZDL: 0-15 fill 0..256, 16-21 cycle, 22-27 bar, 28-29 beat-1, 30 no clock
         .equ    S_INV, 80                   ; ZDL: 1 = box inverted (pulse, blink)
         .equ    S_CYCLE, 84                 ; Perform: CYCLE in bars, 0 = none (zero at boot)
+        .equ    S_LEDOWN, 88                ; firmware: params pointer of the effect under the cursor (play mode), 0 = none
         .equ    S_LEFT, 120                 ; ZDL: left text code (lbox.c, docs/dev/looper-services.md)
         .equ    S_LASTHB, 96                ; firmware private: heartbeat seen last poll
         .equ    S_STALE, 100                ; firmware private: polls without a heartbeat

@@ -10,8 +10,8 @@
 ;            5, other data follows); keys 68 / 70 column-wise, 0 3 1 4 2 5,
 ;            as the MS-50G (jump table 0xC00EF18C), keys 72 / 74 stay +-1.
 ;   enter:   ENTER (event 32) on EXIT (cursor 5) leaves, as the MS-50G; on
-;            a category with no effect loaded it does nothing; otherwise
-;            the stock code puts the first effect of its gid in the unit.
+;            any other spot the stock code puts the first effect of its gid
+;            in the unit; an empty gid gives effect 0, a blank unit (MS-50G).
 ;   tbl:     the MS-50G gid table 0xC00ECF80, moved here (the stock one
 ;            holds 4, other data follows).
 ;   draw:    labels 1-4 point at the MS-50G strings below, row 2 at the
@@ -29,7 +29,6 @@
         .equ    RET, 0xC00A7BF0             ; key handlers: return A4
         .equ    EXIT, 0xC00A7BE6            ; key handler: B14[80] = 0, return 1
         .equ    GO, 0xC00A7B04              ; key handler: stock ENTER, B4 = cursor
-        .equ    COUNT, 0xC00CA5F8           ; count(A4 gid): effects loaded
 
         .text
         .nocmp
@@ -98,27 +97,11 @@ move:           ; cursor = a3[cursor], where the MS-50G's own moves land
 
         .align  32
         .global enter
-enter:          ; from 0xC00A7B00 (ENTER); B4 = cursor
-        mvkl    .S1     tbl, a3
-     || mvkl    .S2     COUNT, b0
-        mvkh    .S1     tbl, a3
-     || mvkh    .S2     COUNT, b0
-        mv      .L1X    b4, a5
+enter:          ; from 0xC00A7B00 (ENTER); B4 = cursor, kept for the stock ENTER
+        mvkl    .S2     GO, b0
      || cmpeq   .L2     5, b4, b1           ; EXIT spot
+        mvkh    .S2     GO, b0
   [b1]  mvkl    .S2     EXIT, b0
   [b1]  mvkh    .S2     EXIT, b0
-        ldw     .D1T1   *+a3[a5], a4        ; gid
-     || b       .S2     b0
-        mvkl    .S2     back, b3
-        mvkh    .S2     back, b3
-        nop     3
-back:           ; A4 = effects loaded in the gid: none -> return 1, else the stock ENTER
-        mv      .L1     a4, a1
-     || mvkl    .S2     GO, b0
-        mvkh    .S2     GO, b0
-  [!a1] mvkl    .S2     RET, b0
-  [!a1] mvkh    .S2     RET, b0
-        ldw     .D2T2   *+b14(356), b4      ; B14[89], the cursor
-     || b       .S2     b0
-  [!a1] mvk     .L1     1, a4
-        nop     4
+        b       .S2     b0
+        nop     5

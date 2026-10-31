@@ -16,8 +16,8 @@ the effect category selection works." This page collects what is known so far. N
 - One gid per spot. ENTER puts the first effect of that gid in the unit; the effect knob then scrolls on
   through the whole sorted list. That is why filters follow DYN, SFX follow MOD and reverbs follow DLY: the
   screen has no spot for them.
-- ENTER on a gid with nothing loaded would put effect 0 in the unit; fx-category checks the count
-  (0xC00CA5F8) first and does nothing.
+- ENTER on a gid with nothing loaded puts effect 0 in the unit, a blank unit, as the MS-50G (stock
+  0xC00CA7B8 and 0xC00C22F4 give ID 0 when the count is 0).
 
 ## Why moving an effect breaks saved patches
 

@@ -163,10 +163,25 @@ slot_done:
         stw     .D1T1   a6, *+a0(S_WASMINE)
         nop     2
         andn    .L1     a7, a6, a7          ; was on the looper, isn't now
-        mv      .L2X    a7, b0
-  [!b0] b       .S1     poll_redraw
+        ; word 22: params pointer of the effect under the cursor in play mode, 0 = none;
+        ; the effect with that ctx[1] may drive the LED (Takeoff, GRDLOOP)
+        mvk     .L1     0, a5
+        cmpgtu  .L1     6, a4, a1           ; slot 0-5 (-1 fails)
+        and     .L1     a1, a2, a1          ; and play mode
+        mvk     .S1     SLOT_STRIDE, a8
+        mpy     .M1     a4, a8, a8
+        mvkl    .S1     SLOT_STATE, a9
+        mvkh    .S1     SLOT_STATE, a9
+        add     .L1     a9, a8, a9
+  [a1]  ldw     .D1T1   *a9, a5
+        ldw     .D1T1   *+a0(S_LEDOWN), a3
+        nop     4
+        stw     .D1T1   a5, *+a0(S_LEDOWN)
+        cmpeq   .L1     a5, a3, a1
+  [a1]  b       .S1     poll_redraw         ; same effect: leave the LED to it
         nop     5
-        ; flip the LED task's "written" bit so it writes the LED again
+        ; the cursor moved to another effect: flip the LED task's "written" bit so it
+        ; writes the LED again (the stock LED comes back after an owner)
         mvkl    .S1     LED_APPLIED, a3
         mvkh    .S1     LED_APPLIED, a3
         ldw     .D1T1   *a3, a4
