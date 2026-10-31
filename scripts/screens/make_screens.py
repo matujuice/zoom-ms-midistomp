@@ -153,7 +153,7 @@ def main(out):
                 continue
             lcd(pixels((dirs[k] / f"{name}.fb").read_bytes(), fmt)).save(out / png)
             print(out / png)
-        still = ROOT.parent / "zoom-ms-zdl-effects-pack/src/custom/looper/live_still.png"  # GRDLOOP with the loop bar lbox.c draws
+        still = ROOT.parent / "zoom-ms-zdl-effects-pack/src/custom/looper/live_still.png"  # GRDLOOP with the loop bar it draws on its cover
         if still.exists():
             im = Image.open(still).convert("L")
             lcd([[im.getpixel((x, y)) < 128 for x in range(W)] for y in range(H)]).save(out / "looper.png")

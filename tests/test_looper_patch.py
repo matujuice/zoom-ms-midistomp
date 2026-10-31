@@ -86,3 +86,11 @@ def test_lbox_fits_between_m0_probe_and_mixer():
     for sec in probe + mixer:
         a = sec["addr"]
         assert a + len(_data(sec)) <= lo or hi <= a, hex(a)
+
+
+def test_lbox_never_draws():
+    # GRDLOOP draws its bar into its own cover; lbox drawing into the framebuffer on the lagging
+    # S_MINE put the bar on other effects' covers (v2.0)
+    src = (ROOT / "asm/looper/lbox.c").read_text(encoding="utf-8")
+    assert "0x11816800" not in src and "0xC00EEBB0" not in src          # the framebuffer, its dirty bits
+    assert len(_data(LBOX)) <= 0x100

@@ -1,4 +1,4 @@
-"""Build the GRDLOOP status bar section of patches/looper.yaml with TI CGT 8.5
+"""Build the GRDLOOP patch-load hook section of patches/looper.yaml with TI CGT 8.5
 (asm/looper/lbox_vec.asm + lbox.c, linked at 0xC00F5400). Compares it with the
 yaml, or --write replaces the yaml hex.
 
