@@ -122,10 +122,10 @@ reports itself as an MS-70CDR over USB. If you run it on a pedal not listed as t
 
 Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
 
-**On a Mac:** download **MIDISTOMP V2.0 Updater** (the Mac zip) from the
-[releases](https://github.com/matujuice/zoom-ms-midistomp/releases), unzip it and double-click
-**Install MIDISTOMP.command**. Tested on an MS-50G from an Apple Silicon Mac. Details in
-[On a Mac](docs/user-guide.md#on-a-mac).
+**On a Mac:** the same, with Zoom's **Mac** updater and **MIDISTOMP-builder-Mac** from the
+[releases](https://github.com/matujuice/zoom-ms-midistomp/releases) (AppleSilicon or Intel, to match your Mac): open
+the builder and drag Zoom's updater app into its window. It writes and signs the MIDISTOMP updater app. Tested on an
+MS-50G from an Apple Silicon Mac. Details in [On a Mac](docs/user-guide.md#on-a-mac).
 
 ## FAQ and troubleshooting
 
@@ -133,7 +133,7 @@ Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and
   in USB) always works and you can flash again. Read [docs/safety.md](docs/safety.md) first.
 - **How do I go back to stock?** Enter update mode and run Zoom's original updater for your pedal. See
   [Recovery](docs/user-guide.md#recovery-and-going-back-to-stock).
-- **Does it work on a Mac?** Yes, download the Mac zip from the release and double-click Install MIDISTOMP.command. See [On a Mac](docs/user-guide.md#on-a-mac).
+- **Does it work on a Mac?** Yes, use MIDISTOMP-builder-Mac with Zoom's Mac updater. See [On a Mac](docs/user-guide.md#on-a-mac).
 - **Do my effects and patches survive?** Yes, the effects area is never touched.
 - **Which effects work?** All stock effects, and every effect in the pack. Effect Manager keeps working.
 - **No MIDI jacks?** MIDI runs over USB: plug into a computer or an iPhone/iPad, or use a USB-MIDI host box for

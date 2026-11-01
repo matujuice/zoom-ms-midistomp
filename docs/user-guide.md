@@ -96,30 +96,32 @@ Zoom's Mac updater holds the same firmware files as the Windows one and runs the
 version of it can be built too. The build has been checked byte for byte against the Windows MIDISTOMP updater and
 flashed to an MS-50G from an Apple Silicon Mac.
 
-The easy way: download **MIDISTOMP-V2.0-Updater-Mac.zip** from the
-[release page](https://github.com/matujuice/zoom-ms-midistomp/releases), unzip it and double-click
-**Install MIDISTOMP.command** next to the app: it signs the app for your Mac and opens it, then go to step 4. It is not
-notarized, so the first time macOS may refuse to open it: right-click it > Open, then Open.
-
-If you'd rather build the app yourself (needs Python and Terminal):
-
 1. Download Zoom's **MS-70CDR v2.10** updater **for Mac** from the
    [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    (a file like `MS-70CDR_v2.10_Mac_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
-2. Get this repository (`git clone`, or Code > Download ZIP on GitHub) and Python 3.10 or newer (from python.org or
-   Homebrew; the `python3` that comes with macOS is too old). Then in the repository's folder:
-   ```sh
-   python3 -m venv .venv && .venv/bin/pip install -e .
-   .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
-   ```
-   It writes **MIDISTOMP V2.0 Updater.app** next to Zoom's app, and refuses anything that is not Zoom's original.
-3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
-   ```sh
-   xattr -cr "/path/to/MIDISTOMP V2.0 Updater.app"
-   codesign --force --deep --sign - "/path/to/MIDISTOMP V2.0 Updater.app"
-   ```
-4. Put the pedal in update mode (step 5 above) and open the app. It is an Intel app, so Apple Silicon Macs run it
-   through Rosetta (macOS offers to install it). Its window reads **MIDISTOMP V2.0 Updater**; click Execute.
+2. Download the Mac builder from the [release page](https://github.com/matujuice/zoom-ms-midistomp/releases):
+   **MIDISTOMP-builder-Mac-AppleSilicon.zip** (M1 and newer) or **MIDISTOMP-builder-Mac-Intel.zip**
+   (Apple menu > About This Mac shows which). Unzip it.
+3. Double-click **MIDISTOMP-builder-Mac-…**. It is not notarized, so the first time macOS refuses it: open System
+   Settings > Privacy & Security, click **Open Anyway** next to it, and double-click it again.
+4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
+   Enter. It writes **MIDISTOMP V2.0 Updater.app** next to Zoom's app and signs it for your Mac. It refuses anything
+   that is not Zoom's original.
+5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0 Updater.app**. It is
+   an Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to install it). Its window reads
+   **MIDISTOMP V2.0 Updater**; click Execute.
+
+To run the builder from source instead of steps 2 to 4 (needs Python and Terminal): get this repository
+(`git clone`, or Code > Download ZIP on GitHub) and Python 3.10 or newer (from python.org or Homebrew; the `python3`
+that comes with macOS is too old). Then in the repository's folder:
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
+```
+
+It writes and signs **MIDISTOMP V2.0 Updater.app** the same way. If signing fails, it prints the two Terminal lines
+(`xattr -cr` and `codesign --force --deep --sign -`) to run on the app yourself.
 
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
 Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover

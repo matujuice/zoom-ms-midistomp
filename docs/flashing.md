@@ -175,7 +175,8 @@ zoomms build-mac "MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \
   --from-exe "MIDISTOMP test build.exe" --out "MIDISTOMP test build.zip"
 ```
 
-and send the .zip. Next to the app it holds `Install MIDISTOMP.command`: the Mac
+and send the .zip, privately: it holds Zoom's code, so it never goes in a GitHub
+release (releases ship the builders only). Next to the app it holds `Install MIDISTOMP.command`: the Mac
 user unzips it and double-clicks that file, which re-signs the app for their Mac
 and opens it. It is not notarized, so the first time macOS (Gatekeeper) may refuse
 to open it: right-click it > Open, then Open. Without it, the same in Terminal from

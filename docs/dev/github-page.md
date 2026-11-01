@@ -19,5 +19,6 @@ which is all v1.2 does.
 **Social preview** (Settings > General > Social preview): 1280x640, cut from the cover photo once it is in
 (repo-refresh-plan step 6).
 
-**Release:** title `MIDISTOMP v2.0`, tag `v2.0`, text = docs/releases/v2.0.md. Attach MIDISTOMP-builder.exe and the
-Mac zip "MIDISTOMP V2.0 Updater".
+**Release:** title `MIDISTOMP v2.0`, tag `v2.0`, text = docs/releases/v2.0.md. The builder workflow attaches
+MIDISTOMP-builder-Windows.exe and MIDISTOMP-builder-Mac-AppleSilicon.zip / -Intel.zip. Never attach a built updater
+(it holds Zoom's code).

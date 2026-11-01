@@ -1,7 +1,8 @@
-# Builds MIDISTOMP-builder-Windows.exe (no Zoom code inside). Running it by hand with
-# release = vX.Y (or pushing tag vX.Y) publishes that release from this commit,
-# notes from docs/releases/vX.Y.md; a release published by hand gets the builder
-# attached. On pull requests it is a workflow artifact.
+# Builds MIDISTOMP-builder-Windows.exe and the Mac builders (zips, one per Mac
+# chip). None holds Zoom code: each user drops in Zoom's own updater. Running it
+# by hand with release = vX.Y (or pushing tag vX.Y) publishes that release from
+# this commit, notes from docs/releases/vX.Y.md; a release published by hand
+# gets the builders attached. On pull requests they are workflow artifacts.
 name: builder
 on:
   pull_request:
@@ -17,7 +18,7 @@ on:
 permissions:
   contents: write
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,13 +38,50 @@ jobs:
         with:
           name: MIDISTOMP-builder-Windows
           path: dist/MIDISTOMP-builder-Windows.exe
+  mac:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            name: MIDISTOMP-builder-Mac-AppleSilicon
+          - runner: macos-15-intel
+            name: MIDISTOMP-builder-Mac-Intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pyinstaller
+      - run: pyinstaller --onefile --console --name ${{ matrix.name }} --add-data "patches:patches" --add-data "models:models" scripts/midistomp_builder.py
+      - name: Refuses a file that is not the stock updater
+        run: |
+          set +e
+          echo | ./dist/${{ matrix.name }} README.md
+          test $? -eq 1 && test ! -e "MIDISTOMP V2.0 Updater.app"
+      - name: Zip it, keeping the program runnable
+        run: cd dist && zip ${{ matrix.name }}.zip ${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.name }}.zip
+  publish:
+    needs: [windows, mac]
+    if: github.event_name == 'release' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release != '')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: MIDISTOMP-builder-*
+          path: dist
+          merge-multiple: true
       - if: github.event_name == 'release'
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder-Windows.exe --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
         env:
           GH_TOKEN: ${{ github.token }}
-      - if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release != '')
-        shell: bash
-        run: gh release create "$TAG" dist/MIDISTOMP-builder-Windows.exe --target "$GITHUB_SHA" --title "MIDISTOMP MOD $TAG" --notes-file "docs/releases/$TAG.md"
+      - if: github.event_name != 'release'
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "MIDISTOMP MOD $TAG" --notes-file "docs/releases/$TAG.md"
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release || github.ref_name }}

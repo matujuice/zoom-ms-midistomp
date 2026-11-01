@@ -33,3 +33,11 @@ def test_refuses_other_mac_apps(tmp_path):
     exe.write_bytes(b"not zoom")
     assert builder.run([str(app)]) == 1
     assert not (tmp_path / builder.OUT_NAME_MAC).exists()
+
+
+def test_ask_path_reads_a_dragged_mac_path(monkeypatch):
+    # Terminal pastes a dragged app shell-escaped, with a trailing space
+    monkeypatch.setattr("builtins.input", lambda: r"/Users/me/Downloads/ZOOM\ MS-70CDR\ v2.10\ Updater.app ")
+    assert builder.ask_path() == ["/Users/me/Downloads/ZOOM MS-70CDR v2.10 Updater.app"]
+    monkeypatch.setattr("builtins.input", lambda: "")
+    assert builder.ask_path() == []
