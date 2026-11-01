@@ -116,7 +116,7 @@ reports itself as an MS-70CDR over USB. If you run it on a pedal not listed as t
 
 1. Download [Zoom's official **MS-70CDR 2.10** updater](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/).
    Use it for every pedal, also the MS-50G and MS-60B.
-2. Drag it onto **MIDISTOMP-builder.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
+2. Drag it onto **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
    It writes the MIDISTOMP updater next to it.
 3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater.
 

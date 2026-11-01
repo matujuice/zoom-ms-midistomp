@@ -68,9 +68,9 @@ This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below). It takes about f
 
 1. Download [Zoom's **MS-70CDR v2.10** updater for Windows](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    from zoomcorp.com (a file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
-2. Download **MIDISTOMP-builder.exe** from the
+2. Download **MIDISTOMP-builder-Windows.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
-3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder.exe`. It writes **MIDISTOMP V2.0 Updater.exe** in
+3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder-Windows.exe`. It writes **MIDISTOMP V2.0 Updater.exe** in
    the same folder. It refuses any other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
@@ -96,7 +96,7 @@ Zoom's Mac updater holds the same firmware files as the Windows one and runs the
 version of it can be built too. The build has been checked byte for byte against the Windows MIDISTOMP updater and
 flashed to an MS-50G from an Apple Silicon Mac.
 
-The easy way: download **MIDISTOMP V2.0 Updater.zip** (the Mac build) from the
+The easy way: download **MIDISTOMP-V2.0-Updater-Mac.zip** from the
 [release page](https://github.com/matujuice/zoom-ms-midistomp/releases), unzip it and double-click
 **Install MIDISTOMP.command** next to the app: it signs the app for your Mac and opens it, then go to step 4. It is not
 notarized, so the first time macOS may refuse to open it: right-click it > Open, then Open.

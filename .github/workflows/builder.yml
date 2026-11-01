@@ -1,4 +1,4 @@
-# Builds MIDISTOMP-builder.exe (no Zoom code inside). Running it by hand with
+# Builds MIDISTOMP-builder-Windows.exe (no Zoom code inside). Running it by hand with
 # release = vX.Y (or pushing tag vX.Y) publishes that release from this commit,
 # notes from docs/releases/vX.Y.md; a release published by hand gets the builder
 # attached. On pull requests it is a workflow artifact.
@@ -26,24 +26,24 @@ jobs:
           python-version: "3.12"
       - run: pip install . pytest pyinstaller
       - run: python -m pytest -q
-      - run: pyinstaller --onefile --console --name MIDISTOMP-builder --add-data "patches;patches" --add-data "models;models" scripts/midistomp_builder.py
+      - run: pyinstaller --onefile --console --name MIDISTOMP-builder-Windows --add-data "patches;patches" --add-data "models;models" scripts/midistomp_builder.py
       - name: Refuses a file that is not the stock updater
         run: |
-          '' | .\dist\MIDISTOMP-builder.exe README.md
+          '' | .\dist\MIDISTOMP-builder-Windows.exe README.md
           if ($LASTEXITCODE -ne 1) { exit 1 }
           if (Test-Path "MIDISTOMP V2.0 Updater.exe") { exit 1 }
           exit 0
       - uses: actions/upload-artifact@v4
         with:
-          name: MIDISTOMP-builder
-          path: dist/MIDISTOMP-builder.exe
+          name: MIDISTOMP-builder-Windows
+          path: dist/MIDISTOMP-builder-Windows.exe
       - if: github.event_name == 'release'
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder.exe --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/MIDISTOMP-builder-Windows.exe --clobber
         env:
           GH_TOKEN: ${{ github.token }}
       - if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release != '')
         shell: bash
-        run: gh release create "$TAG" dist/MIDISTOMP-builder.exe --target "$GITHUB_SHA" --title "MIDISTOMP MOD $TAG" --notes-file "docs/releases/$TAG.md"
+        run: gh release create "$TAG" dist/MIDISTOMP-builder-Windows.exe --target "$GITHUB_SHA" --title "MIDISTOMP MOD $TAG" --notes-file "docs/releases/$TAG.md"
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release || github.ref_name }}

@@ -3,7 +3,7 @@ and it writes the MIDISTOMP updater next to it.
 
 Same output as `zoomms build` with the patch set (docs/flashing.md).
 Refuses any file that is not the stock updater (sha256 in models/ms70cdr.yaml).
-Frozen into MIDISTOMP-builder.exe by .github/workflows/builder.yml.
+Frozen into MIDISTOMP-builder-Windows.exe by .github/workflows/builder.yml.
 The MS-50G build is frozen at tag v1.1; v1.2 and v2.0 are built from the MS-70CDR 2.10 OS.
 
 Also takes Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) and then writes
