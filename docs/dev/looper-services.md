@@ -71,7 +71,8 @@ or 49.7 s mono in 12-bit block float. The regions were confirmed free on the
   bit (`0xC00EEB10` bit 0) so it writes the new effect's state again.
 - **Screen:** while the cursor is on word 10's slot (read at each draw: word 12
   lags the screen by one poll, which put the bar on other effects' covers in the
-  v2.0 beta) and no overlay or prompt is open, every
+  v2.0 beta; the slot comes from `0xC00EE748[6 x view + cursor]`, as in mixer.S:
+  the old `0xC00EE948` table also showed it there) and no overlay or prompt is open, every
   screen draw adds a status bar to the Looper's Effect View, drawn like Perform
   mode's top bar (`asm/looper/lbox.c`, `docs/dev/perform-ui-mockup.html`): knob
   pages: none since PERFORM11; cover x 0-127,

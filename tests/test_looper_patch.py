@@ -89,6 +89,8 @@ def test_lbox_fits_between_m0_probe_and_mixer():
 
 
 def test_lbox_reads_the_cursor_at_draw_time():
-    # S_MINE lags the screen by one poll: gating the bar on it put the bar on other effects' covers
+    # S_MINE lags the screen by one poll, and 0xC00EE948 is not the cursor's slot table:
+    # either put the bar on other effects' covers
     src = (ROOT / "asm/looper/lbox.c").read_text(encoding="utf-8")
-    assert "SV(S_MINE) &&" not in src and "CURSOR_SLOT[6 * c] == SV(S_SLOT)" in src
+    assert "SV(S_MINE) &&" not in src and "CURSOR_SLOT[6 * v + c] == SV(S_SLOT)" in src
+    assert "0xC00EE748" in src and "0xC00EE948" not in src
