@@ -32,7 +32,8 @@
         .equ    GPIO_BANK01, 0x1181DEF0     ; pointer the OS's GPIO writer uses (pin 0 = LED)
         .equ    LED_APPLIED, 0xC00EEB10     ; bit 0: LED state the LED task wrote last
         .equ    CURSOR, 0xC009C064          ; signed byte: cursor of view 0
-        .equ    CURSOR_SLOT, 0xC00EE948     ; word [24 x cursor]: slot under it (view 0)
+        .equ    CURSOR_SLOT, 0xC00EE748     ; word [6 x view + cursor]: slot under it (mixer.S CURSOR_SLOTS)
+        .equ    VIEW, 0xC009D8F8            ; word: play-mode view
         .equ    MODE, 320                   ; B14 offset, 0 = play
         .equ    PENDING, 340                ; B14 offset, a prompt over the Effect View
         .equ    UI_EVENT, 656               ; B14 offset, the UI task's event
@@ -43,4 +44,4 @@
         .equ    FB, 0x11816800              ; frame buffer: column bytes, 128 per 8-pixel row
         .equ    FB_DIRTY, 0xC00EEBB0        ; byte: rows to send (bit = 8-pixel row)
         .equ    FONT7, 0xC00E87D8           ; the Effect View's bold font: 7 column bytes a character
-        .equ    VIEW_KNOBS, 0xC009D398      ; word: 1 = knob pages, 0 = cover
+        .equ    VIEW_KNOBS, 0xC009D398      ; word [view]: knob page, 0 = cover

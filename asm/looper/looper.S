@@ -144,14 +144,20 @@ slot_done:
         mvkh    .S1     CURSOR, a3
         ldb     .D1T1   *a3, a3
         nop     4
-        shl     .S1     a3, 4, a4
-        shl     .S1     a3, 3, a5
-        add     .L1     a4, a5, a4          ; 24 x cursor
+        mvkl    .S1     VIEW, a5
+        mvkh    .S1     VIEW, a5
+        ldw     .D1T1   *a5, a5
+        nop     4
+        shl     .S1     a5, 1, a4
+        add     .L1     a4, a5, a4
+        shl     .S1     a4, 1, a4           ; 6 x view
+        add     .L1     a4, a3, a4          ; + cursor
         mvkl    .S1     CURSOR_SLOT, a5
         mvkh    .S1     CURSOR_SLOT, a5
-        add     .L1     a4, a5, a4
-        ldw     .D1T1   *a4, a4
-        nop     4
+        ldw     .D1T1   *+a5[a4], a4
+        cmpltu  .L1     5, a3, a1           ; cursor not 0-5: no slot
+        nop     3
+  [a1]  mvk     .L1     -1, a4
         cmpeq   .L1X    a4, b1, a6          ; cursor slot is the looper's
         cmpeq   .L2     0, b2, b0           ; play mode
         mv      .L1X    b0, a2
