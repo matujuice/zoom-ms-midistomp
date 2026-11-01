@@ -54,9 +54,9 @@ void chain_poll(void);
 /* ---- Grid: units of 1/8 beat from bar 1 (looper.c lp_block, zmt.h) ------- */
 static struct {
     unsigned clk, starts;
-    float sub, bpm, lastb, gf, du;
+    float sub, bpm, gf, du;
     int wraps, run, gu, anchor, was_on, patch;
-} g = { 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1 };
+} g = { 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1 };
 
 static int imod(int u, int m)   /* u mod m, u >= 0, by shifted subtraction */
 {
@@ -112,7 +112,7 @@ static void grid(void)
     g.du = g.bpm * DU_BPM;
     if (start) {                                        /* MIDI Start: the downbeat is bar 1 */
         perf_reset();
-        g.wraps = 0; g.lastb = 0.0f; g.gu = -1; g.gf = 0.999f; g.anchor = 0;
+        g.wraps = 0; g.gu = -1; g.gf = 0.999f; g.anchor = 0;
     }
     if (g.run) {
         if (clocks == 0) { g.clk = 0; g.sub = 0.0f; g.du = 0.0f; g.gf = 0.999f; }  /* waiting for clock 1 */
@@ -120,12 +120,10 @@ static void grid(void)
             if (clocks != g.clk || start) g.sub = 0.0f;
             else if ((g.sub += g.bpm * 7.2562358e-5f) > 0.999f) g.sub = 0.999f;
             g.clk = clocks;
-            r = clocks - 1;
-            for (k = 20; k-- > 0;)
-                for (mk = 2304u << k; r >= mk;) r -= mk;
+            r = clocks - 1;             /* r = that mod 2304, wraps = the 96-beat turns: right after the grid sat out */
+            for (k = 20, g.wraps = 0; k-- > 0;)
+                for (mk = 2304u << k; r >= mk; g.wraps += 1 << k) r -= mk;
             beats = ((float)(int)r + g.sub) * 0.041666668f;
-            if (beats < g.lastb - 48.0f) g.wraps++;
-            g.lastb = beats;
             err = beats * 8.0f - ((float)(g.gu - 768 * g.wraps) + g.gf);
             if (err >= 4.0f || err <= -4.0f) {          /* entered mid-song, a jump */
                 h = (int)(beats * 8.0f);
@@ -259,10 +257,12 @@ typedef struct {
     unsigned char st, ctl, t, lag;
     unsigned short mv, fol;     /* fol: the Follow scheduled when this lands */
     int due;
+    Tgt x;                      /* the target, from land: no descriptor call a block while it lags */
     float from, to, pos;
 } Slot;
 
 static Slot sl[NSLOT];
+static volatile int busy;       /* a move waits or lags (wait sets it, tick clears it) */
 
 static const float LAGK[LG_N] = {           /* per block: 1 / blocks (ms), 1 / units (beats, bars) */
     0, 1 / (5 * BLK_MS), 1 / (50 * BLK_MS), 1 / (100 * BLK_MS), 1 / (500 * BLK_MS), 1 / (1000 * BLK_MS),
@@ -283,6 +283,7 @@ static void wait(int ctl, int t, unsigned mv, unsigned fol, int due)
     Slot *s;
     if (MV_NEXT(mv) == NX_UNUSED || !(s = slot_new())) return;
     s->st = F_WAIT; s->ctl = ctl; s->t = t; s->mv = mv; s->fol = fol; s->due = due;
+    busy = 1;
 }
 
 static int due_of(unsigned mv)  /* Action / Release: the next line of its NEXT */
@@ -315,25 +316,26 @@ static void land(Slot *s)
     v = fwd(&t, MV_VALUE(s->mv));
     s->lag = MV_LAG(s->mv);
     if (t.k == K_NONE || s->lag == LG_OFF) { put(&t, v); s->st = F_FREE; return; }
+    s->x = t;
     s->st = F_LAG; s->from = (float)now(&t); s->to = (float)v; s->pos = 0.0f;
 }
 
 static void tick(void)
 {
-    int i, n;
+    int i, n, b = 0;
     Slot *s;
-    Tgt t;
     for (i = 0; i < NSLOT; i++) {
         s = &sl[i];
         if (s->st == F_WAIT && g.gu >= s->due) land(s);
         if (s->st != F_LAG) continue;
         s->pos += s->lag < 6 ? LAGK[s->lag] : LAGK[s->lag] * g.du;
         if (s->pos >= 1.0f) s->pos = 1.0f;
-        t = tgt(s->t);
         n = (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
-        put(&t, n);                             /* every block: Perform wins over a CC */
+        put(&s->x, n);                          /* every block: Perform wins over a CC */
         if (s->pos >= 1.0f) s->st = F_FREE;
+        b |= s->st;
     }
+    busy = b;
 }
 
 static void cancel(int ctl)     /* a new gesture: the control's waiting moves go */
@@ -418,13 +420,14 @@ int perf_pending(int ctl)
 
 /* ---- Footswitch LED: its target owns it in Perform ----------------------- */
 static int led_own, pwm;
+static Tgt led_x;               /* tgt(the footswitch's target), from the poll: no descriptor call a block */
 
 static void led(void)
 {
-    int t = perf_patch.target[C_FTSW], lit = -1;
+    int lit = -1;
     Tgt x;
     if (perf_on && SV_OK && SV[W_LEDON] && SV[W_LEDOFF]) {
-        x = tgt(t);
+        x = led_x;
         if (x.k == K_FTSW && (int)SV[W_SLOT] == x.a) {
             pwm = (pwm + 1) & 31;
             lit = pwm < (int)SV[W_LEVEL];       /* the looper's level: countdown, pulse, on */
@@ -451,6 +454,10 @@ void perf_block(void)
         g.patch = p;
         perf_reset();
         need_load = 1;
+    }
+    if (!perf_on && !busy && !led_own) {        /* off screen, no move waiting or lagging: nothing a block */
+        g.was_on = 0;
+        return;
     }
     grid();
     tick();
@@ -489,6 +496,12 @@ void perf_poll16(void)
         }
         lst = st;
         lpass = pass;
+    }
+    {
+        Tgt x = tgt(perf_patch.target[C_FTSW]);
+        DINT;
+        led_x = x;
+        RINT;
     }
     fx_flush();
     if (ftsw_q) {               /* Footsw on a regular effect: the stock footswitch press, in this task */
