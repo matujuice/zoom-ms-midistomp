@@ -66,6 +66,8 @@ You get 6 effects per patch, on every pedal. If you try it on a pedal not listed
 The release does not contain Zoom's firmware, so you make the MIDISTOMP updater yourself from Zoom's official one.
 This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below). It takes about five minutes.
 
+Your patches are kept, but back them up first anyway, just in case (with your usual patch editor).
+
 1. Download [Zoom's **MS-70CDR v2.10** updater for Windows](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    from zoomcorp.com (a file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
 2. Download **MIDISTOMP-builder-Windows.exe** from the
