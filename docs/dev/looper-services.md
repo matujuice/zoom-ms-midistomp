@@ -69,17 +69,17 @@ or 49.7 s mono in 12-bit block float. The regions were confirmed free on the
   (PWM); the LED task only writes on a change, so it stays out of the way.
   When the cursor leaves the looper the poll flips the LED task's "written"
   bit (`0xC00EEB10` bit 0) so it writes the new effect's state again.
-- **Screen:** GRDLOOP draws its status bar into its own cover (the pack's
-  `src/custom/looper/looper.c` lp_bar, zdl_meter.h's double buffer), drawn like
-  Perform mode's top bar (`docs/dev/perform-ui-mockup.html`): cover x 0-127,
-  y 17-34; filled black from the left by word 19, the word 30 text left and
-  bar.beat/C right in FONT7 (proportional, inverted over the fill), a gap in the
-  edge and a dotted line at each bar line. Only while it holds the claim, on
-  2.10, at most 15 frames a second and only when the picture changes; knob pages
-  show no bar. Until v2.0 `asm/looper/lbox.c` drew it into the framebuffer when
-  word 12 was 1, which lags the screen by one poll, so it sometimes showed on
-  other effects' covers; lbox.c now only drops the claim on a patch load. The
-  16 ms poll still asks the UI for a redraw (event 0x40) when the text, the
-  progress (in 64ths) or word 20 changes.
+- **Screen:** while the cursor is on word 10's slot (read at each draw: word 12
+  lags the screen by one poll, which put the bar on other effects' covers in the
+  v2.0 beta) and no overlay or prompt is open, every
+  screen draw adds a status bar to the Looper's Effect View, drawn like Perform
+  mode's top bar (`asm/looper/lbox.c`, `docs/dev/perform-ui-mockup.html`): knob
+  pages: none since PERFORM11; cover x 0-127,
+  y 17-34, exactly where the GRDLOOP cover's bar is. Filled black from the left
+  by word 19, the word 30 text left and bar.beat/C right in FONT7 (proportional,
+  inverted over the fill), a gap in the edge and a dotted line at each bar line.
+  The 16 ms poll asks the UI for a redraw (event 0x40) when the text, the
+  progress (in 64ths) or word 20 changes; the bar/beat bits change every beat,
+  so a new word 30 shows within one beat.
 - **Never** change the address, magic or word layout without a new magic
   (version byte).

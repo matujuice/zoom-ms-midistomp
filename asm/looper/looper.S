@@ -16,9 +16,8 @@
 ;              for values 64-127 and is dropped for 0-63.
 ;   The poll also writes transport words 6 (footswitch down) and 7 (hold
 ;   claim, cleared every round): docs/dev/transport-block.md.
-; GRDLOOP draws its status bar into its own cover (the pack's looper.c lp_bar); the
-; poll still asks the UI for a redraw when the text, the progress (in 64ths) or the
-; inversion changes.
+; The status box is drawn by lbox.c; the poll asks the UI for a redraw when the
+; text, the progress (in 64ths) or the inversion changes.
 ; Everything else goes on to the hooks the trampolines called before.
 ; Design and addresses: docs/dev/os-reverse-engineering.md, "Looper services".
 ;
