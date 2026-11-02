@@ -1,0 +1,22 @@
+name: Feature request
+description: An idea for MIDISTOMP
+title: "[idea] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should the pedal do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What it's for
+      description: How you play or what gear you use, and what this would let you do.
+  - type: dropdown
+    id: pedal
+    attributes:
+      label: Your pedal
+      options: [MS-70CDR, MS-60B, MS-50G, Other]

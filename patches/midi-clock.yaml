@@ -1,5 +1,5 @@
 # MIDI clock sets the patch tempo (issue #5) and publishes MIDI transport for
-# custom effects (issue #24). MS-70CDR 2.10 OS (addresses: docs/ms70cdr-addresses.md).
+# custom effects (issue #24). MS-70CDR 2.10 OS (addresses: docs/dev/ms70cdr-addresses.md).
 #   Incoming MIDI timing clock (0xF8, 24 per quarter note, any source over USB)
 #   sets TEMPO like tap tempo does, so tempo-synced delay times and modulation
 #   rates follow a DAW or drum machine.
@@ -7,8 +7,8 @@
 #   measurements (2 beats each), so jittery USB clock does not wobble it.
 #   A tempo changed by hand while the clock runs is overridden on the next beat.
 #   Start (0xFA), Stop (0xFC) and the clock count go to the transport block at
-#   0x1181FF00 (docs/transport-block.md). Continue (0xFB) is ignored.
-# Design and addresses: docs/os-reverse-engineering.md, "MIDI clock patch" and
+#   0x1181FF00 (docs/dev/transport-block.md). Continue (0xFB) is ignored.
+# Design and addresses: docs/dev/os-reverse-engineering.md, "MIDI clock patch" and
 # "MIDI transport block".
 # The hex below is generated from asm/midi_clock/*.S with
 #   zoomms asm <file> --addr <addr>   (add --section for a section)

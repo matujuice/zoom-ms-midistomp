@@ -209,6 +209,12 @@ def test_zip_app_sets_unix_modes(tmp_path):
     exe = infos["Stock.app/Contents/MacOS/EFX Updater"]
     assert exe.create_system == 3 and stat.S_IMODE(exe.external_attr >> 16) == 0o755
     assert stat.S_IMODE(infos["Stock.app/Contents/Resources/Main.bin"].external_attr >> 16) == 0o644
+    inst = infos[macapp.INSTALL]
+    assert inst.create_system == 3 and stat.S_IMODE(inst.external_attr >> 16) == 0o755
+    with zipfile.ZipFile(out) as z:
+        sh = z.read(macapp.INSTALL).decode()
+    assert sh.startswith("#!/bin/sh\n") and "\r" not in sh
+    assert 'codesign --force --deep --sign - "Stock.app" && open "Stock.app"' in sh
     with pytest.raises(FileExistsError):
         macapp.zip_app(app, out)
 

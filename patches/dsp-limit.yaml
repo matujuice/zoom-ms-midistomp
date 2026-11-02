@@ -1,0 +1,12 @@
+# DSP limit 300 (shipped in v2.0, Luca 2026-10-28): the DSP Full check 0xC00BB4E0 lets a
+# patch use more of the DSP before it switches effects off. Same write as m0-probe.yaml.
+name: dsp-limit
+description: DSP Full limit 225 -> 300
+builds: [ms70cdr-2.10]
+write:
+  # DSP Full check 0xC00BB4E0: the limit 225.0f -> 300.0f (mvkh .S2 0x4361 -> 0x4396, b4)
+  - model: ms70cdr-2.10
+    addr: 0xC00BB52C
+    expect: "eab02102"
+    data: "6acb2102"
+    source: asm/m0_probe/dsp_limit.S

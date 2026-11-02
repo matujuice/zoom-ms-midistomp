@@ -188,10 +188,19 @@ def build_app(stock_app: str | Path, out_app: str | Path, new_os: bytes | None =
     return find_script(bytes(exe))
 
 
+INSTALL = "Install MIDISTOMP.command"
+# Double-clicked in Finder: re-signs the app next to it for this Mac, then opens it.
+INSTALL_SH = """#!/bin/sh
+cd "$(dirname "$0")" || exit 1
+xattr -cr "{app}" && codesign --force --deep --sign - "{app}" && open "{app}"
+"""
+
+
 def zip_app(app: str | Path, out_zip: str | Path) -> None:
     """Zip app with Unix modes set (0755 for Contents/MacOS, else 0644), so it
     runs after unzipping on a Mac even when built on Windows, where the
-    executable bit does not exist."""
+    executable bit does not exist. INSTALL goes next to it (0755), so the
+    user double-clicks it instead of typing the re-sign lines in Terminal."""
     app, out_zip = Path(app), Path(out_zip)
     if out_zip.exists():
         raise FileExistsError(f"{out_zip} already exists")
@@ -210,6 +219,11 @@ def zip_app(app: str | Path, out_zip: str | Path) -> None:
             info.external_attr = (stat.S_IFREG | mode) << 16
             info.create_system = 3  # Unix, so the modes are honored
             z.writestr(info, path.read_bytes())
+        info = zipfile.ZipInfo(INSTALL, (1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = (stat.S_IFREG | 0o755) << 16
+        info.create_system = 3
+        z.writestr(info, INSTALL_SH.format(app=app.name))
 
 
 # The updater's model check (MS-70CDR v2.10, block in -[MainWindow SendIdReq]):

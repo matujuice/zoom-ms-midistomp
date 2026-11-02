@@ -94,16 +94,6 @@ for y in range(H):
     for x in range(W): b.p[y][x] = logo[(y // 8) * W + x] >> (y % 8) & 1
 b.text('v1.2', (W - 24) // 2, 50)  # the OS prints the version here
 b.png(OUT + '/boot-screen.png')
-# banner: the boot screen on an MS-50G grey panel
-sc = 6; fg = (28, 36, 58); bgc = (196, 214, 226)
-ban = Image.new('RGB', (1200, 480), (88, 91, 96)); d = ImageDraw.Draw(ban)
-x0, y0 = (1200 - W * sc) // 2, (480 - H * sc) // 2
-d.rounded_rectangle([x0 - 20, y0 - 20, x0 + W * sc + 19, y0 + H * sc + 19], radius=16, fill=(32, 33, 36))
-d.rectangle([x0, y0, x0 + W * sc - 1, y0 + H * sc - 1], fill=bgc)
-for y in range(H):
-    for x in range(W):
-        if b.p[y][x]: d.rectangle([x0 + x * sc, y0 + y * sc, x0 + x * sc + sc - 1, y0 + y * sc + sc - 1], fill=fg)
-ban.save(OUT + '/banner.png')
 # tempo screen: the stock tempo box with our TURN OR TAP / MIDI CLOCK line
 for name, line in (('tempo-turn-tap', 'TURN OR TAP'), ('tempo-midi-clock', 'MIDI CLOCK')):
     t = Scr()

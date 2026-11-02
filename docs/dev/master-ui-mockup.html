@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Meter Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Same page as docs/dev/perform-ui-mockup.html: the pedal on the left, notes on the right; stacks on phones. */
+:root {
+  --bg: #e9edf1; --panel: #f7f9fb; --fg: #18222e; --muted: #5a6878; --line: #c9d2dc;
+  --accent: #3a3c96; --key: #3b1d22; --key-fg: #f1e9ea;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13161b; --panel: #1b1f26; --fg: #e3e7ee; --muted: #98a2b2; --line: #2d3440;
+  --accent: #9a9cf0; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13161b; --panel: #1b1f26; --fg: #e3e7ee; --muted: #98a2b2; --line: #2d3440;
+  --accent: #9a9cf0; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 40px; }
+main { max-width: 1060px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font: 600 28px/1.15 var(--display); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+h2 { font: 600 15px/1.3 var(--display); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; color: var(--muted); }
+.sub { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.pedal { background: var(--key); border-radius: 14px; padding: 18px; display: grid; gap: 16px; }
+.bezel { background: #1c1012; border-radius: 6px; padding: 12px; }
+canvas { display: block; width: 100%; max-width: 540px; aspect-ratio: 4 / 3; margin: 0 auto; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button, .ctl button { font: 500 13px var(--mono); color: var(--key-fg); background: transparent; border: 1px solid #7a5a60; border-radius: 6px; padding: 6px 10px; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.tabs button[aria-pressed="true"] { background: var(--key-fg); color: var(--key); border-color: var(--key-fg); }
+.knobs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ctl { display: grid; gap: 6px; justify-items: center; }
+.ctl .lbl { font: 500 11px var(--mono); color: #c9b4b8; text-transform: uppercase; letter-spacing: .08em; }
+.ctl .row { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.ctl button.press { border-radius: 50%; width: 44px; height: 44px; padding: 0; background: #17171a; border-color: #555; }
+.ctl button:hover, .tabs button:hover { border-color: var(--key-fg); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; gap: 18px; min-width: 0; }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.tbl { overflow-x: auto; }
+th, td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+#status { font: 12px var(--mono); color: #c9b4b8; text-align: center; min-height: 1.4em; }
+</style>
+
+<main>
+  <header>
+    <h1>Master Meter Screens</h1>
+    <p class="sub">Mockup v8 of MENU › MASTER at the pedal's 128 × 64 pixels: five pages that watch the pedal's final output (after the output limiter). Stock fonts, title bar, frames, lists and softkeys (ported from the 2.10 firmware); the live graphics take after themanro's spectrum and scope effects. The sound is a made-up drum, bass and pad loop at 120 BPM, generated in the page, with a louder chorus every 8 bars.</p>
+  </header>
+
+  <div class="layout">
+    <section class="pedal" aria-label="Pedal mockup">
+      <div class="tabs" role="group" aria-label="Demo">
+        <button id="hot" aria-pressed="false">Hot input +9 dB</button>
+        <button id="patch">Change patch</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="bezel"><canvas id="lcd" width="768" height="576" aria-label="Pedal screen"></canvas></div>
+      <div id="status" aria-live="polite"></div>
+      <div class="knobs">
+        <div class="ctl"><span class="lbl">Knob 1</span><div class="row"><button data-k="1" data-a="-1" aria-label="Knob 1 turn left">◄</button><button class="press" data-k="1" data-a="0" aria-label="Knob 1 press">●</button><button data-k="1" data-a="1" aria-label="Knob 1 turn right">►</button></div></div>
+        <div class="ctl"><span class="lbl">Knob 2</span><div class="row"><button data-k="2" data-a="-1" aria-label="Knob 2 turn left">◄</button><button class="press" data-k="2" data-a="0" aria-label="Knob 2 press">●</button><button data-k="2" data-a="1" aria-label="Knob 2 turn right">►</button></div></div>
+        <div class="ctl"><span class="lbl">Knob 3</span><div class="row"><button data-k="3" data-a="-1" aria-label="Knob 3 turn left">◄</button><button class="press" data-k="3" data-a="0" aria-label="Knob 3 press">●</button><button data-k="3" data-a="1" aria-label="Knob 3 turn right">►</button></div></div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <div>
+        <h2>Try this</h2>
+        <ol>
+          <li><b>Knob 3 press</b>: next page (Spectrum › Scope › Stereo › Loudness › Out meter › In meter › Spectrum). The right softkey names the next page.</li>
+          <li><b>Knob 1 press</b>: the page's option, named in the left softkey: FALL on SPECTRUM, SPAN on SCOPE, ZOOM on STEREO, RESET on LOUDNESS and both meter pages. <b>Knob 1 turn</b> steps the option up or down and stops at the ends.</li>
+          <li><b>Knob 2 press</b>: EXIT to MENU. The audio copy stops there. MASTER in the list opens it again on the page you left (knob 1 or knob 3 press).</li>
+          <li><b>Hot input</b> pushes the mix 9 dB into the output limiter: the LIMIT bar moves, DYNAMICS shrinks, and on IN METER the input clips: CLIP on L and R, INPUT CLIP below, CLIPS counts.</li>
+          <li>Wait for the chorus (every 8 bars): 3 SEC steps up, the graph on LOUDNESS climbs, RANGE grows.</li>
+          <li><b>Switching patterns in one patch:</b> press knob 1 (RESET) on LOUDNESS or a meter page. AVERAGE, RANGE, PEAK, LIMIT, CLIPS and the graph start again, on all three pages.</li>
+          <li><b>Change patch</b> does the same reset by itself, as switching patches will on the pedal.</li>
+        </ol>
+      </div>
+      <div>
+        <h2>Pages</h2>
+        <div class="tbl"><table>
+          <tr><th>Page</th><th>Shows</th><th>Knob 1 press</th></tr>
+          <tr><td>SPECTRUM</td><td>126 log bars, 20 Hz to 20 kHz, 0 to −72 dB, +3 dB/oct tilt so a balanced mix looks flat; peak dots hold, then fall. A line at every octave (31 Hz to 16K) and every 24 dB, so the cells are square (about 13 px); dots about 4 px apart, a crossing is one dot like the rest. The grid is drawn inverted over the bars so it always shows. Labels in the usual 1-2-5 steps (20, 50, 100 … 10K), at least 2 px apart; −24 and −48 sit on their lines, inverted like all text, with the grid kept 2 px off them.</td><td>FALL: SLOW / MED / FAST</td></tr>
+          <tr><td>SCOPE</td><td>The mono sum, min/max per column, dotted centre line. Each redraw starts on a rising zero crossing, so a steady note stands still: on a low-passed copy (about 700 Hz, so hats cannot fire it), the trigger arms when the signal goes below −25% of its recent peak and fires on the next sample at or above 0. Top right: the time across the screen and the frequency, then the nearest note and how far off it is in cents (A4 = 440 Hz, C4 = middle C). The bar on the right is a tuner: it fills up when sharp, down when flat, ±50 cents at the ends, nothing when in tune. The crossings are found between samples, so it stays exact on high notes too.</td><td>SPAN: AUTO / 1 / 2 / 3 / 4 / 6 / 8 / 12 / 24 ms. AUTO measures the period (the middle gap between triggers) and shows whole cycles, 2 or more, 3 to 24 ms. The numbers fix the time across the screen; smaller = zoomed in.</td></tr>
+          <tr><td>STEREO</td><td>Goniometer (mid up, side across, L and R on the diagonals), PHASE (correlation: the bar fills from WIDE in the middle (0) toward MONO = +1 or OUT = −1, where left and right cancel in mono), WIDTH (side vs mid level), BALANCE in dB.</td><td>ZOOM: 1X / 2X / 4X, makes the cloud bigger for quiet signals (display only).</td></tr>
+          <tr><td>LOUDNESS</td><td>NOW (last 0.4 s), 3 SEC, AVERAGE (since the patch was chosen) in LUFS; RANGE (how much the loudness moves, LU), PEAK (dBFS), DYNAMICS (peak minus average). The graph is 3 SEC over the last 11.3 s (one column per 100 ms), filled from the bottom; the dotted line is −14 LUFS (the streaming level), 1 LU per row.</td><td>RESET (AVERAGE, RANGE, PEAK, LIMIT, graph)</td></tr>
+          <tr><td>OUT METER</td><td>Bars in the looper's style: label left and value right inside the bar, drawn inverted where the bar is filled; each gap in the edge is a mark. L/R: solid = average level (RMS, 300 ms), dotted = peak, a line holds the peak for 2 s and its value shows on the right (CLIP for 2 s when that side hits the ceiling); −12 to 0 dB takes the right half; gaps at −24, −12, −6, −3, −1 dB, labelled below (−1 has no room for its label). LIMIT: how much the output limiter turns you down now, 0 to 12 dB on a log scale so 0.2 dB fills 19 px, gaps at 0.5, 1, 2, 4, 8 dB; any cut shows 4 px at least and is held 0.5 s. PEAK and LIMIT below are the highest since RESET.</td><td>RESET (same as LOUDNESS)</td></tr>
+          <tr><td>IN METER</td><td>The same L/R bars for the pedal's input (before the effects), CLIP for 2 s when that side reaches full scale. Below: INPUT CLIP (inverted) while either side shows CLIP, else NO CLIP; PEAK, the highest input since RESET, and CLIPS, how many times clipping started. The analog stage before the converter can distort a little before full scale, so turn down well before CLIP.</td><td>RESET (same as LOUDNESS)</td></tr>
+        </table></div>
+      </div>
+      <div>
+        <h2>CPU: almost nothing in the audio path</h2>
+        <ul>
+          <li><b>Audio side, only while MASTER is open:</b> copy the block's 16 output floats (8 L, 8 R, after the limiter) and the limiter's gain into a 4096-frame ring (32 KB), then bump a write counter. About 30 cycles per block.</li>
+          <li><b>MASTER closed:</b> one flag test per block, nothing else.</li>
+          <li><b>Everything else runs on the UI side</b>, in idle time: K-weighting filters and gating for LUFS, the FFT, the scope trigger and its period search (one pass over about 3,100 samples per redraw), goniometer, correlation, peaks and RMS. Only the open page draws; loudness keeps counting on every page so I and LRA don't stop while you flip pages.</li>
+          <li>The FFT (1024 points, Hann) runs only on SPECTRUM, at 10 to 15 frames a second.</li>
+          <li>The ring holds 93 ms. The UI must read it at least 11 times a second; if it falls behind, the write counter shows it and the missed part is skipped (loudness just has a gap).</li>
+          <li>I and LRA use a fixed 0.1 LU histogram (about 2 KB), not a list of blocks, so memory never grows.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Memory</h2>
+        <p>The ring and the code take about 48 KB from the start of looper region 1 (0xC010A000). Region 1 moves up, which costs about 1% of loop time. The C section has only 416 bytes left, so MASTER gets its own section.</p>
+      </div>
+      <div>
+        <h2>Limits of v1</h2>
+        <ul>
+          <li>Sample peak, not true peak. True peak needs 4× oversampling on the UI side; maybe in v2.</li>
+          <li>1-bit screen: no colours, so RMS is solid and peak is dotted.</li>
+          <li>Loudness counts only while MASTER is open. Leaving pauses it; coming back carries on.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Still open</h2>
+        <ol>
+          <li>Where MASTER sits in MENU (here: after PERFORM MODE).</li>
+          <li>Leaving MASTER: pause AVERAGE and RANGE (as here), or start them again?</li>
+                    <li>How fast the pedal's UI can redraw while a heavy patch plays: to measure on the pedal.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+// ---- the pedal's own drawing code, ported from the 2.10 firmware (fonts and knob bitmap read from the OS image) ----
+// The screen is a 128x64 bit buffer; present() paints it like the effect chain mockup photo: 5x8 dots on a 1-px grid.
+const BG = "#e2e5e8", INK = "#3a3c96", GRID = "#cdd0d4";
+const g = document.getElementById("lcd").getContext("2d");
+const fb = new Uint8Array(128 * 64);
+const F7="0000000000000000005f5f00000003030003030000143e14143e1400242a7f7f2a12002333180c666200367f4957265000000b0700000000001c3e634100000041633e1c000024187e7e18240018187e7e1818000058380000000018181818181800006060000000002030180c0602003e7f594d7f3e0000427f7f400000466171594f4600224149497f36001814127f7f1000274745457d39003e7f49497930000101717d0f0300367f49497f3600064f49497f3e00000036360000000000563600000000081c36630000363636363636000063361c080000060151590f06003a7d457d423c00707c13137c70007f7f49497f36003e7f41414122007f7f41633e1c007f7f49494941007f7f09090901003e7f4149797a007f7f08087f7f0000417f7f4100000040417f3f00007f7f1c366341007f7f40404040007f0e3c3c0e7f007f7f0e1c7f7f003e7f41417f3e007f7f11111f0e003e7f31615f5e007f7f19396f4600264f4d5979320001017f7f0101003f7f40407f3f00071f78781f07003f703e3e703f0063771c1c776300030f7c7c0f03006171795d4f4700007f7f4141000002060c183020000041417f7f0000040603060400006060606060600000010306040000207454547c78007f7f44447c3800387c4444442800387c44447f7f00387c54545c580000047e7f050100085c54547c3c007f7f04047c780000007d7d0000000040447d3d00007f7f10386c440000007f7f0000007c047c780478007c7c04047c7800387c44447c38007c7c24243c1800183c24247c7c007c7c180c0c0400485c5c7474240000043f7f4400003c7c40407c7c000c3c70703c0c007c603c3c607c006c381010386c000c5c60203c0c00646454544c4c00083e774141000000007777000000004141773e080002010302010000";
+const OS6="00000000000000004f000000000700070000147f147f1400242a7f2a1200231308646200364955225000000503000000001c224100000041221c000014083e08140008083e0808000050300000000808080808000060600000002010080402003e5149453e0000427f4000004261514946002141454b31001814127f10002745454539003c4a49493000017109050300364949493600064949291e00003636000000005636000000081422410000141414141400412214080000020151090600324979413e007e1111117e007f49494936003e41414122007f4141221c007f49494941007f09090901003e4149497a007f0808087f0000417f4100002040413f01007f08142241007f40404040007f020c027f007f0408107f003e4141413e007f09090906003e4151215e007f091929460046494949310001017f0101003f4040403f001f2040201f003f4038403f00631408146300070870080700615149454300007f414100000204081020000041417f00000402010204004040404040000001020400002054545478007f4844443800384444442000384444487f00385454541800087e090102000c5252523e007f080404780000447d4000002040443d00007f102844000000417f4000007c04180478007c08040478003844444438007c1414140800081414187c007c0804040800485454542000043f444020003c4040207c001c2040201c003c4030403c004428102844000c5050503c004464544c4400000836410000000077000000004136080000000201020100";
+const SOFT="000000003e223e00243e20003a2a2e002a2a3e000e083e002e2a3a003e2a3a0006023e003e2a3e002e2a3e003e0a3e003e2a14003e2222003e221c003e2a2a003e0a0a003e223a003e083e00223e220030203e003e0836003e2020003e043e003c081e003e223e003e0a0e001e122e003e0a34002e2a3a00023e02003e203e001e201e003e103e003608360006380600322a2600100804000014000008080800002e00000a06000000200000081c08002a1c2a0038283800081c3e003e1c0800";
+const KNOB="80403008040402020101010101010101010101010102020404083040807f8000000000000000804020100804081020408000000000000000807f0000030408080402010000000000000000000000010204080804030000";
+const hex = (s, o, n) => Array.from({ length: n }, (_, i) => parseInt(s.substr((o + i) * 2, 2), 16));
+function px(x, y, v = 1, op = "or") {
+  if (x < 0 || x > 127 || y < 0 || y > 63) return;
+  const i = y * 128 + x; fb[i] = op === "xor" ? fb[i] ^ 1 : op === "or" ? fb[i] | v : v;
+}
+function line(x0, y0, x1, y1) {   // 0xC00A132C: a single point draws nothing; ORs; C integer division
+  if (x0 === x1 && y0 === y1) return;
+  const cl = v => Math.max(-1, Math.min(128, v));
+  if (y0 === y1) { for (let x = Math.min(cl(x0), cl(x1)); x <= Math.max(cl(x0), cl(x1)); x++) px(x, y0); return; }
+  if (x0 === x1) { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) px(x0, y); return; }
+  if (y0 > y1) [x0, y0, x1, y1] = [x1, y1, x0, y0];
+  const td = (a, b) => Math.trunc(a / b);
+  if (y1 - y0 + 1 < Math.abs(x1 - x0) + 1) { const st = x1 >= x0 ? 1 : -1; for (let x = x0; x !== x1 + st; x += st) px(x, td((y1 - y0) * x + x1 * y0 - x0 * y1, x1 - x0)); }
+  else for (let y = y0; y <= y1; y++) px(td((x1 - x0) * y + x0 * y1 - x1 * y0, y1 - y0), y);
+}
+function rect(x0, y0, x1, y1, mode) {   // 0xC00A0144: 0 fill, 1 outline + clear inside, 2 clear, 3 outline
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+    const edge = x === x0 || x === x1 || y === y0 || y === y1;
+    if (mode === 0) px(x, y, 1, "set"); else if (mode === 2) px(x, y, 0, "set");
+    else if (edge) px(x, y, 1, "set"); else if (mode === 1) px(x, y, 0, "set");
+  }
+}
+function invert(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px(x, y, 1, "xor"); }   // 0xC009F284
+function blit(x, y, w, h, b, or) {   // 0xC009F9B0: column bytes, bit 0 on top; replaces the area
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) { const v = b[(r >> 3) * w + c] >> (r & 7) & 1; or ? v && px(x + c, y + r) : px(x + c, y + r, v, "set"); }
+}
+function pagebyte(page, x, b, shift) {   // 0xC009F50C
+  const lo = (b << shift) & 255, hi = (b << shift) >> 8;
+  for (let r = 0; r < 8; r++) { px(x, page * 8 + r, lo >> r & 1, "set"); if (hi >> r & 1) px(x, page * 8 + 8 + r); }
+}
+const code = ch => Math.max(32, Math.min(126, ch.charCodeAt(0))) - 32;
+function font7(s, x, y) { for (const ch of String(s)) { blit(x, y, 7, 8, hex(F7, 7 * code(ch), 7)); x += 7; } }   // 0xC00A0040
+const font7r = (s, right, y) => font7(s, right - 7 * String(s).length, y);
+const font7c = (s, cx, y) => font7(s, cx - Math.trunc(7 * String(s).length / 2), y);
+function os6(s, x, y) { for (const ch of String(s)) { blit(x, y, 6, 8, hex(OS6, 6 * code(ch), 6)); x += 6; } }   // 0xC009FCE0
+const SOFT_IDX = { 47: 37, 58: 38, 45: 39, 33: 40, 39: 41, 46: 42, 43: 43, 42: 44, 111: 45, 3: 46, 4: 47 };
+// M W N are drawn 5 wide here; \x05 is a down arrow the soft font lacks (ours, for the ▼ cursor button)
+const SOFT_WIDE = { M: [0x3C, 0x02, 0x1C, 0x02, 0x3C, 0], W: [0x1E, 0x20, 0x1C, 0x20, 0x1E, 0], N: [0x3E, 0x04, 0x08, 0x3E, 0], "\x05": [0x04, 0x0C, 0x1C, 0x0C, 0x04, 0], "#": [0x14, 0x3E, 0x14, 0x3E, 0x14, 0] };
+const softW = s => [...s].reduce((n, ch) => n + (SOFT_WIDE[ch] ? SOFT_WIDE[ch].length : 4), 0);
+const softCols = ch => { const c = ch.charCodeAt(0), i = c >= 48 && c <= 57 ? c - 47 : c >= 65 && c <= 90 ? c - 54 : SOFT_IDX[c] || 0; return SOFT_WIDE[ch] || hex(SOFT, 4 * i, 4); };
+function small(s, x, y) { for (const ch of s) { const cols = softCols(ch); cols.forEach((b, j) => { for (let r = 0; r < 8; r++) if (b >> r & 1) px(x + j, y + r - 1); }); x += cols.length; } }   // the softkey font at any row (our code); ink rows y..y+4
+function halo(s, x, y) {   // small() with a 1-px clear outline, so it reads over the grid and bars
+  const ink = []; let cx = x; for (const ch of s) { const cols = softCols(ch); cols.forEach((b, j) => { for (let r = 0; r < 8; r++) if (b >> r & 1) ink.push([cx + j, y + r - 1]); }); cx += cols.length; }
+  for (const [a, b] of ink) for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) px(a + i, b + j, 0, "set");
+  small(s, x, y);
+}
+// looper-style bar (asm/looper/lbox.c bar()): frame with radius-2 corners, fill f0..f1, label left and value right
+// XORed so they read on fill and on empty; a tick is a gap in the edge plus a dotted inverted line kept 1 px off
+// the text; marks (peak dots, hold line) are also kept 1 px off the text
+const inkAdd = (ink, t, x, ty) => { for (const ch of t) { const cols = softCols(ch); cols.forEach((b, j) => { for (let r = 0; r < 8; r++) if (b >> r & 1) ink.add(x + j + "," + (ty + r - 1)); }); x += cols.length; } };
+const nearInk = (ink, x, y, m = 1) => { for (let i = -m; i <= m; i++) for (let j = -m; j <= m; j++) if (ink.has(x + i + "," + (y + j))) return true; return false; };
+const inkXor = ink => { for (const k of ink) { const [x, y] = k.split(",").map(Number); px(x, y, 1, "xor"); } };
+const corners = (x0, y0, x1, y1) => { for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) px(x, y, 0, "set"); };   // 1-px rounding
+function mbar(x0, y0, x1, y1, f0, f1, left, right, ticks = [], marks = [], mid) {
+  rect(x0, y0, x1, y1, 1); if (f1 >= f0) rect(f0, y0 + 1, f1, y1 - 1, 0);
+  const ty = y0 + 1 + ((y1 - y0 - 6) >> 1), ink = new Set();
+  if (left) inkAdd(ink, left, x0 + 3, ty); if (right) inkAdd(ink, right, x1 - 1 - softW(right), ty);
+  if (mid) inkAdd(ink, mid[0], mid[1] - (softW(mid[0]) >> 1), ty);   // [text, centre x]
+  for (const [x, y] of marks) if (!nearInk(ink, x, y)) px(x, y);
+  for (const x of ticks) { px(x, y0, 0, "set"); px(x, y1, 0, "set"); for (let y = y0 + 2; y < y1 - 1; y += 2) if (!nearInk(ink, x, y)) px(x, y, 1, "xor"); }
+  inkXor(ink); corners(x0, y0, x1, y1);
+}
+function softText(s, x) {   // 0xC009F6F0: 5-px softkey font in page 7, shifted down 1
+  for (const ch of s) { const cols = softCols(ch); cols.forEach((b, j) => pagebyte(7, x + j, b, 1)); x += cols.length; }
+}
+// the looper's status box (asm/looper/looper.S draw_pre): FONT7 drawn proportional (inked columns + 1 gap, space 2), XORed so it always contrasts the fill
+function fontP(s, x, y, ink) { for (const ch of s) { if (ch === " ") { x += 2; continue; } for (const b of hex(F7, 7 * code(ch), 7)) if (b) { for (let r = 0; r < 7; r++) if (b >> r & 1) { px(x, y + r, 1, "xor"); ink?.add(x + "," + (y + r)); } x++; } x++; } }
+const widthP = s => [...s].reduce((n, ch) => n + (ch === " " ? 2 : hex(F7, 7 * code(ch), 7).filter(b => b).length + 1), 0) - 1;
+function statusBar(fill, left, right) { const ink = new Set(); rect(0, 0, 127, 10, 1); const w = Math.trunc(126 * fill); if (w > 0) rect(1, 1, w, 9, 0); fontP(left, 3, 2, ink); fontP(right, 125 - widthP(right), 2, ink); return ink; }
+// stock switch and fader (0xC00A9AD8 / 0xC00AA1F8): 31x24 bitmaps; the fader's handle at trunc(20 * value / range)
+const TOG0 = "00000000e0f8fcfcfce4e4d8f8f0c000000000000000000000000000000000000000000003070f1f3f7fff7f7f3f3e70c0408000000000000000000000000000000000000000000e1f336f4e5c5c5e5f4f6e311f0e0000000000000000";
+const TOG1 = "0000000000000000000000000000000000c0f0f8d8e4e4fcfcfcf8e00000000000000000000000000000008040c0703e3f7f7fff7f3f1f0f0703000000000000000000000000000e1f316e4f5f5e5c5c4e6f331f0e0000000000000000";
+const FAD = "000002020aaaaaaaaaaa000000ffffffff000000aaaaaaaaaa0a0202020000080808082aaaaaaaaaaa000000ffffffff000000aaaaaaaaaa2a080808080800002020282a2a2a2a2a0000007f7f7f7f0000002a2a2a2a2a282020200000";
+const toggle = (on, x, y) => blit(x, y, 31, 24, hex(on ? TOG1 : TOG0, 0, 93));
+function fader(x, y, v, lo, hi) { blit(x, y, 31, 24, hex(FAD, 0, 93)); const h = Math.trunc(20 * (v - lo) / (hi - lo)); rect(x + 6, y + 20 - h, x + 23, y + 22 - h, 1); }
+function softkey(x0, x1, rx, cx, s, brackets) {   // 0xC009F834 / 0xC009F8F0: inverted box, or [ ] brackets when off
+  softText(s, cx - (softW(s) >> 1));   // centred by real width (M W N are 5 wide)
+  if (!brackets) return invert(x0, 57, x1, 63);
+  [[x0, [0xfe, 0x82]], [rx, [0x82, 0xfe]]].forEach(([x, b]) => b.forEach((v, j) => pagebyte(7, x + j, v, 0)));
+}
+const softkey40 = (k, s, br) => softkey(40 * k + 5, 40 * k + 41, 40 * k + 35, 40 * k + 23, s, br);   // knob pages
+const softkey42 = (k, s, br) => softkey(42 * k + 2, 42 * k + 41, 42 * k + 40, 42 * k + 22, s, br);   // menus and lists
+function frame(x, y, w, h) { line(x, y, x + w - 1, y); rect(x, y, x + 1, y + h - 1, 0); rect(x + w - 2, y, x + w - 1, y + h - 1, 0); }   // 0xC00AB1B4
+function knob(frac, x, y) {   // 0xC00A95A4: the knob bitmap, then the filled wedge row by row
+  blit(x, y, 29, 20, hex(KNOB, 0, 87));
+  const k = 40 / 33, C = 5 * Math.PI / 4, [D0, D1, D2] = [0.785398163395, 2.356194490185, 3.926990816975];
+  const cx = x + 14, cy = y + 10, t = frac * 3 * Math.PI * 0.5, a = C - t, S = 10 * Math.sin(a), cs = 10 * Math.cos(a);
+  const tana = cs ? S / cs : Math.sign(S) * 1e300, tanC = Math.tan(C), sC = 10 * Math.sin(C);
+  const R = v => Math.sign(v) * Math.floor(Math.abs(v) + 0.5), q = i => tana ? i / tana : Math.sign(i) * 1e300;
+  for (let i = Math.trunc(sC); i < 0; i++) {
+    const ms = -Math.sqrt(100 - i * i);
+    if (t < D0 && !(ms > q(i)) && Math.abs(t - D0) >= 1e-4) line(cx + R(k * q(i)), cy - i, cx + R(k * i / tanC), cy - i);
+    else line(cx + R(k * ms), cy - i, cx + R(k * i / tanC), cy - i);
+  }
+  if (t < D0) return;
+  for (let i = 1; i <= 10; i++) {
+    if (!(t > D1) && i > S) return;
+    const ms = -Math.sqrt(100 - i * i), row = cy - i + 1;
+    if (!(D1 > t) && i > S) line(cx + R(k * ms), row, cx + R(-k * ms), row); else line(cx + R(k * ms), row, cx + R(k * q(i)), row);
+  }
+  if (t < D2) return;
+  const A1 = Math.trunc(S); if (A1 >= 0) return;
+  for (let i = -1; i >= A1; i--) { if (i < S) return; line(cx + R(k * q(i)), cy - i, cx + R(k * Math.sqrt(100 - i * i)), cy - i); }
+}
+function tab(x, y, st, s) {   // 0xC00AB238: 0 current (outlined), 1 after it, 2 before it; returns the width
+  const w = 7 * s.length + 7; font7(s, x + 4, y + 2);
+  if (st === 0) {
+    line(x + 3, y, x, y + 3); line(x + 4, y, x, y + 4); line(x + w - 4, y, x + w - 1, y + 3); line(x + w - 5, y, x + w - 1, y + 4); line(x + 4, y, x + w - 5, y);
+    [x, x + 1, x + w - 2, x + w - 1].forEach(xx => line(xx, y + 4, xx, y + 11)); rect(x + 2, y + 11, x + w - 3, y + 11, 2);
+  } else if (st === 1) { line(x, y, x + w - 4, y); line(x + 1, y + 1, x + w - 3, y + 1); invert(x + 2, y + 2, x + w - 2, y + 9); line(x + w - 1, y + 3, x + w - 1, y + 9); }
+  else { line(x + 3, y, x + w - 1, y); line(x + 2, y + 1, x + w - 2, y + 1); invert(x + 1, y + 2, x + w - 3, y + 9); line(x, y + 3, x, y + 9); }
+  return w;
+}
+const title = s => { font7c(s, 64, 1); invert(0, 0, 127, 8); };   // 0xC00A7378
+const cursor = (r, short) => invert(0, 11 + 9 * r, short ? 121 : 127, 19 + 9 * r);   // 0xC00A73A4
+const turnArrows = k => { const x = [24, 64, 104][k]; blit(x - 7, 53, 5, 3, [4, 6, 7, 6, 4]); blit(x + 2, 53, 5, 3, [1, 3, 7, 3, 1]); };   // 0xC00A7400
+function scrollbar(top, total, vis, x, y, w, h) {   // 0xC009EB90
+  rect(x, y, x + w - 1, y + h - 1, 1);
+  const s = Math.trunc(top * (h - 2) / total), e = top + vis > total ? h - 3 : Math.trunc(vis * (h - 2) / total) + s;
+  rect(x + 1, y + s + 1, x + w - 2, y + e + 1, 0);
+  blit(x, y + h + 1, 5, 8, [1, 3, 7, 3, 1], true); blit(x, y - 4, 5, 8, [4, 6, 7, 6, 4], true);
+}
+function present() {
+  g.fillStyle = GRID; g.fillRect(0, 0, 768, 576);
+  for (const on of [0, 1]) { g.fillStyle = on ? INK : BG; for (let i = 0; i < fb.length; i++) if (fb[i] === on) g.fillRect(i % 128 * 6, (i >> 7) * 9, 5, 8); }
+}
+
+let lt = 0;   // first visible list row
+function list(name, items, cur, turn3) {   // stock list: title, 4 OS-font rows, cursor, scroll bar; knob 2 EXIT, knob 3 ENTER
+  const n = items.length, bar = n > 4;
+  lt = Math.max(0, Math.min(lt, n - 4, cur)); if (cur > lt + 3) lt = cur - 3; const top = lt;
+  title(name);
+  items.slice(top, top + 4).forEach(([l, v, ic], j) => { if (ic) ic.forEach((b, x) => { for (let r = 0; r < 7; r++) if (b >> r & 1) px(1 + x, 12 + 9 * j + r); }); os6(l, ic ? 12 : 1, 12 + 9 * j); const vx = (bar ? 121 : 127) - 6 * v.length; os6(v.replace("^", " "), vx, 12 + 9 * j);
+    if (v.includes("^")) [4, 6, 7, 6, 4].forEach((col, k) => { for (let r = 0; r < 3; r++) if (col >> r & 1) px(vx + 6 * v.indexOf("^") + k, 12 + 9 * j + 2 + r); }); });   // ^ is drawn as the softkey ▲
+  cursor(cur - top, bar);
+  if (bar) { rect(122, 11, 127, 54, 2); scrollbar(top, n, 4, 123, 16, 5, 26); }
+  turnArrows(0); if (turn3) turnArrows(2);
+  softkey42(0, ""); softkey42(1, "EXIT"); softkey42(2, "ENTER");
+}
+
+// ---- MASTER: state and keys ---------------------------------------------------------------
+const SR = 44100, TAU = 2 * Math.PI;
+const PAGES = [
+  { name: "SPECTRUM", opt: "FALL", vals: ["SLOW", "MED", "FAST"], v: 1 },
+  { name: "SCOPE", opt: "SPAN", vals: ["AUTO", "1", "2", "3", "4", "6", "8", "12", "24"], v: 0 },   // AUTO fits 2+ cycles; the rest in ms
+  { name: "STEREO", opt: "ZOOM", vals: ["1X", "2X", "4X"], v: 0 },
+  { name: "LOUDNESS", opt: "RESET" },
+  { name: "IN METER", opt: "RESET" },
+  { name: "OUT METER", opt: "RESET" }];
+const MENU = ["EFFECT CHAIN", "DELETE EFFECT UNIT", "PERFORM MODE", "MASTER", "SETTINGS", "MIDI SETTINGS", "VERSION"];
+let page = 0, inMenu = false, menuRow = 3, hot = false, msg = "";
+const optLabel = p => p.vals ? p.opt + ":" + p.vals[p.v] : p.opt;
+for (const p of PAGES) for (const t of [p.name, ...(p.vals ? p.vals.map(v => p.opt + ":" + v) : [p.opt])]) console.assert(softW(t) <= 38, "softkey text too wide: " + t);   // 1 px clear each side of the 40-px key
+
+function key(k, a) {
+  msg = "";
+  if (inMenu) {
+    if (k === 1 && a) menuRow = Math.max(0, Math.min(MENU.length - 1, menuRow + a));
+    else if ((k === 1 || k === 3) && !a) { if (MENU[menuRow] === "MASTER") { inMenu = false; last = performance.now(); } else msg = "a stock screen (not drawn here)"; }
+    else if (k === 2 && !a) msg = "EXIT: back to the patch screen";
+    return;
+  }
+  if (k === 3 && a) { page = (page + (a > 0 ? 1 : PAGES.length - 1)) % PAGES.length; return; }   // knob 3 turn: pages both ways
+  if (a) {   // knob 1 turn: one option step, stops at the ends
+    const p = PAGES[page];
+    if (k === 1 && p.vals) { p.v = Math.max(0, Math.min(p.vals.length - 1, p.v + a)); msg = p.opt + " " + p.vals[p.v]; } else msg = "only knob 1 turns do something on MASTER";
+    return;
+  }
+  if (k === 3) page = (page + 1) % PAGES.length;
+  else if (k === 2) { inMenu = true; menuRow = 3; }
+  else if (k === 1) {
+    const p = PAGES[page];
+    if (!p.vals) { resetStats(); msg = "RESET: AVERAGE, RANGE, PEAK, LIMIT and the graph start again"; return; }   // same reset on LOUDNESS and METERS
+    p.v = (p.v + 1) % p.vals.length;
+    msg = p.opt + " " + p.vals[p.v];
+  }
+}
+
+// ---- the made-up output: drums, bass and pad at 120 BPM, then the output limiter ----
+let n0 = 0, seed = 7, kickPh = 0, bassPh = 0, bassLp = 0, hatPrev = 0, lim = 1;
+const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2147483648 - 1;
+const BASS = [55, 43.65, 65.41, 49], PAD = [[220, 261.6, 329.6], [174.6, 220, 261.6], [261.6, 329.6, 392], [196, 246.9, 293.7]];
+const CEIL = 0.891;   // -1 dBFS
+function synth() {
+  const s = n0++ / SR, beat = s * 2, bi = Math.floor(beat), tb = (beat - bi) / 2, bar = Math.floor(beat / 4), chorus = Math.floor(bar / 8) % 2;
+  const f = 48 + 90 * Math.exp(-tb * 35); kickPh += f / SR;
+  const kick = Math.sin(TAU * kickPh) * Math.exp(-tb * 7) * 0.55;
+  const sn = bi % 2 ? (rnd() * 0.22 + Math.sin(TAU * 185 * tb) * 0.12) * Math.exp(-tb * 18) : 0;
+  const e = beat * 2, te = (e - Math.floor(e)) / 4, hn = rnd(), hat = (hn - hatPrev) * 0.5 * Math.exp(-te * 70) * (chorus ? 0.16 : 0.09); hatPrev = hn;
+  bassPh += BASS[bar % 4] / SR; bassLp += 0.07 * ((2 * (bassPh % 1) - 1) - bassLp);
+  const bass = bassLp * ((beat % 1) < 0.8 ? 0.3 : 0.1) * (chorus ? 1 : 0.8);
+  let pL = 0, pR = 0; for (const fr of PAD[bar % 4]) { pL += Math.sin(TAU * fr * 1.004 * s); pR += Math.sin(TAU * fr * 0.996 * s + 1); }
+  const pad = chorus ? 0.07 : 0.025, g = hot ? 2.82 : 1;
+  const L = (kick + sn + hat * 0.6 + bass + pL * pad) * g, R = (kick + sn + hat * 1.2 + bass + pR * pad) * g;
+  const x = Math.max(Math.abs(L), Math.abs(R)), want = x > CEIL ? CEIL / x : 1;   // instant attack, 50 ms release
+  lim = want < lim ? want : lim + (1 - lim) * 0.00045;
+  return [L * lim, R * lim, Math.max(-1, Math.min(1, L)), Math.max(-1, Math.min(1, R))];   // and the input: before the limiter, clipped at full scale
+}
+
+// ---- the UI side: everything below reads the ring the audio side fills ----------------------
+const RING = 8192, rL = new Float32Array(RING), rR = new Float32Array(RING); let w = 0;
+function biq(b0, b1, b2, a0, a1, a2) { return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0]; }
+const KW = (() => {   // BS.1770 K-weighting, designed for 44.1 kHz
+  let G = 3.99984385397, Q = 0.7071752369554193, fc = 1681.9744509555319, A = 10 ** (G / 40), w0 = TAU * fc / SR, c = Math.cos(w0), al = Math.sin(w0) / (2 * Q), sA = Math.sqrt(A);
+  const shelf = biq(A * ((A + 1) + (A - 1) * c + 2 * sA * al), -2 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - 2 * sA * al),
+    (A + 1) - (A - 1) * c + 2 * sA * al, 2 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - 2 * sA * al);
+  Q = 0.5003270373253953; fc = 38.13547087613982; w0 = TAU * fc / SR; c = Math.cos(w0); al = Math.sin(w0) / (2 * Q);
+  const hp = biq((1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + al, -2 * c, 1 - al);
+  return [shelf, hp];
+})();
+const kst = [[0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]];
+function kw(ch, x) {
+  const s = kst[ch];
+  for (let j = 0; j < 2; j++) {
+    const [b0, b1, b2, a1, a2] = KW[j], o = 4 * j, y = b0 * x + b1 * s[o] + b2 * s[o + 1] - a1 * s[o + 2] - a2 * s[o + 3];
+    s[o + 1] = s[o]; s[o] = x; s[o + 3] = s[o + 2]; s[o + 2] = y; x = y;
+  }
+  return x;
+}
+const lk = e => e > 0 ? -0.691 + 10 * Math.log10(e) : -Infinity;
+const A300 = Math.exp(-1 / (0.3 * SR));
+let M;   // all meter state
+function resetLoud() {
+  Object.assign(M, { sub: 0, subN: 0, subs: [], mBlocks: [], sBlocks: [], peakMax: 0, hist: [] });
+}
+function resetStats() { resetLoud(); Object.assign(M, { limMin: 1, hold: [-99, -99], clip: [0, 0], ipeakMax: 0, ihold: [-99, -99], iclip: [0, 0], nclip: 0 }); }
+function resetAll() {
+  M = { msL: 0, msR: 0, sLL: 0, sRR: 0, sLR: 0, sMM: 0, sSS: 0, pk: [0, 0], gr: 1, dpk: [-99, -99], hold: [-99, -99], holdT: [0, 0], clip: [0, 0], scG: 1, scGT: 0, scT: null, scTL: 0, grT: 0,
+        ims: [0, 0], ipk: [0, 0], iq: [0, 0], idpk: [-99, -99], iholdT: [0, 0], icf: 0, iprev: 0,
+        bars: new Float32Array(126).fill(-99), peaks: new Float32Array(126).fill(-99), age: new Uint8Array(126) };
+  resetStats();
+}
+resetAll();
+const A8 = A300 ** 8;
+function analyse(L, R, iL, iR) {
+  rL[w & (RING - 1)] = L; rR[w & (RING - 1)] = R; w++;
+  // the input, as master_tap sees it per 8-frame block: peak, 300 ms mean square, full scale
+  M.ipk[0] = Math.max(M.ipk[0], Math.abs(iL)); M.ipk[1] = Math.max(M.ipk[1], Math.abs(iR)); M.ipeakMax = Math.max(M.ipeakMax, M.ipk[0], M.ipk[1]);
+  if (Math.abs(iL) >= 0.999) M.icf |= 4; if (Math.abs(iR) >= 0.999) M.icf |= 8;
+  M.iq[0] += iL * iL; M.iq[1] += iR * iR;
+  if ((w & 7) === 0) { for (const c of [0, 1]) M.ims[c] += (1 - A8) * (M.iq[c] / 8 - M.ims[c]); M.iq = [0, 0]; }
+  const zl = kw(0, L), zr = kw(1, R);
+  M.sub += zl * zl + zr * zr; M.subN++;
+  if (M.subN === SR / 10) {   // 100 ms: one gating step
+    M.subs.push(M.sub / M.subN); M.sub = 0; M.subN = 0;
+    if (M.subs.length > 30) M.subs.shift();
+    const n = M.subs.length, mean = k => M.subs.slice(n - k).reduce((a, b) => a + b, 0) / k;
+    if (n >= 4) M.mBlocks.push(mean(4));
+    if (n >= 30) M.sBlocks.push(mean(30));
+    if (n >= 30) { M.hist.push(lk(mean(30))); if (M.hist.length > 113) M.hist.shift(); }
+  }
+  M.msL = A300 * M.msL + (1 - A300) * L * L; M.msR = A300 * M.msR + (1 - A300) * R * R;
+  M.sLL = A300 * M.sLL + L * L; M.sRR = A300 * M.sRR + R * R; M.sLR = A300 * M.sLR + L * R;
+  const m = (L + R) / 2, sd = (L - R) / 2; M.sMM = A300 * M.sMM + m * m; M.sSS = A300 * M.sSS + sd * sd;
+  M.pk[0] = Math.max(M.pk[0], Math.abs(L)); M.pk[1] = Math.max(M.pk[1], Math.abs(R));
+  M.peakMax = Math.max(M.peakMax, Math.abs(L), Math.abs(R)); M.gr = Math.min(M.gr, lim); M.limMin = Math.min(M.limMin, lim);
+}
+function loud() {
+  const n = M.subs.length, mean = k => M.subs.slice(n - k).reduce((a, b) => a + b, 0) / k;
+  const gate = (bl, rel) => { const a = bl.filter(e => lk(e) > -70); if (!a.length) return []; const t = lk(a.reduce((x, y) => x + y, 0) / a.length) - rel; return a.filter(e => lk(e) > t); };
+  const gi = gate(M.mBlocks, 10), I = gi.length ? lk(gi.reduce((x, y) => x + y, 0) / gi.length) : -Infinity;
+  const gs = gate(M.sBlocks, 20).map(lk).sort((a, b) => a - b);
+  const LRA = gs.length > 1 ? gs[Math.floor(0.95 * (gs.length - 1))] - gs[Math.floor(0.1 * (gs.length - 1))] : -Infinity;
+  const pk = M.peakMax > 0 ? 20 * Math.log10(M.peakMax) : -Infinity;
+  return { m: n >= 4 ? lk(mean(4)) : -Infinity, s: n >= 30 ? lk(mean(30)) : -Infinity, I, LRA, pk, plr: pk - I };
+}
+const db = v => v > 0 ? 20 * Math.log10(v) : -99;
+const f1 = v => isFinite(v) && v > -70 ? (v > 0 ? "+" : "") + v.toFixed(1) : "--.-";
+const os6r = (s, right, y) => os6(s, right - 6 * s.length, y);
+const smallc = (s, cx, y) => small(s, cx - (softW(s) >> 1), y);
+
+// ---- FFT (1024 points, Hann) --------------------------------------------------------------
+const N = 1024, HANN = Float32Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos(TAU * i / N));
+function fft(re, im) {
+  for (let i = 1, j = 0; i < N; i++) { let b = N >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= N; len <<= 1) {
+    const a = -TAU / len, wr = Math.cos(a), wi = Math.sin(a);
+    for (let i = 0; i < N; i += len) { let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) { const u = i + k, v = u + len / 2, tr = re[v] * cr - im[v] * ci, ti = re[v] * ci + im[v] * cr;
+        re[v] = re[u] - tr; im[v] = im[u] - ti; re[u] += tr; im[u] += ti; [cr, ci] = [cr * wr - ci * wi, cr * wi + ci * wr]; } }
+  }
+}
+const fx = f => 1 + Math.round(42 * Math.log10(f / 20));   // 126 columns over 3 decades
+const COLF = Array.from({ length: 127 }, (_, c) => 20 * 1000 ** (c / 126));
+const OCT = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];   // grid: one line per octave, 12 or 13 px apart
+const FLAB = [[50, "50"], [100, "100"], [200, "200"], [500, "500"], [1000, "1K"], [2000, "2K"], [5000, "5K"], [10000, "10K"]];   // the usual 1-2-5 steps, 2 px or more apart; 20 sits at the left edge, 20K has no room
+const dbY = d => 11 + Math.round(-d / 72 * 37);
+
+// ---- the five pages -----------------------------------------------------------------------
+function header() { font7r(page + 1 + "/6", 127, 1); title(PAGES[page].name); }
+function soft() {
+  softkey42(0, optLabel(PAGES[page])); softkey42(1, "EXIT"); softkey42(2, PAGES[(page + 1) % 6].name);   // menu softkeys (0xC009F8F0), as on other MENU screens
+}
+function drawSpectrum() {
+  const re = new Float32Array(N), im = new Float32Array(N), fall = [1, 2, 5][PAGES[0].v];   // 20 / 40 / 100 dB/s
+  for (let i = 0; i < N; i++) { const j = (w - N + i) & (RING - 1); re[i] = (rL[j] + rR[j]) / 2 * HANN[i]; }
+  fft(re, im);
+  const df = SR / N, mag = k => Math.hypot(re[k], im[k]) / (N / 4);
+  for (let c = 0; c < 126; c++) {
+    const lo = Math.max(1, Math.round(COLF[c] / df)), hi = Math.max(lo, Math.round(COLF[c + 1] / df));
+    let m = 0; for (let k = lo; k <= hi; k++) m = Math.max(m, mag(k));
+    const fc = Math.sqrt(COLF[c] * COLF[c + 1]), d = db(m) + 3 * Math.log2(fc / 1000);
+    M.bars[c] = Math.max(d, M.bars[c] - fall);
+    if (M.bars[c] >= M.peaks[c]) { M.peaks[c] = M.bars[c]; M.age[c] = 0; } else if (++M.age[c] > 15) M.peaks[c] -= fall;
+  }
+  rect(0, 10, 127, 49, 3);
+  const ink = new Set(); for (const d of [-24, -48]) { const t = String(d); inkAdd(ink, t, 126 - softW(t), dbY(d) - 2); }   // dB labels
+  for (let c = 0; c < 126; c++) {
+    const top = dbY(M.bars[c]); if (M.bars[c] > -72) for (let y = Math.max(11, top); y <= 48; y++) px(1 + c, y);
+    const py = Math.max(11, dbY(M.peaks[c])); if (M.peaks[c] > -72 && !nearInk(ink, 1 + c, py)) px(1 + c, py);   // peak dots keep 1 px off the labels
+  }
+  // grid drawn inverted over the bars so it always shows. Square cells: an octave (12.6 px) across, 24 dB (13 px) down.
+  // Vertical lines: dots about 4 px apart, spaced evenly from crossing to crossing; horizontal lines: one dot between verticals
+  const VX = OCT.map(fx), HY = [-24, -48].map(dbY), g = new Set();
+  const seg = (a, b, put) => { const n = Math.max(1, Math.round((b - a) / 4)); for (let k = 0; k <= n; k++) put(a + Math.round(k * (b - a) / n)); };
+  const XS = [0, ...VX, 127], YS = [10, ...HY, 49];
+  for (const y of HY) for (let i = 1; i < XS.length; i++) for (const x of [XS[i - 1], (XS[i - 1] + XS[i]) >> 1]) x > 0 && x < 127 && g.add(x + "," + y);   // a dot at each crossing and one halfway
+  for (const x of VX) for (let i = 1; i < YS.length; i++) seg(YS[i - 1], YS[i], y => y > 10 && y < 49 && g.add(x + "," + y));
+  // dB labels sit on their own line, on the right where highs are low, inverted like all text over the bars
+  // (black on clear, clear on black); grid dots keep 2 px off them
+  for (const k of g) { const [x, y] = k.split(",").map(Number); if (!nearInk(ink, x, y, 2)) px(x, y, 1, "xor"); }
+  inkXor(ink); corners(0, 10, 127, 49);
+  small("20", 0, 51); for (const [f, t] of FLAB) smallc(t, fx(f), 51);   // row 50 stays empty
+}
+function drawScope() {
+  // period: NSDF (McLeod) on the window decimated by 8, the first peak within 90% of the best, refined at full rate
+  // around it. Trigger: the start, within one period of the newest, that best matches the trace drawn last frame, so
+  // the wave holds still even with several zero crossings per cycle. With no last trace (first frame, or the span
+  // changed by more than 1/8): the last rising zero crossing of a low-passed copy (about 700 Hz; arm below -25% of
+  // its peak). AUTO shows whole cycles (2 or more, 3 to 24 ms). UI side only.
+  const mono = i => (rL[i & (RING - 1)] + rR[i & (RING - 1)]) / 2, end = w - 1, S0 = end - 1058 - 2048, N = end - S0;
+  const lp = new Float32Array(N + 1), d = new Float32Array(388); let z = 0, pk = 0, rp = 0;
+  for (let i = 0; i <= N; i++) { const v = mono(S0 + i); z += 0.1 * (v - z); lp[i] = z; pk = Math.max(pk, Math.abs(z)); rp = Math.max(rp, Math.abs(v)); if (i < 388 * 8) d[i >> 3] += v; }
+  // auto gain: the largest power of 2 (1/2 to 32) that keeps the peak within 3/4 of the half height; down at once, up one step after 8 frames that fit
+  let gn = 32; while (gn > 0.5 && rp * gn > 0.75) gn /= 2;
+  if (gn < M.scG) { M.scG = gn; M.scGT = 0; } else if (gn > M.scG && ++M.scGT >= 8) { M.scG *= 2; M.scGT = 0; }
+  const W = 193, nsdf = (x, k, n, s0) => { let a = 0, b = 0; for (let i = 0; i < n; i++) { const p = x ? x[i] : mono(s0 + i), q = x ? x[i + k] : mono(s0 + i + k); a += p * q; b += p * p + q * q; } return b > 0 ? 2 * a / b : 0; };
+  const nf = [1]; for (let k = 1; k <= W; k++) nf[k] = nsdf(d, k, W);
+  let k = 1, L = 0, best = 0; while (k <= W && nf[k] > 0) k++;   // skip the lag-0 lobe
+  for (let j = k; j <= W; j++) best = Math.max(best, nf[j]);
+  if (best > 0.5) for (let j = k; j < W; j++) if (nf[j] >= 0.9 * best && nf[j] >= nf[j - 1] && nf[j] >= nf[j + 1]) { L = j; break; }
+  if (L > 1) {
+    best = -2; for (let j = 8 * L - 8; j <= 8 * L + 8; j++) { const v = nsdf(0, j, 1024, S0); if (v > best) { best = v; k = j; } }
+    const r0 = nsdf(0, k - 1, 1024, S0), r2 = nsdf(0, k + 1, 1024, S0), t = r0 - 2 * best + r2;
+    M.per = k + (t < 0 ? 0.5 * (r0 - r2) / t : 0);
+  }
+  const auto = PAGES[1].v === 0, per = M.per || SR / 100, ms = 1000 / SR;
+  const span = auto ? Math.min(24, Math.max(2, Math.ceil(3 / (per * ms))) * per * ms) : +PAGES[1].vals[PAGES[1].v];
+  const len = span / ms, spc = len / 115, col = (t, i) => mono(S0 + Math.trunc(t + spc * i));
+  let st = N - len;
+  if (M.scTL > 0 && Math.abs(len - M.scTL) * 8 < len) {
+    const pp = Math.min(M.per > 0 ? M.per : len, st); let step = Math.max(1, spc * 0.25); if (step * 256 < pp) step = pp / 256;
+    let bs = -1e30, u = st;
+    // under one period: the closest shape to the last trace (a product would pull to the loudest part); else the best product
+    for (let t = st; t >= st - pp; t -= step) { let v = 0; for (let i = 0; i < 115; i++) { const y = col(t, i); v += len < pp ? -(M.scT[i] - y) * (M.scT[i] - y) : M.scT[i] * y; } if (v > bs) { bs = v; u = t; } }
+    st = u;
+  } else {
+    let armed = false, u = st;
+    for (let i = 64; i + len <= N; i++) { if (lp[i] < -0.25 * pk) armed = true; else if (armed && lp[i] >= 0) { u = i; armed = false; } }
+    st = u;
+  }
+  M.scT = Array.from({ length: 115 }, (_, i) => col(st, i)); M.scTL = len;
+  st += S0;
+  rect(0, 10, 116, 55, 3);
+  for (let x = 2; x < 115; x += 2) px(x, 33);
+  const Y = v => Math.max(11, Math.min(54, 33 - Math.round(v * 30 * M.scG)));
+  let prev = mono(st);
+  for (let c = 0; c < 115; c++) {
+    const a = Math.floor(st + c * spc), b = Math.max(a + 1, Math.floor(st + (c + 1) * spc));
+    let lo = prev, hi = prev;
+    for (let i = a; i < b; i++) { const v = mono(i); lo = Math.min(lo, v); hi = Math.max(hi, v); prev = v; }
+    for (let y = Y(hi); y <= Y(lo) + 1; y++) px(1 + c, Math.min(54, y));
+  }
+  // tuner: the nearest note (A4 = 440 Hz, C4 = middle C) and how far off it is in cents (hundredths of a semitone)
+  const f = M.per ? SR / M.per : 0, ex = 12 * Math.log2(f / 440) + 69, nn = Math.round(ex), cents = f ? Math.round(100 * (ex - nn)) : 0;
+  const note = f ? ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][nn % 12] + (Math.floor(nn / 12) - 1) + " " + (cents > 0 ? "+" : "") + cents : "--";
+  const t = (span < 10 ? span.toFixed(1) : String(Math.round(span))) + "MS" + (f ? " " + Math.round(f) + "HZ" : "");
+  halo(t, 115 - softW(t), 12); halo(note, 115 - softW(note), 19);   // the screen's width in ms and the frequency; then note and cents
+  // tuner bar: fills from the middle, up = sharp, down = flat, the ends are +-50 cents; the middle is a tick like the other bars
+  const cy = 33, cb = cy - Math.round(cents / 50 * 21);
+  rect(119, 10, 127, 55, 1); if (f && cb !== cy) rect(120, Math.min(cy, cb), 126, Math.max(cy, cb), 0);
+  px(119, cy, 0, "set"); px(127, cy, 0, "set"); for (let x = 121; x < 126; x += 2) px(x, cy, 1, "xor");
+  corners(119, 10, 127, 55); corners(0, 10, 116, 55);
+}
+function drawStereo() {
+  const z = [24, 48, 96][PAGES[2].v], cx = 22, cy = 32;   // ZOOM 1X / 2X / 4X: display only, the sound is not touched
+  rect(0, 10, 45, 55, 3);
+  const ink = new Set(); inkAdd(ink, "L", 3, 12); inkAdd(ink, "R", 39, 12);
+  const dot = (x, y) => nearInk(ink, x, y) || px(x, y);   // no dot touches the letters
+  for (let i = -20; i <= 20; i += 3) { dot(cx + i, cy + i); dot(cx - i, cy + i); dot(cx, cy + i); }
+  small("L", 3, 12); small("R", 39, 12); corners(0, 10, 45, 55);
+  for (let i = w - 1024; i < w; i++) {
+    const L = rL[i & (RING - 1)], R = rR[i & (RING - 1)], x = cx + Math.round((R - L) * 0.7071 * z), y = cy - Math.round((L + R) * 0.7071 * z);
+    if (x > 0 && x < 45 && y > 10 && y < 55) dot(x, y);
+  }
+  const corr = M.sLL * M.sRR > 0 ? M.sLR / Math.sqrt(M.sLL * M.sRR) : 0;
+  os6("PHASE", 50, 11); os6r((corr >= 0 ? "+" : "") + corr.toFixed(2), 127, 11);
+  const c0 = 88, c1 = c0 + Math.round(corr * 37);   // fills from the middle (0 = wide) toward OUT (-1) or MONO (+1)
+  mbar(50, 19, 127, 27, Math.min(c0, c1), Math.max(c0, c1), "OUT", "MONO", [], [], ["WIDE", c0 + 1]);   // WIDE sits on 0
+  const width = M.sMM > 0 ? Math.round(100 * Math.sqrt(M.sSS / M.sMM)) : 0;
+  os6("WIDTH", 50, 36); os6r(width + "%", 127, 36);
+  const bal = M.sLL > 0 && M.sRR > 0 ? 10 * Math.log10(M.sLL / M.sRR) : 0;
+  os6("BALANCE", 50, 45); os6r(Math.abs(bal) < 0.2 ? "C" : (bal > 0 ? "L" : "R") + Math.abs(bal).toFixed(1), 127, 45);
+}
+function drawLoudness() {
+  const v = loud(), T = -14;   // streaming level; a fixed line to aim at
+  [["NOW", v.m], ["3 SEC", v.s], ["AVERAGE", v.I], ["RANGE", v.LRA], ["PEAK", v.pk], ["DYNAMICS", v.plr]].forEach(([l, x], i) => {
+    const cx = 21 + 43 * (i % 3), y = i < 3 ? 11 : 27, t = !isFinite(x) || x < -70 ? "--.-" : i < 3 ? f1(x) : x.toFixed(1);
+    smallc(l, cx, y); os6(t, cx - 3 * t.length, y + 6);
+  });
+  for (const x of [42, 85]) for (let y = 11; y <= 39; y += 2) px(x, y);
+  // the 3 SEC level over the last 11.3 s, one column per 100 ms, filled from the bottom; 1 LU per row, -14 on row 49.
+  // The label sits outside, left of its line; the line is dotted and inverted so it shows on the fill
+  rect(13, 42, 127, 55, 1);
+  M.hist.forEach((L, i) => { const x = 127 - M.hist.length + i; if (isFinite(L)) for (let y = Math.max(43, 49 + Math.round(T - L)); y <= 54; y++) px(x, y); });
+  for (let x = 15; x < 127; x += 2) px(x, 49, 1, "xor");
+  small(String(T), 0, 47); corners(13, 42, 127, 55);
+}
+const XL = d => { d = Math.max(-48, Math.min(0, d)); return 1 + Math.round((d >= -12 ? 0.5 + (d + 12) / 24 : (d + 48) / 72) * 125); };   // -12 to 0 dB takes the right half
+function lbars(ms, pk, dpk, hold, holdT, clip, dt) {   // L and R (level, peak, hold, CLIP) and the scale, on both meter pages
+  const holdS = 2, TK = [-24, -12, -6, -3, -1].map(XL);
+  [0, 1].forEach(ch => {
+    const y = ch ? 21 : 11, p = db(pk[ch]), rms = db(Math.sqrt(ms[ch]));
+    dpk[ch] = Math.max(p, dpk[ch] - 20 * dt);
+    if (p >= hold[ch] || (holdT[ch] += dt) > holdS) { hold[ch] = p; holdT[ch] = 0; }
+    const mk = [];   // peak: dotted with a solid middle row; hold: a line
+    for (let x = XL(rms) + 1; x <= XL(dpk[ch]); x++) for (let r = 1; r <= 7; r++) if (r === 4 || (x + r) % 2) mk.push([x, y + r]);
+    if (hold[ch] > -48) for (let r = 1; r <= 7; r++) mk.push([XL(hold[ch]), y + r]);
+    mbar(0, y, 127, y + 8, 1, rms > -48 ? XL(rms) : 0, ch ? "R" : "L", clip[ch] ? "CLIP" : hold[ch] > -48 ? hold[ch].toFixed(1) : "", TK, mk);
+  });
+  small("-48", 0, 31); for (const d of [-24, -12, -6, -3]) smallc(String(d), XL(d), 31); small("0", 124, 31);   // under the gaps; -1 has no room
+}
+function drawMeters(dt) {
+  // CLIP is set where the output is clamped (the pedal: master_tap after the stock post mix); the limited demo never reaches full scale
+  lbars([M.msL, M.msR], M.pk, M.dpk, M.hold, M.holdT, M.clip.map(c => c && performance.now() - c < 2000), dt);
+  const gr = -db(M.gr), G = d => 126 - Math.round(Math.log2(1 + 4 * Math.min(12, d)) / Math.log2(49) * 125);   // log: 0.2 dB fills 19 px
+  if (gr >= (M.dgr || 0)) { M.dgr = gr; M.grT = 0; } else if ((M.grT += dt) > 0.5) M.dgr -= 12 * dt;   // held 0.5 s like the chain's LIMIT tag, then falls 12 dB/s
+  mbar(0, 38, 127, 46, M.dgr > 0.01 ? Math.min(G(M.dgr), 122) : 127, 126, "LIMIT", M.dgr > 0.01 ? "-" + M.dgr.toFixed(1) : "0.0", [0.5, 1, 2, 4, 8].map(G));   // any cut shows 4 px at least
+  const pk = db(M.peakMax), grMax = -db(M.limMin);   // readouts: highest since RESET, counted on every page
+  os6("PEAK", 1, 49); os6r(pk > -70 ? pk.toFixed(1) : "--.-", 61, 49); os6("LIMIT", 67, 49); os6r(grMax > 0.01 ? grMax.toFixed(1) : "0.0", 127, 49);
+}
+function drawInput(dt) {
+  lbars(M.ims, M.ipk, M.idpk, M.ihold, M.iholdT, M.iclip.map(c => c > 0), dt);
+  const on = M.iclip[0] > 0 || M.iclip[1] > 0, t = on ? "INPUT CLIP" : "NO CLIP", pk = db(M.ipeakMax);
+  os6(t, 64 - 3 * t.length, 39); if (on) invert(0, 38, 127, 46);
+  os6("PEAK", 1, 49); os6r(pk > -70 ? pk.toFixed(1) : "--.-", 61, 49); os6("CLIPS", 67, 49); os6r(String(M.nclip), 127, 49);
+}
+
+// ---- loop -----------------------------------------------------------------------------------
+let last = performance.now(), lastDraw = 0;
+function frameTick(t) {
+  const dt = Math.min(0.25, (t - last) / 1000); last = t;
+  if (!inMenu) for (let i = Math.round(dt * SR); i > 0; i--) { const [L, R, iL, iR] = synth(); analyse(L, R, iL, iR); }
+  if (t - lastDraw >= 50) {   // 20 frames a second
+    const ddt = (t - lastDraw) / 1000; lastDraw = t;
+    fb.fill(0);
+    if (inMenu) list("MENU", MENU.map(m => [m, ""]), menuRow);
+    else {
+      const ms = Math.round(ddt * 1000);   // input clip: CLIP shows 2 s; CLIPS counts the frames where clipping starts
+      for (const c of [0, 1]) { if (M.icf & 4 << c) M.iclip[c] = 2000; M.iclip[c] = Math.max(0, M.iclip[c] - ms); }
+      if (M.icf && !M.iprev) M.nclip++; M.iprev = M.icf !== 0; M.icf = 0;
+      header(); [drawSpectrum, drawScope, drawStereo, drawLoudness, () => drawInput(Math.min(0.25, ddt)), () => drawMeters(Math.min(0.25, ddt))][page](); soft();
+    }
+    M.pk = [0, 0]; M.gr = 1; M.ipk = [0, 0];
+    present();
+    document.getElementById("status").textContent = msg || (inMenu ? "MASTER closed: audio copy off (one flag test per block)" : "MASTER open: audio side copies 16 floats + GR per block");
+  }
+  requestAnimationFrame(frameTick);
+}
+document.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => key(+b.dataset.k, +b.dataset.a)));
+const hb = document.getElementById("hot");
+hb.addEventListener("click", () => { hot = !hot; hb.setAttribute("aria-pressed", hot); });
+document.getElementById("patch").addEventListener("click", () => { resetStats(); msg = "new patch: AVERAGE, RANGE, PEAK, LIMIT and the graph start again"; });
+document.getElementById("reset").addEventListener("click", () => { resetAll(); PAGES.forEach(p => p.vals && (p.v = p === PAGES[0] ? 1 : 0)); page = 0; inMenu = false; msg = ""; });
+requestAnimationFrame(frameTick);
+</script>
