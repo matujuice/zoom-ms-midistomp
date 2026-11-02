@@ -24,7 +24,7 @@
 #define CURSOR_SLOT ((volatile unsigned *)0xC00EE748)     /* [6 x view + cursor]: the slot under it (mixer.S CURSOR_SLOTS) */
 #define CUR_PATCH (*(volatile int *)(0xC00EF748u + 324))  /* patch played, 0-49 */
 #define PENDING (*(volatile int *)(0xC00EF748u + 340))   /* a prompt over the Effect View */
-#define VIEW_KNOBS ((volatile int *)0xC009D398)           /* [view]: knob page, 0 cover */
+#define KNOBS (*(volatile int *)0xC009D398)               /* knob pages shown, 0 cover: one word, not per view (stock 0xC00BAA2C) */
 #define FB ((volatile unsigned char *)0x11816800)         /* page format: 128 bytes per 8 rows */
 #define FB_DIRTY (*(volatile unsigned char *)0xC00EEBB0)  /* bit = 8-row page to send */
 #define FONT7 ((const unsigned char *)0xC00E87D8)         /* 7 column bytes per character */
@@ -162,7 +162,7 @@ int lbox_draw(int a4)
         seen = CUR_PATCH;
         SV(S_CLAIM) = 0; SV(S_SLOT) = (unsigned)-1; SV(S_MINE) = 0;
     }
-    if (SV(S_CLAIM) && c >= 0 && c < 6 && v < 6 && CURSOR_SLOT[6 * v + c] == SV(S_SLOT) && !MODE && !PENDING && !VIEW_KNOBS[v] && OVL_GET(0) == -1)
+    if (SV(S_CLAIM) && c >= 0 && c < 6 && v < 6 && CURSOR_SLOT[6 * v + c] == SV(S_SLOT) && !MODE && !PENDING && !KNOBS && OVL_GET(0) == -1)
         bar(0, 17, 127, 34, 2, 4);                        /* the cover only */
     return LCD_GATE(a4);
 }

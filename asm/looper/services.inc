@@ -44,4 +44,4 @@
         .equ    FB, 0x11816800              ; frame buffer: column bytes, 128 per 8-pixel row
         .equ    FB_DIRTY, 0xC00EEBB0        ; byte: rows to send (bit = 8-pixel row)
         .equ    FONT7, 0xC00E87D8           ; the Effect View's bold font: 7 column bytes a character
-        .equ    VIEW_KNOBS, 0xC009D398      ; word [view]: knob page, 0 = cover
+        .equ    VIEW_KNOBS, 0xC009D398      ; word: knob pages shown, 0 = cover (one word, not per view)

@@ -94,3 +94,9 @@ def test_lbox_reads_the_cursor_at_draw_time():
     src = (ROOT / "asm/looper/lbox.c").read_text(encoding="utf-8")
     assert "SV(S_MINE) &&" not in src and "CURSOR_SLOT[6 * v + c] == SV(S_SLOT)" in src
     assert "0xC00EE748" in src and "0xC00EE948" not in src
+
+
+def test_lbox_reads_the_knob_page_flag_as_one_word():
+    # stock reads 0xC009D398 as one word (0xC00BAA2C); indexed by view the bar drew over knob pages
+    src = (ROOT / "asm/looper/lbox.c").read_text(encoding="utf-8")
+    assert "!KNOBS" in src and "VIEW_KNOBS[" not in src
