@@ -78,7 +78,7 @@ Small things that make the stock pedal nicer to live with.
 
 ## Custom effects
 
-<img width="1920" height="870" alt="effects pack cover v2 0" src="https://github.com/user-attachments/assets/2f8fa485-b7cb-44c6-ad30-2468fd3668cd" />
+<p align="center"><img alt="effects pack cover v2 0" src="https://github.com/user-attachments/assets/2f8fa485-b7cb-44c6-ad30-2468fd3668cd" width="720"></p>
 
 **MIDISTOMP is at its best with the free custom effects from
 [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack).**
