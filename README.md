@@ -189,6 +189,7 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - [Zoom-Firmware-Editor](https://github.com/Barsik-Barbosik/Zoom-Firmware-Editor) by Barsik-Barbosik: the updater
   flash layout.
 - [zoom-zt2](https://github.com/mungewell/zoom-zt2) by mungewell: SysEx file transfer.
+- Alexander Lim. The live screens and the zvis kit, the pedal's file-size cap and DSP limit, and linker pitfalls.
 - Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
