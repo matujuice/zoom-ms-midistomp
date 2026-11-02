@@ -148,7 +148,7 @@ MS-50G from an Apple Silicon Mac. Details in [On a Mac](docs/user-guide.md#on-a-
 
 - **More than 6 effects per patch**, limited only by the DSP.
 - **PERFORM per gesture:** a different effect and parameter for each press, hold or turn (to be tested).
-- **Install from the browser (Modwerk):** flash MIDISTOMP and effects without Python or a builder.
+- **Modwerk integration:** the MIDISTOMP firmware mods and the effects pack inside Modwerk, so you pick the mods and effects you want and flash them from the browser, without Python or a builder.
 - **More stereo effects** in the pack.
 
 Want something else? [Open an issue](https://github.com/matujuice/zoom-ms-midistomp/issues) and tell me.
