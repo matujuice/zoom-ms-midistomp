@@ -99,6 +99,8 @@ static void limit(void)
     int i;
     for (i = 0; i < 16; i++) {
         float a = F[i] < 0.0f ? -F[i] : F[i];
+        if (!(a <= 1e30f))              /* NaN or Inf (a stock delay reading stale arena data, pack #41): silence, not a stuck output */
+            F[i] = a = 0.0f;
         if (a > peak)
             peak = a;
     }

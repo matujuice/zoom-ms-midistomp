@@ -483,15 +483,16 @@ waits for its Next line, except with NOW.
 
 ### Memory
 
-Loops are stored in 12-bit, about 72 dB under the signal. The looper picks stereo or mono when recording starts,
+Loops are stored in 12-bit, about 72 dB under the signal: up to 23.3 s stereo or 43.2 s mono. The looper picks stereo or mono when recording starts,
 from the tempo and the cycle length:
 
 | Length | Stereo | Mono |
 |---|---|---|
-| 1-4 bars | any tempo | |
-| 8 bars | 79 BPM and up | 40-78 BPM |
-| 16 bars | 158 BPM and up | 81-157 BPM |
-| 32 bars | | 161 BPM and up |
+| 1-2 bars | any tempo | |
+| 4 bars | 42 BPM and up | 40-41 BPM |
+| 8 bars | 83 BPM and up | 45-82 BPM |
+| 16 bars | 165 BPM and up | 89-164 BPM |
+| 32 bars | | 178 BPM and up |
 
 If the cycle doesn't fit, the looper records what fits, halving the length, and the status says so (for example
 `REC 4/8`, or `REC 14/16 M` when it also went mono). At 120 BPM a 32-bar cycle records 16 bars mono; the counter
@@ -636,8 +637,9 @@ MENU > **SETTINGS** holds the stock rows plus these:
 **HOLD FOR:**
 - TUNER (default): opens the tuner, as stock.
 - TEMPO: opens the tempo screen.
-- MOMENTARY: a short press flips the effect as usual. Hold it over half a second and it flips back when you let go.
-  The flip-back is never saved.
+- MOMENTARY: hold the footswitch and the effect flips while you hold it: a bypassed effect turns on, an active one
+  turns off. Let go and it goes back. A short press (under half a second) flips it as usual and it stays.
+  The hold is never saved.
 
 **INPUT:** the firmware can't tell the pedals apart, so tell it. **STEREO** on an MS-70CDR gives the Split and Mono
 Serial modes. **MONO** (default) is for the MS-50G and MS-60B: those modes are not offered, and a patch that uses

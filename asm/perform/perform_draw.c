@@ -68,7 +68,7 @@ static int nearink(int x, int y)
 /* ---- targets: a CC (perform.h), its module, parameter, range and text ------------------- */
 enum { FADER, KNOB, TOGGLE, TRIG };
 typedef struct { const char *n; unsigned char cc, max, look, dcc, x; const char *const *opt; } NPar;
-typedef struct { char nm[9]; unsigned short max; unsigned char look, dcc, x; const char *const *opt; } Par;
+typedef struct { char nm[9]; unsigned short max; unsigned char look, dcc, x; const char *const *opt; int (*gs)(unsigned, char *); } Par;
 
 static const char *const o_mode[] = { "Serl", "Paral", "Split", "MSerl" };
 static const char *const o_out[] = { "Ster", "Mono", "Split" };
@@ -121,7 +121,7 @@ static void pinfo(int t, Par *p)
     int n = t_node(t), k, i;
     const NPar *q;
     const int *d;
-    p->nm[0] = 0; p->max = 127; p->look = KNOB; p->dcc = 255; p->x = 0; p->opt = 0;
+    p->nm[0] = 0; p->max = 127; p->look = KNOB; p->dcc = 255; p->x = 0; p->opt = 0; p->gs = 0;
     if (t == T_NONE) return;
     if (IS_FTSW(t)) { scat(p->nm, "Footsw"); p->max = 1; p->look = TRIG; return; }
     if (n >= 0) {
@@ -135,6 +135,7 @@ static void pinfo(int t, Par *p)
             p->nm[i] = 0;
             p->max = d[3] < 1 ? 1 : d[3] > 9999 ? 9999 : d[3];
             if (p->max == 1) { p->look = TOGGLE; p->opt = o_off; }
+            p->gs = (int (*)(unsigned, char *))d[9];   /* +0x24: the effect's own value text, as the stock screen (A4 value, B4 out, returns the length) */
         } else ncat(scat(p->nm, "Knob"), k);
     }
 }
@@ -176,7 +177,12 @@ static void val_text(int t, int v, char *o)      /* v in CC units, -1 unused */
     if (v < 0) { scat(o, "-"); return; }
     if (p.look == TRIG) { scat(o, "TAP"); return; }
     d = disp(t, &p, v);
-    if (p.opt) scat(o, p.opt[d]);
+    if (p.gs) {
+        char g[16];
+        int n = p.gs(d, g);
+        g[n < 0 ? 0 : n > 8 ? 8 : n] = 0;       /* the stock buffer is 8 bytes */
+        scat(o, g);
+    } else if (p.opt) scat(o, p.opt[d]);
     else if (p.x) {                              /* a crossfade reads like a pan */
         if (d == 50) scat(o, "AB");
         else ncat(scat(o, d < 50 ? "A" : "B"), 2 * (d < 50 ? 50 - d : d - 50));
@@ -304,18 +310,25 @@ static int ftsw_on(int t)                        /* a Footsw target: its effect 
     return fx_on(s);
 }
 
-static int left_text(char *o)                   /* the looper's left text (S_LEFT, lbox.c); a pending footswitch action counts down. Returns the S_LEFT kind */
+static int loop_pending(void)                   /* the soonest move waiting on a control aimed at the GRDLOOP's Footsw, -1 = none */
 {
-    unsigned c = SVC(30), kind = c & 15, n = c >> 4 & 63;
-    int i, lp = -1, p, b = beatms(), ms, k;
-    char *e = o;
-    o[0] = 0;
-    if (SVC(0) != 0x5A4C5301 || !SVC(8)) return 0;
+    int i, p, lp = -1;
     for (i = 0; i < NCTL; i++)
-        if (IS_FTSW(perf_patch.target[i])) {
+        if (IS_FTSW(perf_patch.target[i]) && (perf_patch.target[i] & 7) == SVC(10)) {
             p = perf_pending(i);
             if (p >= 0 && (lp < 0 || p < lp)) lp = p;
         }
+    return lp;
+}
+
+static int left_text(char *o)                   /* the looper's left text (S_LEFT, lbox.c); a pending footswitch action counts down. Returns the S_LEFT kind */
+{
+    unsigned c = SVC(30), kind = c & 15, n = c >> 4 & 63;
+    int i, lp, b = beatms(), ms, k;
+    char *e = o;
+    o[0] = 0;
+    if (SVC(0) != 0x5A4C5301 || !SVC(8)) return 0;
+    lp = loop_pending();
     if (lp >= 0 && kind >= 1 && kind != 2 && kind != 3 && kind != 4) {   /* our own countdown: what the press does now */
         ms = PEND_MS(lp);
         k = ms > 4 * b ? udiv(ms + 4 * b - 1, 4 * b) : udiv(ms + b - 1, b);
@@ -358,18 +371,15 @@ static void play(void)
 
     left[0] = 0;
     lk = loop_live() ? left_text(left) : 0;
-    for (i = 0; i < NCTL; i++)
-        if (IS_FTSW(perf_patch.target[i])) {
-            n = perf_pending(i);
-            if (n >= 0 && (lp < 0 || n < lp)) lp = n;
-        }
+    if (lk) lp = loop_pending();
     for (i = 0; i < 11; i++) for (j = 0; j < 16; j++) ink[i][j] = 0;
     if (run) {                                   /* the top bar is the cycle counter: it fills over the cycle */
         k = C ? C : 1;
         w = udiv(126u * (umod(perf_grid.beat, 4 * k) * 65536u + perf_grid.frac), 4u * k * 65536u);
         if (lp >= 0 && !blinkon(PEND_MS(lp))) w = 0;     /* an action waits: the fill blinks faster as it comes */
         if (lp < 0 && (lk == 5 || lk == 6) && umod(gms(), 2 * b) < (unsigned)b / 2) w = 0;   /* recording: off an 1/8 every 2 beats */
-        if (lp < 0 && lk && SVC(22) >> 8 & 255 && !(SVC(19) & 0xFFFF)) w = 0;   /* the GRDLOOP's own action waits (its Next): it zeroes the fill while its bar blinks off */
+        n = SVC(30);                             /* the GRDLOOP's own action waits (its Next): the same grid-locked blink, from its count */
+        if (lp < 0 && lk >= 2 && lk <= 4 && !blinkon((n >> 4 & 63) * (n >> 16 & 1 ? b : 4 * b))) w = 0;
         o = ncat(right, 1 + (C ? umod(perf_grid.beat >> 2, C) : perf_grid.beat >> 2));
         o = ncat(scat(o, "."), 1 + (perf_grid.beat & 3));
         if (C) ncat(scat(o, "/"), C);
@@ -407,7 +417,7 @@ static void play(void)
         softtext(a, 42 * i + 26 - ((softw(a) - 1) >> 1));
         pinfo(t, &p);
         if (IS_FTSW(t)) {                        /* a footswitch: a box when off, filled when on */
-            if (shown(3 + i) && ftsw_on(t)) invert(42 * i + 2, 57, 42 * i + 41, 63);
+            if (perf_pending(3 + i) >= 0 ? shown(3 + i) : ftsw_on(t)) invert(42 * i + 2, 57, 42 * i + 41, 63);   /* waiting: it blinks */
             else rect(42 * i + 2, 57, 42 * i + 41, 63, 3);
         } else if (shown(3 + i) && (!SOFT_AWAY || (p.dcc != 255 && perf_value(t) != p.dcc))) invert(42 * i + 2, 57, 42 * i + 41, 63);
         h = ARN[i] == 3 ? 5 : 3;
@@ -416,8 +426,7 @@ static void play(void)
 }
 
 /* ---- SETUP -------------------------------------------------------------------------------- */
-static const char *const WHEN[NX_N] = { "NOW", "1BEAT", "2BEAT", "4BEAT", "8BEAT", "1BAR", "2BAR", "4BAR", "8BAR", "16BAR", "32BAR",
-                                        "1CYC", "2CYC", "4CYC", "8CYC", "16CYC", "32CYC" };
+static const char *const WHEN[NX_N] = { "NOW", "1BEAT", "2BEAT", "4BEAT", "8BEAT", "1BAR", "2BAR", "4BAR", "8BAR", "16BAR", "32BAR" };
 static const char *const LAG[LG_N] = { "OFF", "MICRO", "50MS", "100MS", "500MS", "1S", "1BEAT", "2BEAT", "4BEAT", "8BEAT",
                                        "1BAR", "2BAR", "4BAR", "8BAR", "16BAR", "32BAR" };
 static const char *const CN[NCTL] = { "KNOB 1", "KNOB 2", "KNOB 3", "LEFT BTN", "DOWN BTN", "RIGHT BTN", "FOOTSW" };
@@ -430,7 +439,7 @@ static void mv_text(int t, unsigned short m, char *o)    /* "80 1BAR", "-" */
 {
     if (MV_NEXT(m) == NX_UNUSED) { scat(o, "-"); return; }
     val_text(t, MV_VALUE(m), o);
-    scat(scat(o + slen(o), " "), WHEN[MV_NEXT(m) < NX_N ? MV_NEXT(m) : 0]);
+    scat(scat(o + slen(o), " "), WHEN[MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1]);
 }
 
 static void ges_text(int c, int g, char *o)              /* a gesture's moves: 80>30 */
@@ -561,8 +570,8 @@ static void move(void)                           /* a stock knob page: frame, ta
     ctl(t, un ? 0 : MV_VALUE(m), 8, 24);
     a[0] = 0; val_text(t, un ? -1 : MV_VALUE(m), a);
     font7r(a, 8 + 30, 48);
-    k = un ? 0 : MV_NEXT(m);
-    font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k < NX_N ? k : 0], 48 + 30, 48);
+    k = un ? 0 : MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1;
+    font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k], 48 + 30, 48);
     k = un ? 0 : MV_LAG(m);
     font7("Lag", 88, 16); KP_KNOB(0, KP_DIVD(k, LG_N - 1), 88, 24); font7r(LAG[k], 88 + 30, 48);
     invert(5, 57, 41, 63);                       /* softkey40: nothing, EXIT, nothing */

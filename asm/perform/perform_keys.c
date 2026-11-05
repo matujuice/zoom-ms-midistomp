@@ -104,7 +104,7 @@ static void release(int c)
     int s = st[c];
     st[c] = 0;
     if (c != C_FTSW && sw(c)) V_PDOWN = ZMT_FTSW = 0;
-    if (s == 4) perf_gesture(c, G_PRESS, 0);    /* MOMENTARY: the release flips it back */
+    if (s == 4) perf_momentary(c, 1);           /* MOMENTARY: the release flips it back */
     if (s == 2) perf_gesture(c, G_HOLD, 1);
     else if (s == 1 && !sw(c) && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
 }
@@ -232,6 +232,10 @@ void perf_poll(void)
     sync();
     if (perf_on != 1) return;
     for (c = 0; c < NCTL; c++)
-        if (st[c] == 1 && pu_t - td[c] >= (c == C_FTSW ? FTSW_HOLD_MS : HOLD_MS) && (st[c] = ftsw_hold(c)) == 2) perf_gesture(c, G_HOLD, 0);
+        if (st[c] == 1 && pu_t - td[c] >= (c == C_FTSW ? FTSW_HOLD_MS : HOLD_MS)) {
+            st[c] = ftsw_hold(c);
+            if (st[c] == 2) perf_gesture(c, G_HOLD, 0);
+            if (st[c] == 4) perf_momentary(c, 0);
+        }
     if (++polls >= REDRAW_POLLS) { polls = 0; EVENT_POST(MAILBOX, 0x40); }
 }

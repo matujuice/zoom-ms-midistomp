@@ -68,7 +68,7 @@ Small things that make the stock pedal nicer to live with.
 | Change | What it does |
 |---|---|
 | **Tempo Lock** | set the tempo by turning the knob or tapping, and keep one tempo across patches |
-| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or works as a momentary switch |
+| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or flips the effect only while held |
 | **Faster scrolling** | on the effect select (carousel) screen, left/right scroll faster and wrap around from the last effect to the first |
 | **Button combos** | down + right = tuner, down + left = tempo |
 | **EXIT goes back** | EXIT returns to the MENU entry you left |

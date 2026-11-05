@@ -73,6 +73,8 @@ typedef struct {
     volatile unsigned aud, own;     /* busy cycles: whole audio blocks, master_tap's part (master_tap) */
     unsigned ui;                    /* master_poll's cycles, audio taken out */
     int np, lk;                     /* polls in this CPU window, its menu entry */
+    unsigned la, lt;                /* aud and CYC at the last poll */
+    int full;                       /* the audio takes almost the whole core: analysis paused (#55) */
 } St;
 
 #ifndef MS_ST
@@ -1033,18 +1035,25 @@ void master_tap(unsigned t0)        /* t0: TSCL at the block's start (engine.c) 
 
 static void poll(St *s)
 {
+    unsigned now = CYC, da = s->aud - s->la, dt = now - s->lt;
+    int f, post;
     if (MS_MODE != 11 || MS_SCREEN != 11 || (MS_MENU_ENTRY != 3 && MS_MENU_ENTRY != 6)) { MS_ON = 0; return; }
-    if (MS_MENU_ENTRY == 6) {
+    /* The UI shares the core with the audio: near 100% DSP the 16 ms analysis never ends and starves the keys
+     * and footswitches (#55). Pause it above 7/8 audio, resume below 3/4. */
+    s->la = s->aud; s->lt = now;
+    f = s->full ? da > dt - (dt >> 2) : da > dt - (dt >> 3);
+    post = f != s->full;
+    s->full = f;
+    if (f) s->rd = s->w;
+    else if (MS_MENU_ENTRY == 6) {
         kal_poll(s);
-        if ((++s->tick & 3) == 0) { kal_frame(s); EVENT_POST(MAILBOX, 0x40); }
-        return;
+        if ((++s->tick & 3) == 0) { kal_frame(s); post = 1; }
+    } else {
+        if (MS_CUR_PATCH != s->patch) { s->patch = MS_CUR_PATCH; reset_stats(); }
+        consume();
+        if ((++s->tick & 3) == 0) { advance(); post = 1; }
     }
-    if (MS_CUR_PATCH != s->patch) { s->patch = MS_CUR_PATCH; reset_stats(); }
-    consume();
-    if ((++s->tick & 3) == 0) {
-        advance();
-        EVENT_POST(MAILBOX, 0x40);
-    }
+    if (post) EVENT_POST(MAILBOX, 0x40);       /* one call site: a second one makes -ms3 use __c6xabi_call_stub */
 }
 
 /* 16 ms while open: the poll, and every 64 polls (1.02 s) MASTER's or KALEIDO's CPU load (its polls with
@@ -1098,6 +1107,12 @@ void master_draw(void)
     volatile unsigned *l = LCD0;
     if (!inited) { init(); inited = 1; }
     if (!MS_ON) { s->rd = s->w; MS_ON = 1; }
+    if (s->full) {
+        for (i = 0; i < 256; i++) l[i] = 0;
+        font7c("CPU FULL", 64, 28);           /* EXIT still works */
+        LCD_DIRTY(0);
+        return;
+    }
     if (MS_MENU_ENTRY == 6) { draw_kal(); LCD_DIRTY(0); return; }
     for (i = 0; i < 256; i++) l[i] = 0;
     o = icat(t, p + 1); scat(o, "/6");

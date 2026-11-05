@@ -53,7 +53,7 @@
 
 /* ---- A move: two bytes (storage E) ------------------------------------- *
  * bits 0-6   VALUE 0-127, in CC units (the screen shows the target's range)
- * bits 7-11  NEXT 0-16 (table below), 31 = unused move (VALUE "-")
+ * bits 7-11  NEXT 0-10 (table below), 31 = unused move (VALUE "-")
  * bits 12-15 LAG 0-15 (table below) */
 #define MV_VALUE(m) ((m) & 127)
 #define MV_NEXT(m) ((m) >> 7 & 31)
@@ -61,7 +61,7 @@
 #define MV(v, n, l) ((unsigned short)((v) | (n) << 7 | (l) << 12))
 #define MV_UNUSED MV(0, NX_UNUSED, 0)
 
-/* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR; 11-16 = 1..32 CYC.
+/* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR (v2.0 saved 11-16 = CYC: now 32 BAR).
  * Action / Release: the next line of that grid, counted from bar 1.
  * Follow: exactly that long after its Action / Release landed (Turn: the next line).
  * No clock running: the grid runs at the pedal tempo from bar 1 (entering Perform,
@@ -69,8 +69,7 @@
 #define NX_NOW 0
 #define NX_BEAT 1
 #define NX_BAR 5
-#define NX_CYC 11
-#define NX_N 17
+#define NX_N 11
 #define NX_UNUSED 31
 
 /* LAG: 0 OFF, 1 MICRO, 2-4 = 50/100/500 ms, 5 = 1 s, 6-9 = 1,2,4,8 BEAT,
@@ -107,6 +106,7 @@ extern volatile int perf_on;    /* 1 while screen 11 shows PERFORM (play), 2 SET
 /* Engine API (audio block and 16 ms poll). */
 void perf_block(void);                        /* top of engine_run: grid, due moves, lags, LED */
 void perf_gesture(int ctl, int gesture, int phase); /* phase 0 press/turn, 1 release (hold) */
+void perf_momentary(int ctl, int phase);       /* HOLD FOR MOMENTARY: 0 hold seen, 1 release */
 void perf_turn(int ctl, int steps);           /* knob turn: moves the target now, schedules TURN_F */
 void perf_loop_event(int ev);                 /* L_*: from the looper's state words */
 void perf_reset(void);                        /* MIDI Start/Stop, patch change: cancel all */
