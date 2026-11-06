@@ -295,7 +295,7 @@ trailer sector (`0x0EF000`); the erase just before the write is the trailer eras
    that. Running Zoom's own updater later rewrites the file system (and the bootloader).
 6. **Bootloader never written** (`flash.py:19-22`): this keeps Up+Down update mode as the
    recovery path (`docs/safety.md:3-6`). Matches their note.
-7. **Wire protocol is not in this repo.** We only know the step table (type, address, length,
+7. **Wire protocol: captured 2026-11-06**, see [flash-protocol.md](flash-protocol.md) (erase `0A`, write `02` in 2048-byte chunks with a CRC-32, finish `04`, one ack per message). Earlier note: We only know the step table (type, address, length,
    resource) that the updater sends to the bootloader over USB MIDI; the bytes themselves
    ("the bytes the pedal is sent are unchanged", `docs/flashing.md:24-26`) were never
    captured here. Their `0A / 02 / 04` therefore cannot be checked by us. Also unknown:
@@ -413,9 +413,10 @@ Inside the pack, on purpose: GRDELAY/BarDelay 495, Breather/Pump 493, GRDLOOP/Lo
 effects take 481-484, 492, 494, 498+ (`NEW-EFFECTS.md:17`); 512 (CRN_TRI) is the only stock
 number above 496.
 
-No renumbering needed. Left to do: ask for gid 8, fxid 480-511 in Modwerk's ledger. Not
-checked: that the OS keys its effect file list by gid + fxid too (STEREO.md says so; no
-hardware test with CRN_CHO and DualShft both installed found).
+No renumbering needed against stock. On the pedal (Luca, 2026-10-31): Sweep 8/496 and stock
+ANA234CH 6/496 load together in one patch, so the OS tells effects apart by gid + fxid.
+Left to do: save, power-cycle and reload that patch; ask for gid 8, fxid 480-511 in Modwerk's
+ledger (other packs also use group 8, 403-957).
 
 ### 5.4 Transport block as a shared contract
 

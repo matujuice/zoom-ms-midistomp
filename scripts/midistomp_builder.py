@@ -17,6 +17,8 @@ drags the app into the Terminal window.
 from __future__ import annotations
 
 import hashlib
+import re
+import tempfile
 import shlex
 import subprocess
 import sys
@@ -27,16 +29,32 @@ from zoomms import cli, macapp, models
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 NAME = "MIDISTOMP V2.0.1"
 BASE = ["version-2.0.1", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
-PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
+PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0.1 Updater.exe"
 OUT_NAME_MAC = "MIDISTOMP V2.0.1 Updater.app"
 
 
+def identity_tag(name: str = NAME) -> str:
+    """The identity reply's 4 version bytes: "M" + the version digits ("V2.0.1" -> "M201")."""
+    digits = "".join(re.findall(r"\d", name.rsplit("V", 1)[-1]))
+    if len(digits) != 3:
+        raise ValueError(f"{name}: the identity tag needs a 3-digit version (x.y.z, one digit each)")
+    return "M" + digits
+
+
 def build(updater: Path, out: Path, mac: bool = False) -> int:
     argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out)]
-    for p in PATCHES:
-        argv += ["--patch", str(ROOT / "patches" / f"{p}.yaml")]
-    return cli.main(argv)
+    with tempfile.TemporaryDirectory() as tmp:
+        for p in PATCHES:
+            path = ROOT / "patches" / f"{p}.yaml"
+            if p == "identity-tag":  # the tag follows NAME, so it never goes stale
+                text = path.read_text(encoding="utf-8")
+                assert 'data: "4d323031"' in text, "identity-tag.yaml data line changed"
+                text = text.replace('data: "4d323031"', f'data: "{identity_tag().encode().hex()}"')
+                path = Path(tmp) / path.name
+                path.write_text(text, encoding="utf-8")
+            argv += ["--patch", str(path)]
+        return cli.main(argv)
 
 
 def sign_for_this_mac(app: Path) -> bool:

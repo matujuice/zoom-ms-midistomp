@@ -1,0 +1,14 @@
+# MIDISTOMP tag in the identity reply (Modwerk hello, step A). The OS copies the 4-byte
+# text at 0xC00ECCE8 ("2.10") into the reply's version bytes (one code reference,
+# 0xC00AD36C); the boot screen uses its own string. Stock reply:
+#   F0 7E 00 06 02 52 61 00 00 00 32 2E 31 30 F7   ("2.10"; the bootloader says "1.10")
+# With this patch the last 4 bytes read "M201" (MIDISTOMP 2.0.1). Tested 2026-11-06 on Luca's
+# MS-70CDR: reply reads M201, Effect Manager still works.
+name: identity-tag
+description: identity reply version bytes "2.10" -> "M201"
+builds: [ms70cdr-2.10]
+write:
+  - model: ms70cdr-2.10
+    addr: 0xC00ECCE8
+    expect: "322e3130"
+    data: "4d323031"   # "M201"; midistomp_builder.py sets it from its NAME on every build
