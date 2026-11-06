@@ -41,9 +41,11 @@ def test_hooks_call_the_diag_vectors():
 
 def test_probe_hooks_and_dsp_limit_unchanged():
     probe = {w["addr"]: w for w in PROBE["write"]}
-    for addr in (0xC00BB52C, 0xC00C6998, 0xC00A93D0, 0xC00A8364):
+    for addr in (0xC00C6998, 0xC00A93D0, 0xC00A8364):
         assert _site(addr)["expect"] == probe[addr]["expect"]
-    assert _site(0xC00BB52C)["data"] == probe[0xC00BB52C]["data"]
+    (dsp,) = patcher.load(ROOT / "patches/dsp-limit.yaml")["write"]                # shipped in v2.0, not in diag
+    assert (dsp["expect"], dsp["data"]) == (probe[0xC00BB52C]["expect"], probe[0xC00BB52C]["data"])
+    assert all(w["addr"] != 0xC00BB52C for w in PATCH["write"])
 
 
 def test_section_layout():
@@ -51,7 +53,7 @@ def test_section_layout():
     assert img[40:44] == (0x47414944).to_bytes(4, "little")       # the magic engine.c checks
     for key, off in SEC["stamp"].items():
         assert img[off:off + 16].rstrip(b"\0") == f"<{key}>".encode()
-    menu = _site(0xC00F60D4)
+    menu = _site(0xC00F60D8)
     name = int.from_bytes(bytes.fromhex(menu["data"]), "little") - VEC
     assert img[name:name + 7] == b"SYSTEM\0"
     assert VEC + len(img) <= 0xC00F5400                             # below lbox.c

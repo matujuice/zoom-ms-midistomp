@@ -45,7 +45,7 @@ else: static cover. The meter stays switched off on the pedal for this build (NE
   when free and EMPTY). If the patch-load hook costs more than a few lines, check the slot's effect id
   instead. Test: host or pedal, GRDLOOP -> StompDly patch change, bar gone; cursor off GRDLOOP, bar gone.
 
-**GRDELAY (GridDly) ~1 s dropout on footswitch with stereo input:** the effect. The firmware's flip path
+**GRDELAY ~1 s dropout on footswitch with stereo input:** the effect. The firmware's flip path
 is the same for every effect and stock effects don't drop out. Fixed in the effects stereo port
 (reproduce in a host test first, per STEREO.md). Only if the host test can't reproduce it and the pedal
 still does after the port does it come back to the firmware.
@@ -82,7 +82,8 @@ clock from the first FOOTSW press; truncated mono shows " M". 32-bar cycle is no
 - **Space:** the mixer/perform C section (`patches/mixer-m2.yaml`) has 32 bytes left; looper hooks 4.
   Session 5 must free space before adding to `asm/perform/` or `asm/mixer/`.
 - `tests/test_looper_patch.py` skips here (no GNU tic6x binutils); hex came from the TI assembler,
-  which reproduced the old hex byte for byte. Re-run it once where binutils exist.
+  which reproduced the old hex byte for byte. Luca accepted the TI check for beta2 (2026-10-28); GNU
+  binutils exist on no machine here (they need Linux/WSL).
 - Guide changes for session 4: memory table (`user-guide.md` ~472: 8 bars stereo from ~79 BPM, 4 bars
   from ~40), " M" for truncated mono, PERFORM CYCLE needs LOOPER ON, counter starts at first FOOTSW
   press without clock, knob on Footsw (click toggles, turn sets), 32-bar cycle records 16 mono at 120

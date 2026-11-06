@@ -15,3 +15,7 @@ build/out/
 *.exe
 *.dat
 work/
+
+# Local tools and debug output, never committed
+MS-50G_EffectManager*/
+*.pdb

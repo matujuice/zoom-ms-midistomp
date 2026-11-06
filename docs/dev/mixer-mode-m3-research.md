@@ -79,7 +79,7 @@ place (e.g. a hook near `0xC00B6CF4`, after the record swap), and shifted by add
 
 | what | address | conf | evidence |
 |---|---|---|---|
-| Play-mode draw | `0xC00BA9D8..BAA52`: slot from CURSOR_SLOT `0xC00EE748`; `VIEW_KNOBS[view]` (`0xC009D398`) != 0 -> **`0xC00CAFA0(view, slot)`** (knob pages) else `0xC00AA3D8(view, slot)` (covers); call at `0xC00BAA4C` | high | |
+| Play-mode draw | `0xC00BA9D8..BAA52`: slot from CURSOR_SLOT `0xC00EE748`; `VIEW_KNOBS` (`0xC009D398`, one word, not per view) != 0 -> **`0xC00CAFA0(view, slot)`** (knob pages) else `0xC00AA3D8(view, slot)` (covers); call at `0xC00BAA4C` | high | |
 | Knob pages `0xC00CAFA0` | 3 columns (loop `0xCB014..0xCB1D4`: value `0xA95A4`, text, `0xA0040`); parameter count `0xC00B0594`; pages `(n+2)/3` via `0xC00DB5A0` | medium-high | |
 | **Tab row** | loop `0xC00CB1E4..0xCB27C`: per tab, text from `0xC00BBA2C(slot)` with `"%s"` (`0xC00EC8C8`, first tab) or `"%d"` (`0xC00EC8CB`); state 0 current, 1/2 left/right; drawn with **`0xC00AB238(view, x, y 0, state, text)`** (returns width). Softkeys via `0xC009F834`: TAP, EXIT, PAGE | medium | |
 | A/B tag hook | after the tab loop, at the call to `0xC00BB92C(slot)` (`0xC00CB284`) or the end (`0xCB2E4`). A15 = slot, B11 = view. Tab row y 0-8; knob area clear y 11-53 (`0xC00AB1B4`) | medium | |

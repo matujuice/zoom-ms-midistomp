@@ -16,7 +16,7 @@ PREFIX = os.environ.get("C6X_PREFIX", "/opt/c6x/bin/tic6x-elf-")
 
 
 def available() -> bool:
-    return Path(PREFIX + "as").exists()
+    return Path(PREFIX + "as").exists() or Path(PREFIX + "as.exe").exists()  # .exe: Windows build
 
 
 def assemble(src: str | Path, addr: int, whole_packets: bool = False) -> bytes:

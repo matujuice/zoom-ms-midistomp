@@ -22,7 +22,7 @@
 ; Saving (pages.c mix_get / mix_put): the bus of each slot and settings
 ; 18-23 ride in byte 17 of the six 18-byte slot blocks of the packed 122-byte
 ; patch (free: bytes 0-16 are the effect's; bits 0-1 the bus, bits 2-6 the next 5
-; of the 21 bits of 18-23, bit 6 of block 6 marks this layout, bit 7 always 0: a
+; of the 22 bits of 18-23, bit 6 of block 6 marks this layout, bit 7 always 0: a
 ; SysEx round trip moves it), settings 0-10 in a table at the
 ; end of the global record 50 (R50, grown to 824 bytes, an entry per patch;
 ; then the Perform table, asm/perform/perform_store.c).
@@ -67,7 +67,7 @@
         .equ    MAXES, BASE + 296           ; [24] maximum of each setting
         .equ    DEFAULTS, BASE + 320        ; [24]
         .equ    NSET, 24
-        .equ    R50, 0xC01086E0             ; [6428] record 50 (chain.h)
+        .equ    R50, 0xC0116000             ; [11228] record 50 (chain.h)
         .equ    CUR_PATCH, 324              ; B14 offset: the patch played
 
         .equ    C_SEC, 0xC00F8000           ; chain_vec.asm vectors
@@ -173,15 +173,15 @@ vectors:
         .word   0, 0                        ; +128 PAGE
         .byte   0, 0, BUS_A, 0, NONE, 0, 0, PG_OUT ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .word   0, 0, 0, 0, 0, F_ONE, 0, 0  ; +144 GAINS: In, SendA, SendB, cA, cB, limiter, InR, MasterR
-        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, then free to +184
-        ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 SETTINGS (1),
-        ; 4 the version entry (9), 5 MASTER (11), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
+        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, +177 IDLE, +178 IDLE_SHOWN (chain.h), then free to +184
+        ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 MASTER (11), 4 SETTINGS (1),
+        ; 5 the version entry (9), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
         ; MIDI SETTINGS is the last SETTINGS row (pedal_in.c).
-        .byte   0, 0, 11, 1, 9, 11, 11, 0
+        .byte   0, 0, 11, 11, 1, 9, 11, 0
         .word   0                           ; +192 free
-        ; +196 MENU7: the stock menu entries with PERFORM MODE after EFFECT CHAIN
-        ; then MASTER and KALEIDO (all 7 used)
-        .word   0xC00E8FE4, 0xC00E8FF7, s_perform, 0xC00E9004, 0xC00E900D, s_master, s_kaleido
+        ; +196 MENU7: the stock menu entries with PERFORM MODE and MASTER after EFFECT CHAIN,
+        ; KALEIDO last (all 7 used)
+        .word   0xC00E8FE4, 0xC00E8FF7, s_perform, s_master, 0xC00E9004, 0xC00E900D, s_kaleido
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +224 LIVE
         .byte   PRE, PRE, PRE, PRE, PRE, PRE, 100, 100, 0, 0, 0, 0
         .byte   0, 50, 100, 100, 100, 50, 100, 1, 100, 100, 0, MAGIC ; +248 SAVED
@@ -693,7 +693,7 @@ pl_ret:
         mvkl    .S2     LP_MAGIC, b1
         mvkh    .S2     LP_MAGIC, b1
         nop     3
-        cmpeq   .L2X    a0, b1, b1          ; looper.yaml applied first: chain its poll
+        cmpeq   .L2X    b1, a0, b1          ; looper.yaml applied first: chain its poll
         addk    .S2     16, b15
         mvkl    .S2     POLL, b0
         mvkh    .S2     POLL, b0

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from zoomms import ais, patcher
@@ -52,5 +54,5 @@ def test_bin133_checks_stock_hash():
 
 
 def test_boot_logo_patch_is_one_screen():
-    p = patcher.load("patches/boot-logo.yaml")
+    p = patcher.load(Path(__file__).resolve().parent.parent / "patches/boot-logo.yaml")
     assert [(b["offset"], len(bytes.fromhex(b["data"]))) for b in p["bin133"]] == [(0, 1024)]

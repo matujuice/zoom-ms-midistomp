@@ -1,0 +1,154 @@
+# Effect select: the MS-50G 3.10 category screen on the MS-70CDR 2.10 OS.
+#   Both OSes share the screen code and the effect lists behind it; only the
+#   data differs. This copies the MS-50G data:
+#       DYN/FLTR  OD/DIST  AMP        gid 1 3 4
+#       MOD/SFX   DLY/REV  EXIT           6 8
+#   ENTER on a spot puts the first effect of its gid in the unit; the effect
+#   knob then scrolls on through the sorted list, so filters (gid 2) follow
+#   DYN, SFX (7) follow MOD and reverbs (9) follow DLY, as on the MS-50G.
+#   ENTER on EXIT leaves; ENTER on a category with no effect loaded puts
+#   effect 0 in the unit, a blank unit, as the MS-50G.
+# Design: asm/fx_category/fxcat.S. The hex below is generated from it with
+#   scripts/build_mixer_ui.py's assemble (TI CGT) at 0xC00F2A00, and
+#   tests/test_fx_category_patch.py checks it still matches the source.
+name: fx-category
+description: Effect select, the MS-50G 3 x 2 category screen
+builds: [ms70cdr-2.10]
+write:
+  # Cursor move: mod 5 -> mod 6, the MS-50G bytes (mvk.l2 6, b4; add.l1 a0, 6, a4)
+  - model: ms70cdr-2.10
+    addr: 0xC00A7A50
+    expect: "27a6"
+    data: "27c6"
+  - model: ms70cdr-2.10
+    addr: 0xC00A7A56
+    expect: "40a4"
+    data: "40c4"
+  # Keys 68 / 70 (stock -3 / +3) -> prev / next, column-wise as the MS-50G
+  - model: ms70cdr-2.10
+    addr: 0xC00EF18C
+    expect: "ba7a0ac0"
+    data: "102b0fc0"
+  - model: ms70cdr-2.10
+    addr: 0xC00EF194
+    expect: "ca7a0ac0"
+    data: "002b0fc0"
+  # Draw: labels 1-4 (CHO DLY REV DYN/FLTR) -> the MS-50G strings DYN/FLTR, OD/ DIST, AMP, MOD/SFX
+  - model: ms70cdr-2.10
+    addr: 0xC00A9078
+    expect: "a9f14802"
+    data: "a94b1502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9084
+    expect: "69076002"
+    data: "e9076002"
+  - model: ms70cdr-2.10
+    addr: 0xC00A908C
+    expect: "a9f34802"
+    data: "293c1502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9094
+    expect: "69076002"
+    data: "e9076002"
+  - model: ms70cdr-2.10
+    addr: 0xC00A90A0
+    expect: "a9f54802"
+    data: "a9401502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A90A8
+    expect: "69076002"
+    data: "e9076002"
+  - model: ms70cdr-2.10
+    addr: 0xC00A90B0
+    expect: "a8f74802"
+    data: "a8421502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A90C0
+    expect: "68076002"
+    data: "e8076002"
+  # Draw: label 4 (MOD/SFX) at x 3 (was 24), mvk.l2 3, b4, as the MS-50G
+  - model: ms70cdr-2.10
+    addr: 0xC00A90B6
+    expect: "131a"
+    data: "2766"
+  # Draw: callp box (0xC00A0144) at spot 5 -> draw (DLY/REV label, EXIT box at the MS-50G place)
+  - model: ms70cdr-2.10
+    addr: 0xC00A90D4
+    expect: "9210ee1f"
+    data: "123c9310"
+  # Draw: EXIT text at x 92 (was 71)
+  - model: ms70cdr-2.10
+    addr: 0xC00A90E0
+    expect: "aa230003"
+    data: "2a2e0003"
+  # Draw: EXIT icon at x 90 (was 69), mvk.s1 90, a6
+  - model: ms70cdr-2.10
+    addr: 0xC00A90FA
+    expect: "52a3"
+    data: "525b"
+  # Draw: EXIT arrow box x 113..120 (was 92..99)
+  - model: ms70cdr-2.10
+    addr: 0xC00A910E
+    expect: "7363"
+    data: "731b"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9112
+    expect: "539a"
+    data: "7332"
+  # Draw: cursor box x / y tables (5 spots, other data follows) -> xs / ys (6 spots)
+  - model: ms70cdr-2.10
+    addr: 0xC00A912C
+    expect: "2a346503"
+    data: "2a0c1503"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9130
+    expect: "6a076003"
+    data: "ea076003"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9134
+    expect: "2a40e502"
+    data: "2a189502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A9138
+    expect: "6a07e002"
+    data: "ea07e002"
+  # ENTER: [B0] bnop 0xC00A7BE6 (cursor 4 = EXIT) -> b enter (cursor 5 = EXIT, an empty category gives effect 0); the next packets (B1 = screen, B0 = 33) run in its delay slots
+  - model: ms70cdr-2.10
+    addr: 0xC00A7B00
+    expect: "20a17320"
+    data: "10089600"
+  # ENTER, change effect (screen 32): the gid table 0xC00ECAC8 -> tbl
+  - model: ms70cdr-2.10
+    addr: 0xC00A7B20
+    expect: "2a64e502"
+    data: "2a009502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A7B24
+    expect: "6a07e002"
+    data: "ea07e002"
+  # ENTER, add effect unit (screen 33): the same table -> tbl
+  - model: ms70cdr-2.10
+    addr: 0xC00A7BD4
+    expect: "2a64e502"
+    data: "2a009502"
+  - model: ms70cdr-2.10
+    addr: 0xC00A7BD8
+    expect: "6a07e002"
+    data: "ea07e002"
+section:
+  # tbl, xs, ys, nxt, prv, the 5 MS-50G strings; draw (+160), next (+256), prev (+272), enter (+320)
+  - model: ms70cdr-2.10
+    addr: 0xC00F2A00
+    source: asm/fx_category/fxcat.S
+    data: >-
+      010000000300000004000000060000000800000000000000010000002b000000
+      55000000010000002b000000550000000a0000000a0000000a00000024000000
+      2400000024000000030000000400000005000000010000000200000000000000
+      0500000003000000040000000000000001000000020000004f442f2044495354
+      00414d50004d4f442f5346582000444c592f524556200044594e2f464c545200
+      f654bc012b68950128471502eb07e001e80760022a9a45006a05600062030000
+      aa160002281300035aa3100300200000e652bc012aa200006a05600062030000
+      59a30002aa2b0002291300032a3e0003291e00045aa304040020000000000000
+      2924950112030000e807e0010060000028309501e807e001d81f900264aa0c02
+      2af83d006a056000004000007c5900026203000058a304020060000000000000
+      2b823d005aaa90006a0560002af33d406a056040620300000080000000000000

@@ -4,7 +4,11 @@
  * Replaces looper.S draw_pre at the callp 0xC00BB0EC (patches/looper.yaml); the poll's
  * redraw check stays in looper.S (S_PROG's bar/beat bits change every beat).
  * Cover: the GRDLOOP cover's bar (make_cover.py) x 0-127, y 17-34, pixel for pixel.
- * Knob pages: none (Luca, PERFORM11: it clashed with the page title).
+ * Only while the cursor is on the claimant's slot, read at draw time: S_MINE (the poll's copy)
+ * lags the screen by one poll, so the bar showed on other effects' covers (v2.0 beta). The slot comes
+ * from the table mixer.S and zdl_meter.h use (0xC00EE748, 6 x view + cursor); the old ...948 table was wrong.
+ * Knob pages: none (Luca, PERFORM11: it clashed with the page title). v2.0 still showed it on knob page 2+
+ * (v2.0.1 bug 9, cause not found), so the bar now also needs the stock cover drawn this frame (lbox_cover).
  * Data: docs/dev/looper-services.md (S_TEXT, S_PROG, S_LEFT). Built by scripts/build_looper_ui.py. */
 
 #define FN(addr, ret, args) ((ret (*) args)(addr))
@@ -15,15 +19,19 @@
 #define S_TEXT 68
 #define S_PROG 76
 #define S_LEFT 120
-#define MODE (*(volatile int *)(0xC00EF748u + 320))      /* 0 play; S_MINE lags it by one poll */
+#define MODE (*(volatile int *)(0xC00EF748u + 320))      /* 0 play */
+#define CURSOR (*(volatile signed char *)0xC009C064)      /* cursor of view 0 (services.inc) */
+#define VIEW (*(volatile unsigned *)0xC009D8F8)            /* play-mode view */
+#define CURSOR_SLOT ((volatile unsigned *)0xC00EE748)     /* [6 x view + cursor]: the slot under it (mixer.S CURSOR_SLOTS) */
 #define CUR_PATCH (*(volatile int *)(0xC00EF748u + 324))  /* patch played, 0-49 */
 #define PENDING (*(volatile int *)(0xC00EF748u + 340))   /* a prompt over the Effect View */
-#define VIEW_KNOBS (*(volatile int *)0xC009D398)          /* 1 knob pages, 0 cover */
+#define KNOBS (*(volatile int *)0xC009D398)               /* knob pages shown, 0 cover: one word, not per view (stock 0xC00BAA2C) */
 #define FB ((volatile unsigned char *)0x11816800)         /* page format: 128 bytes per 8 rows */
 #define FB_DIRTY (*(volatile unsigned char *)0xC00EEBB0)  /* bit = 8-row page to send */
 #define FONT7 ((const unsigned char *)0xC00E87D8)         /* 7 column bytes per character */
 #define OVL_GET FN(0xC00CCD6C, int, (int))                /* -1 = no overlay */
 #define LCD_GATE FN(0xC00D5720, int, (int))               /* the stock call we sit in front of */
+#define COVER_DRAW FN(0xC00AA3D8, int, (int, int))        /* the cover (view, slot), from the play draw 0xC00BAA40 */
 
 static void px(int x, int y, int op)                      /* 0 clear, 1 set, 2 invert */
 {
@@ -146,15 +154,27 @@ static void bar(int x0, int y0, int x1, int y1, int s, int margin)
     for (y = y0 >> 3; y <= y1 >> 3; y++) FB_DIRTY |= (unsigned char)(1u << y);
 }
 
+static int cover;                                         /* the stock cover was drawn since the last lbox_draw */
+
+/* the callp at 0xC00BAA40: the play draw's cover call */
+int lbox_cover(int view, int slot)
+{
+    cover = 1;
+    return COVER_DRAW(view, slot);
+}
+
 /* the callp at 0xC00BB0EC: A4 = the stock call's argument */
 int lbox_draw(int a4)
 {
     static int seen = -1;
+    int c = CURSOR, drawn = cover;
+    cover = 0;
+    unsigned v = VIEW;
     if (CUR_PATCH != seen) {                              /* a patch load: drop the old claim (a new effect in the same slot can share its pointer); the ZDL re-claims */
         seen = CUR_PATCH;
         SV(S_CLAIM) = 0; SV(S_SLOT) = (unsigned)-1; SV(S_MINE) = 0;
     }
-    if (SV(S_MINE) && !MODE && !PENDING && !VIEW_KNOBS && OVL_GET(0) == -1)
+    if (drawn && SV(S_CLAIM) && c >= 0 && c < 6 && v < 6 && CURSOR_SLOT[6 * v + c] == SV(S_SLOT) && !MODE && !PENDING && !KNOBS && OVL_GET(0) == -1)
         bar(0, 17, 127, 34, 2, 4);                        /* the cover only */
     return LCD_GATE(a4);
 }

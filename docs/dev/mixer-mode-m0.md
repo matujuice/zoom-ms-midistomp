@@ -392,9 +392,9 @@ declared 20). Old = the v1 table in the pack's docs/STEREO.md (settings differ).
 | 5 GAIN | 258 / 4 005 | |
 
 Patch A sums to about 36 700: fits. Patch B (Breather 7 381, Choral 22 371, DirtBox 11 015,
-DualShft 11 355, DubSiren 9 391, GridDly 9 980) sums to about **71 500, more than the 54 422 of a
+DualShft 11 355, DubSiren 9 391, GRDELAY 9 980) sums to about **71 500, more than the 54 422 of a
 block**, at a declared 203: the patch overruns, and its per-slot numbers (2-3x the old ones, even
-GridDly) are inflated, not usable as costs. **[I]** The inflation comes from interrupts landing
+GRDELAY) are inflated, not usable as costs. **[I]** The inflation comes from interrupts landing
 inside the timed calls.
 
 - The P2 name check (descriptor's audio function = `FX_TABLE[slot]`) passed on every slot, so the

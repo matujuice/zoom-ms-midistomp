@@ -186,7 +186,7 @@ const rect = (x, y, w, h, c = INK) => { fill(x + 1, y, w - 2, 1, c); fill(x + 1,
 // name, channel type (mono / m2s = mono in stereo out / linked / dual = dual mono), DSP cost, knobs, defaults
 const TYPES = [
   ["DirtBox", "mono", 15, ["Gain", "Tone", "Level"], [60, 45, 80]],
-  ["GridDly", "m2s", 25, ["Time", "Grid", "Mix"], [40, 8, 35]],
+  ["GRDELAY", "m2s", 25, ["Time", "Grid", "Mix"], [40, 8, 35]],
   ["Breather", "linked", 20, ["Depth", "Rate", "Mix"], [60, 25, 50]],
   ["Sweep", "mono", 10, ["Freq", "Reso", "Rate"], [30, 70, 20]],
   ["EuGate", "dual", 5, ["Notes", "Steps", "Shift"], [16, 16, 0], 16],
@@ -215,7 +215,7 @@ function reset() {
   Object.assign(MIX.vals, { xf: 50, out: 0, curve: 1, al: 100, bl: 100, ph: 0, ma: 0, mb: 0, solo: 0 });
   Object.assign(IN.vals, { inl: 100, inr: 100 });
   Object.assign(OUT.vals, { master: 100, mr: 100 });
-  Z = { PRE: [mk("DirtBox")], A: [mk("GridDly")], B: [mk("Breather"), mk("Sweep", false)], POST: [mk("EuGate")] };   // 5 of 6, so one can be added
+  Z = { PRE: [mk("DirtBox")], A: [mk("GRDELAY")], B: [mk("Breather"), mk("Sweep", false)], POST: [mk("EuGate")] };   // 5 of 6, so one can be added
   S = { bus: "A", screen: "chain", cur: Z.A[0], sel: false, page: 0, msg: "", stereo: false, popup: "" };
 }
 const serial = () => ROUTE.vals.mode === 0 || ROUTE.vals.mode === 3;

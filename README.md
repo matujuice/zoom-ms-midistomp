@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/img/banner.jpg" alt="MIDISTOMP MOD v2.0 on the screen of a Zoom MultiStomp" width="720"></p>
+<p align="center"><img src="docs/img/banner.jpg" alt="MIDISTOMP MOD v2.0.1 on the screen of a Zoom MultiStomp" width="720"></p>
 
 <h1 align="center">MIDISTOMP 2.0</h1>
 
@@ -10,15 +10,11 @@ effect chain routing, a looper, Perform mode, mastering meters, and full MIDI co
 <a href="docs/user-guide.md#8-midi-and-the-cc-chart">MIDI chart</a> ·
 <a href="#demo">Demo</a> ·
 <a href="#custom-effects">Effects</a> ·
+<a href="#whats-next">Roadmap</a> ·
 <a href="#feedback-and-support">Feedback</a></p>
 
-<p align="center">
-<a href="https://paypal.me/matujuice"><img src="https://img.shields.io/badge/PayPal-matujuice-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
-<a href="https://buymeacoffee.com/matujuice"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-matujuice-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
-<a href="https://github.com/sponsors/matujuice"><img src="https://img.shields.io/badge/GitHub%20Sponsors-matujuice-ea4aaa?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors"></a>
-</p>
-<p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:<br>
-<a href="https://paypal.me/matujuice">PayPal</a> · <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a> · <a href="https://github.com/sponsors/matujuice">GitHub Sponsors</a></p>
+<p align="center">MIDISTOMP is free and made by one person with one pedal. If it makes your pedal more fun, a coffee keeps it going:</p>
+<h3 align="center">💙 <a href="https://paypal.me/matujuice">PayPal</a> · ☕ <a href="https://buymeacoffee.com/matujuice">Buy Me a Coffee</a></h3>
 
 <p align="center"><img src="docs/img/cover.jpg" alt="A Zoom MS-70CDR running MIDISTOMP, KALEIDO on the screen, wrapped in orange cables" width="720"></p>
 
@@ -36,9 +32,10 @@ updater.
 
 ## What 2.0 adds
 
-<p align="center"><img src="docs/img/mixer-chain.png" alt="Effect Chain screen with ROUTE, two parallel buses and MIX" width="200"> <img src="docs/img/perform.png" alt="PERFORM MODE" width="200"> <img src="docs/img/master.png" alt="MASTER SPECTRUM page" width="200"> <img src="docs/img/kaleido.png" alt="MASTER KALEIDO visual" width="200"></p>
+<p align="center"><img src="docs/img/mixer-chain.png" alt="Effect Chain screen with ROUTE, two parallel buses and MIX" width="200"> <img src="docs/img/perform.png" alt="PERFORM MODE" width="200"> <img src="docs/img/looper.png" alt="GRDLOOP recording, with the loop bar MIDISTOMP draws" width="200"></p>
+<p align="center"><img src="docs/img/master.png" alt="MASTER SPECTRUM page" width="200"> <img src="docs/img/kaleido.png" alt="MASTER KALEIDO visual" width="200"> <img src="docs/img/system-load.png" alt="SYSTEM LOAD page" width="200"></p>
 
-| | |
+| Feature | What it does |
 |---|---|
 | **EFFECT CHAIN ROUTING** | Your chain can branch now. `[ROUTE]` splits it into two parallel buses and `[MIX]` brings them back together, with crossfade, levels, mute and solo per bus. The nodes don't take effect slots, so you still get 6 effects. On the MS-70CDR (SETTINGS > INPUT: STEREO) Split sends L to bus A and R to bus B, and the output can send bus A left and bus B right. A safety limiter at the very end catches level boosts, so the output never clips. |
 | **PERFORM MODE** | Turn the pedal into an instrument: every knob, press and the footswitch gets a target (an effect knob, a routing control or the looper). Moves can wait for the next beat, bar or cycle, glide over time, and fire a follow move later. |
@@ -54,31 +51,37 @@ Everything is saved in the patch: routing, levels, the looper settings and the P
 
 <p align="center"><img src="docs/img/midi-menu.png" alt="MIDI menu" width="260"> <img src="docs/img/tempo-midi-clock.png" alt="Tempo screen with MIDI clock" width="260"></p>
 
-| | |
+| Message | What it does |
 |---|---|
 | **Program Change** | loads patches from a DAW, an app or a drum machine |
 | **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#8-midi-and-the-cc-chart) |
 | **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
 | **Patch up/down by CC** | CC 80 / 81 load the previous / next patch |
+| **Tap tempo by CC** | CC 82 taps the tempo, without the tempo screen |
 | **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
 
 ## QOL improvements
 
 Small things that make the stock pedal nicer to live with.
 
-| | |
+<p align="center"><img src="docs/img/effect-select.png" alt="ADD EFFECT UNIT: the MS-50G category screen" width="260"> <img src="docs/img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"></p>
+
+| Change | What it does |
 |---|---|
 | **Tempo Lock** | set the tempo by turning the knob or tapping, and keep one tempo across patches |
-| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or works as a momentary switch |
-| **Faster scrolling** | left/right move faster and wrap around |
+| **Fast knobs** | Perform, node and tempo knobs take bigger steps when turned fast, like the stock effect knobs |
+| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or flips the effect only while held |
+| **Faster scrolling** | on the effect select (carousel) screen, left/right scroll faster and wrap around from the last effect to the first |
 | **Button combos** | down + right = tuner, down + left = tempo |
 | **EXIT goes back** | EXIT returns to the MENU entry you left |
 | **INPUT MONO/STEREO** | tell the pedal which input it has, in SETTINGS |
+| **IDLE KALEIDO** | KALEIDO as a screen saver: at power-on and after 10 s to 2 min untouched, in SETTINGS |
 | **Levels up to 150** | Input and Master levels go past unity (100) |
+| **MS-50G effect select** | the category screen is the MS-50G's: DYN/FLTR, OD/DIST, AMP, MOD/SFX, DLY/REV and EXIT |
 
 ## Custom effects
 
-<p align="center"><a href="https://github.com/matujuice/zoom-ms-zdl-effects-pack"><img src="https://raw.githubusercontent.com/matujuice/zoom-ms-zdl-effects-pack/main/release/covers.png" alt="Effects from the Matujuice Zoom MS ZDL effects pack" width="640"></a></p>
+<p align="center"><img alt="effects pack cover v2 0" src="https://github.com/user-attachments/assets/2f8fa485-b7cb-44c6-ad30-2468fd3668cd" width="720"></p>
 
 **MIDISTOMP is at its best with the free custom effects from
 [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack).**
@@ -105,7 +108,7 @@ Synced gates, pitch shifters, delays, filters, the looper, a choir and more. New
 |---|---|
 | **MS-70CDR** | tested, with stereo input |
 | **MS-60B** | tested (v1.2), mono input |
-| **MS-50G** | tested (v1.2, from a Mac), mono input |
+| **MS-50G** | tested (v2.0, and v1.2 from a Mac), mono input |
 | MS-50G+, MS-70CDR+, MS-200D+ and the Four series | not supported: different hardware |
 
 One build runs on all three pedals. It is made from Zoom's MS-70CDR 2.10 firmware, so after the update every pedal
@@ -114,17 +117,23 @@ reports itself as an MS-70CDR over USB. If you run it on a pedal not listed as t
 
 ## Install
 
+Your patches are kept, but back them up first anyway, just in case (with your usual patch editor).
+
 1. Download [Zoom's official **MS-70CDR 2.10** updater](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/).
    Use it for every pedal, also the MS-50G and MS-60B.
-2. Drag it onto **MIDISTOMP-builder.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
-   It writes the MIDISTOMP updater next to it.
+2. Download **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
+   In File Explorer, drag Zoom's updater (`ZOOM MS-70CDR v2.10 Updater.exe`) and drop it on the builder's icon.
+   The builder writes **MIDISTOMP V2.0.1 Updater.exe** in the same folder.
 3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater.
+4. On the pedal, go to MENU > SETTINGS > **INPUT** and choose your input: **STEREO** on an MS-70CDR (needed for the
+   Split routing modes), **MONO** on the MS-50G and MS-60B.
 
-Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
+Full steps, Mac and Linux, and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
 
-**On a Mac:** it works today (tested on an MS-50G from an Apple Silicon Mac), but for now it's a bit of a ride:
-Python, a build script and re-signing the app in Terminal. A much easier Mac install is on the way. Until then,
-follow [On a Mac](docs/user-guide.md#on-a-mac).
+**On a Mac:** the same, with Zoom's **Mac** updater and **MIDISTOMP-builder-Mac** from the
+[releases](https://github.com/matujuice/zoom-ms-midistomp/releases) (AppleSilicon or Intel, to match your Mac): open
+the builder and drag Zoom's updater app into its window. It writes and signs the MIDISTOMP updater app. Tested on an
+MS-50G from an Apple Silicon Mac. Details in [On a Mac](docs/user-guide.md#on-a-mac).
 
 ## FAQ and troubleshooting
 
@@ -132,7 +141,7 @@ follow [On a Mac](docs/user-guide.md#on-a-mac).
   in USB) always works and you can flash again. Read [docs/safety.md](docs/safety.md) first.
 - **How do I go back to stock?** Enter update mode and run Zoom's original updater for your pedal. See
   [Recovery](docs/user-guide.md#recovery-and-going-back-to-stock).
-- **Does it work on a Mac?** Yes, see [On a Mac](docs/user-guide.md#on-a-mac). An easier Mac install is coming.
+- **Does it work on a Mac?** Yes, use MIDISTOMP-builder-Mac with Zoom's Mac updater. See [On a Mac](docs/user-guide.md#on-a-mac).
 - **Do my effects and patches survive?** Yes, the effects area is never touched.
 - **Which effects work?** All stock effects, and every effect in the pack. Effect Manager keeps working.
 - **No MIDI jacks?** MIDI runs over USB: plug into a computer or an iPhone/iPad, or use a USB-MIDI host box for
@@ -141,6 +150,15 @@ follow [On a Mac](docs/user-guide.md#on-a-mac).
 - **Something is wrong.** [Open an issue](https://github.com/matujuice/zoom-ms-midistomp/issues) with your pedal, your
   MIDISTOMP version, what you did and what happened.
 
+## What's next
+
+- **More than 6 effects per patch**, limited only by the DSP.
+- **PERFORM per gesture:** a different effect and parameter for each press, hold or turn (to be tested).
+- **Modwerk integration:** the MIDISTOMP firmware mods and the effects pack inside Modwerk, so you pick the mods and effects you want and flash them from the browser, without Python or a builder.
+- **More stereo effects** in the pack.
+
+Want something else? [Open an issue](https://github.com/matujuice/zoom-ms-midistomp/issues) and tell me.
+
 ## Feedback and support
 
 MIDISTOMP is made by one person with one pedal, so every report helps a lot. If something doesn't work, looks wrong,
@@ -148,7 +166,8 @@ or you have an idea, please [open an issue](https://github.com/matujuice/zoom-ms
 MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free. If it's useful to you, you can buy me a coffee:
-[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice) · [GitHub Sponsors](https://github.com/sponsors/matujuice)
+
+### 💙 [PayPal](https://paypal.me/matujuice) · ☕ [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
 
 ---
 
@@ -162,10 +181,20 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - **Contributing:** issues and pull requests are welcome. Run `pip install -e '.[midi,dev]'` and `pytest` before
   you send one, and say which pedal you tested on.
 - **Related projects:**
-  - [ZoomMultistompZDL](https://github.com/repeat98/ZoomMultistompZDL) (MIT): ZDL format, custom effect linker, loader safety notes.
+  - [ZoomMultistompZDL](https://github.com/themanro/ZoomMultistompZDL) (MIT): ZDL format, custom effect linker, loader safety notes.
   - [Zoom-Firmware-Editor](https://github.com/Barsik-Barbosik/Zoom-Firmware-Editor) (MIT): updater flash layout.
   - [zoom-zt2](https://github.com/mungewell/zoom-zt2): SysEx file transfer for the newer pedals.
 - **License:** [MIT](LICENSE).
+
+## Credits
+
+- [ZoomMultistompZDL](https://github.com/themanro/ZoomMultistompZDL) by Roman Rusinov (themanro): the ZDL format,
+  the custom effect linker and the loader safety notes.
+- [Zoom-Firmware-Editor](https://github.com/Barsik-Barbosik/Zoom-Firmware-Editor) by Barsik-Barbosik: the updater
+  flash layout.
+- [zoom-zt2](https://github.com/mungewell/zoom-zt2) by mungewell: SysEx file transfer.
+- Alexander Lim. The live screens and the zvis kit, the pedal's file-size cap and DSP limit, and linker pitfalls.
+- Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 

@@ -3,26 +3,33 @@ and it writes the MIDISTOMP updater next to it.
 
 Same output as `zoomms build` with the patch set (docs/flashing.md).
 Refuses any file that is not the stock updater (sha256 in models/ms70cdr.yaml).
-Frozen into MIDISTOMP-builder.exe by .github/workflows/builder.yml.
-The MS-50G build is frozen at tag v1.1; v1.2 is built from the MS-70CDR 2.10 OS.
+Frozen into MIDISTOMP-builder-Windows.exe and MIDISTOMP-builder-Mac-* by
+.github/workflows/builder.yml; neither holds Zoom code, each user brings Zoom's updater.
+The MS-50G build is frozen at tag v1.1; v1.2 and v2.0 are built from the MS-70CDR 2.10 OS.
 
 Also takes Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) and then writes
-MIDISTOMP V1.2 Updater.app, same as `zoomms build-mac`.
+MIDISTOMP V2.0.1 Updater.app, same as `zoomms build-mac`. On a Mac it then signs
+that app for this Mac (xattr + ad-hoc codesign), so it opens with a double-click.
+Started with no file (a double-click on the Mac), it asks for the path: the user
+drags the app into the Terminal window.
 """
 
 from __future__ import annotations
 
 import hashlib
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V1.2"
-PATCHES = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
-OUT_NAME = "MIDISTOMP V1.2 Updater.exe"
-OUT_NAME_MAC = "MIDISTOMP V1.2 Updater.app"
+NAME = "MIDISTOMP V2.0.1"
+BASE = ["version-2.0.1", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
+PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
+OUT_NAME = "MIDISTOMP V2.0.1 Updater.exe"
+OUT_NAME_MAC = "MIDISTOMP V2.0.1 Updater.app"
 
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:
@@ -32,11 +39,34 @@ def build(updater: Path, out: Path, mac: bool = False) -> int:
     return cli.main(argv)
 
 
+def sign_for_this_mac(app: Path) -> bool:
+    """The patched app no longer matches Zoom's signature; sign it ad hoc for this Mac."""
+    try:
+        subprocess.run(["xattr", "-cr", str(app)], check=True)
+        subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)], check=True)
+        return True
+    except (OSError, subprocess.CalledProcessError):
+        return False
+
+
+def ask_path() -> list[str]:
+    """Started without a file (double-click on a Mac): ask for it."""
+    print("Drag Zoom's MS-70CDR v2.10 updater (the .app) onto this window, then press Enter:")
+    try:
+        line = input().strip()
+        return shlex.split(line) if line else []  # Terminal pastes the path shell-escaped
+    except (EOFError, ValueError):
+        return []
+
+
 def run(args: list[str]) -> int:
+    if not args and getattr(sys, "frozen", False) and sys.platform == "darwin":
+        args = ask_path()
     if len(args) != 1:
         print(f"{NAME} builder\n\nDrag Zoom's official MS-70CDR v2.10 updater "
               "(ZOOM MS-70CDR v2.10 Updater.exe) onto this program.\n"
-              "On a Mac, pass Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) instead.")
+              "On a Mac, open this program and drag Zoom's Mac updater "
+              "(ZOOM MS-70CDR v2.10 Updater.app) into its window instead.")
         return 1
     updater = Path(args[0].rstrip("/"))
     mac = updater.suffix == ".app"
@@ -63,6 +93,14 @@ def run(args: list[str]) -> int:
     if failed:
         print("Build failed, nothing usable was written.")
         return 1
+    if mac:
+        sign = f'  xattr -cr "{out}"\n  codesign --force --deep --sign - "{out}"'
+        if sys.platform != "darwin":
+            print(f"\nOn the Mac, sign it before opening it:\n{sign}")
+        elif sign_for_this_mac(out):
+            print(f"\nSigned {out.name} for this Mac.")
+        else:
+            print(f"\nCould not sign it. In Terminal run:\n{sign}")
     print(f"\nDone: {out}\nFlash it in update mode (see the MIDISTOMP user guide).")
     return 0
 

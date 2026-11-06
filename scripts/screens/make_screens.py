@@ -57,6 +57,7 @@ SHOTS = {
     "tempo-turn-tap.png": ("fw", "tempo_turn_tap", "ascii"),
     "tempo-midi-clock.png": ("fw", "tempo_clock", "ascii"),
     "hold-for.png": ("fw", "hold_for", "ascii"),
+    "effect-select.png": ("fw", "effect_select", "ascii"),
     "menu-2.png": ("fw", "menu_2", "ascii"),
     "settings-2.png": ("fw", "settings_2", "ascii"),
     "settings-3.png": ("fw", "settings_3", "ascii"),
@@ -103,7 +104,8 @@ def lcd(p, cw=CW, ch=CH, mx=M, my=M):
                 continue
             X, Y = B + mx + x * cw, B + my + y * ch
             d.rectangle((X, Y, X + cw - 1, Y + ch - 1), fill=GAP)
-            d.rectangle((X, Y, X + cw - 2, Y + ch - 2), fill=ink(x / (w - 1)) if p[y][x] else OFF)
+            gx = 1 if cw > 3 else 0                 # small cells (kaleido grid): no column gap, so the ink reads as dark as the big shots
+            d.rectangle((X, Y, X + cw - 1 - gx, Y + ch - 2), fill=ink(x / (w - 1)) if p[y][x] else OFF)
     return im
 
 
@@ -151,6 +153,11 @@ def main(out):
                 continue
             lcd(pixels((dirs[k] / f"{name}.fb").read_bytes(), fmt)).save(out / png)
             print(out / png)
+        still = ROOT.parent / "zoom-ms-zdl-effects-pack/src/custom/looper/live_still.png"  # GRDLOOP with the loop bar lbox.c draws
+        if still.exists():
+            im = Image.open(still).convert("L")
+            lcd([[im.getpixel((x, y)) < 128 for x in range(W)] for y in range(H)]).save(out / "looper.png")
+            print(out / "looper.png")
         order = [2, 17, 9, 25, 5, 21, 0, 28, 13, 7, 16, 3, 19, 11, 24, 6, 27, 1, 22, 15, 29, 8, 14, 20, 4, 18, 26, 10, 23, 12]
         kaleido_grid([(dirs["master"] / f"master_grid{i:02d}.fb").read_bytes() for i in order]).save(out / "kaleido-grid.png")
         print(out / "kaleido-grid.png")

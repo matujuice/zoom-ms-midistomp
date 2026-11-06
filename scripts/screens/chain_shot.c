@@ -29,10 +29,10 @@ static void two(Chain *c, int stereo, int cur, const char *a, const char *b)
 int main(int argc, char **argv)
 {
     Chain c; const char *d = argv[1];
-    two(&c, 0, 0, "GridDly", "Breather"); out(d, "rm_a0", &c);
-    two(&c, 0, 1, "GridDly", "Breather"); out(d, "rm_a1", &c);
-    two(&c, 0, IT_ROUTE, "GridDly", "Breather"); out(d, "rm_route", &c);
-    two(&c, 0, IT_MIX, "GridDly", "Breather"); out(d, "rm_mix", &c);
-    two(&c, 0, 0, "DirtBox", "GridDly"); out(d, "rm_b0", &c);
+    two(&c, 0, 0, "GRDELAY", "Breather"); out(d, "rm_a0", &c);
+    two(&c, 0, 1, "GRDELAY", "Breather"); out(d, "rm_a1", &c);
+    two(&c, 0, IT_ROUTE, "GRDELAY", "Breather"); out(d, "rm_route", &c);
+    two(&c, 0, IT_MIX, "GRDELAY", "Breather"); out(d, "rm_mix", &c);
+    two(&c, 0, 0, "DirtBox", "GRDELAY"); out(d, "rm_b0", &c);
     return 0;
 }

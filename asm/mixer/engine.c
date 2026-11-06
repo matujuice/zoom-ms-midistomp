@@ -26,7 +26,7 @@ extern __cregister volatile unsigned int TSCL;
 #define DIAG_MAGIC (*(volatile unsigned *)0xC00F3128)
 #define DIAG_END ((void (*)(unsigned, unsigned *))0xC00F3100)
 #define MS_ON (*(volatile int *)0xC010A020)     /* MASTER screen open (asm/master/master_vec.asm) */
-#define MS_TAP ((void (*)(void))0xC010A000)     /* copies this block for it */
+#define MS_TAP ((void (*)(unsigned))0xC010A000) /* copies this block for it (t0: the block's start, for its CPU) */
 static unsigned dg_cyc[7];      /* [0] perf_block, [1 + s] slot s (diag_end clears them) */
 
 #define F ((float *)0x11F03738)         /* ctx[5], the chain signal */
@@ -99,6 +99,8 @@ static void limit(void)
     int i;
     for (i = 0; i < 16; i++) {
         float a = F[i] < 0.0f ? -F[i] : F[i];
+        if (!(a <= 1e30f))              /* NaN or Inf (a stock delay reading stale arena data, pack #41): silence, not a stuck output */
+            F[i] = a = 0.0f;
         if (a > peak)
             peak = a;
     }
@@ -199,7 +201,7 @@ void engine_run(void)
     gain2(F, MASTER_G, G[G_MR]);
     limit();
     if (MS_ON)
-        MS_TAP();
+        MS_TAP(t0);
     if (DIAG_MAGIC == 0x47414944u)      /* "DIAG" */
         DIAG_END(t0, dg_cyc);
 }

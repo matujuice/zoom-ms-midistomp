@@ -17,7 +17,7 @@ WRITES = {w["addr"]: w for w in PATCH["write"] + CHAIN["write"]}
 spec = importlib.util.spec_from_file_location("builder", ROOT / "scripts" / "midistomp_builder.py")
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-PROBE_SET = builder.PATCHES + ["m0-probe", "m0-probe-chain"]  # the probe build: release set, then these
+PROBE_SET = builder.BASE + ["m0-probe", "m0-probe-chain"]  # the probe build: release set, then these
 
 
 def _data(entry):
@@ -146,7 +146,7 @@ def test_probe_build_does_not_overlap():
         assert end <= start, f"{a} and {b} overlap at 0x{start:08X}"
     # the probe's writes only touch what no other patch in the set writes, except the
     # poll call it takes over from midi-clock.yaml (checked by its expect)
-    others = [(a, e, p) for a, e, p in _spans(builder.PATCHES)]
+    others = [(a, e, p) for a, e, p in _spans(builder.BASE)]
     for w in PATCH["write"] + CHAIN["write"]:
         a, e = w["addr"], w["addr"] + len(bytes.fromhex(w["data"]))
         hits = [p for s, t, p in others if s < e and a < t]

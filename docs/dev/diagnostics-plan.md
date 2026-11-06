@@ -11,8 +11,7 @@ leaves. Softkeys: blank with the stock list arrows over knob 1 / EXIT / PAGE.
 | VERSION | version, commit, date, label (build stamps), uptime |
 | LOAD | CPU, CPU PEAK (since the screen opened), AUDIO (the chain) and AUDIO MAX, FREE (headroom), LATE blocks (this window), LATE TOTAL (since boot), declared DSP total of the patch vs 300 |
 | EFFECTS | per slot: name, average CPU % of a block, declared DSP |
-| MODS | sorted from most to least CPU: EFFECT CHAIN (the mixer), PERFORM MODE, LOOPER BUFFER (the GRDLOOP slot; "-" and last without one), MIDI (Task_MIDI), DIAGNOSTICS itself, EFFECTS (the other slots), OS |
-| MODS, to do | add MASTER and KALEIDO (their UI-side CPU while open), per Luca 2026-10-24 |
+| MODS | sorted from most to least CPU: EFFECT CHAIN (the mixer), PERFORM MODE, LOOPER BUFFER (the GRDLOOP slot; "-" and last without one), MIDI (Task_MIDI), SYSTEM itself, EFFECTS (the other slots), OS; then MASTER and KALEIDO, their load when last open ("-" before) |
 
 ## How it measures
 - CPU 300 MHz, one audio block (8 frames) = 54,422 cycles. TSCL stops while the OS idles,

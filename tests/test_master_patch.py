@@ -9,7 +9,7 @@ from zoomms import patcher
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = patcher.load(ROOT / "patches/mixer-m2.yaml")
 (SEC,) = [s for s in PATCH["section"] if s["addr"] == 0xC010A000]
-VEC, END, BUF_END = 0xC010A000, 0xC0110400, 0xC0116000
+VEC, END, BUF_END = 0xC010A000, 0xC0110480, 0xC0116000
 
 
 def _data(sec):

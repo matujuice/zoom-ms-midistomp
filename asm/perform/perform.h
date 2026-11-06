@@ -51,17 +51,17 @@
 #define T_FTSW 0x80
 #define IS_FTSW(t) (((t) & 0xF8) == T_FTSW)
 
-/* ---- A move: two bytes (storage E) ------------------------------------- *
- * bits 0-6   VALUE 0-127, in CC units (the screen shows the target's range)
- * bits 7-11  NEXT 0-16 (table below), 31 = unused move (VALUE "-")
- * bits 12-15 LAG 0-15 (table below) */
-#define MV_VALUE(m) ((m) & 127)
-#define MV_NEXT(m) ((m) >> 7 & 31)
-#define MV_LAG(m) ((m) >> 12 & 15)
-#define MV(v, n, l) ((unsigned short)((v) | (n) << 7 | (l) << 12))
+/* ---- A move: four bytes ---------------------------------------------- *
+ * bits 0-15  VALUE in the target's own units (an effect knob's own steps, a mixer level)
+ * bits 16-20 NEXT 0-10 (table below), 31 = unused move (VALUE "-")
+ * bits 21-24 LAG 0-15 (table below) */
+#define MV_VALUE(m) ((m) & 0xFFFF)
+#define MV_NEXT(m) ((m) >> 16 & 31)
+#define MV_LAG(m) ((m) >> 21 & 15)
+#define MV(v, n, l) ((unsigned)((v) | (n) << 16 | (l) << 21))
 #define MV_UNUSED MV(0, NX_UNUSED, 0)
 
-/* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR; 11-16 = 1..32 CYC.
+/* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR (v2.0 saved 11-16 = CYC: now 32 BAR).
  * Action / Release: the next line of that grid, counted from bar 1.
  * Follow: exactly that long after its Action / Release landed (Turn: the next line).
  * No clock running: the grid runs at the pedal tempo from bar 1 (entering Perform,
@@ -69,8 +69,7 @@
 #define NX_NOW 0
 #define NX_BEAT 1
 #define NX_BAR 5
-#define NX_CYC 11
-#define NX_N 17
+#define NX_N 11
 #define NX_UNUSED 31
 
 /* LAG: 0 OFF, 1 MICRO, 2-4 = 50/100/500 ms, 5 = 1 s, 6-9 = 1,2,4,8 BEAT,
@@ -85,10 +84,10 @@ typedef struct {
     unsigned char target[NCTL];             /* T_* */
     unsigned char loop_target[NLOOP];
     unsigned char loop_on;                  /* LOOPER menu: 1 = the loop events fire (byte 15, the alignment gap, is perform_store's PT_OK) */
-    unsigned short move[NCTL][NMOVE_CTL];   /* [ctl][M_*]; buttons/footswitch leave M_TURN_F unused */
-    unsigned short loop_move[NLOOP];
-} PerfPatch;                                /* 1 + 7 + 6 + 1 + 84 + 12 = 111 -> 112 with alignment */
-#define PT_SIZE 112
+    unsigned move[NCTL][NMOVE_CTL];         /* [ctl][M_*]; buttons/footswitch leave M_TURN_F unused */
+    unsigned loop_move[NLOOP];
+} PerfPatch;                                /* 1 + 7 + 6 + 1 + 1 pad + 168 + 24 = 208 */
+#define PT_SIZE 208
 
 /* ---- Runtime (perform_engine.c owns it) -------------------------------- */
 #define NSLOT 16                /* moves at once: a lag running or a move waiting */
@@ -103,14 +102,16 @@ typedef struct {
 extern PerfPatch perf_patch;    /* the patch played */
 extern PerfGrid perf_grid;
 extern volatile int perf_on;    /* 1 while screen 11 shows PERFORM (play), 2 SETUP, 0 out */
+extern volatile int perf_led;   /* the play screen's blink for the LED, -1 = the looper's level */
 
 /* Engine API (audio block and 16 ms poll). */
 void perf_block(void);                        /* top of engine_run: grid, due moves, lags, LED */
 void perf_gesture(int ctl, int gesture, int phase); /* phase 0 press/turn, 1 release (hold) */
+void perf_momentary(int ctl, int phase);       /* HOLD FOR MOMENTARY: 0 hold seen, 1 release */
 void perf_turn(int ctl, int steps);           /* knob turn: moves the target now, schedules TURN_F */
 void perf_loop_event(int ev);                 /* L_*: from the looper's state words */
 void perf_reset(void);                        /* MIDI Start/Stop, patch change: cancel all */
-int perf_value(int target);                   /* live value 0-127 of a target, for the screen */
+int perf_native(int target);                  /* live value in the target's own range, -1 none */
 int perf_pending(int ctl);                    /* grid units (1/8 beat) to its next waiting move, -1 none (blink) */
 
 /* Storage (perform_store.c): the patch's entry in record 50, keyed like the mixer table. */

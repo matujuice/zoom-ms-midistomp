@@ -22,6 +22,11 @@
 #ifndef MS_ON
 #define MS_ON (*(volatile int *)0xC010A020)
 #endif
+#ifndef MS_LOAD
+#define MS_LOAD ((volatile int *)0xC010A024)  /* master_vec.asm +36: [0] MASTER, [1] KALEIDO */
+extern __cregister volatile unsigned int TSCL;
+#define CYC TSCL
+#endif
 #define P ((volatile unsigned char *)LCD0)
 
 #define scols ds_scols
@@ -34,7 +39,7 @@
 #undef softw
 #undef softtext
 
-/* ---- state: the two gaps in the buffers (SIN ends at 0xC0111804, HIST at 0xC0115700) ---------------- */
+/* ---- state: the two gaps in the buffers (SIN ends at 0xC0111884, HIST at 0xC0115780) ---------------- */
 typedef struct {
     volatile unsigned w;            /* frames written (master_tap) */
     volatile float gmin;            /* lowest limiter gain since the last poll (master_tap) */
@@ -65,14 +70,19 @@ typedef struct {
     float kb, km, kh, kra, kring, kt, krot;   /* bass mid high, kick, ring phase, time, turn */
     int ksi, ksh, kinv;             /* segments step, frames to the next change, inverted */
     int kzs, krs, kmi;              /* KALEIDO knobs: zoom -10..10, spin -10..10, mirrors 0 AUTO or 4 6 8 10 12 16 */
+    volatile unsigned aud, own;     /* busy cycles: whole audio blocks, master_tap's part (master_tap) */
+    unsigned ui;                    /* master_poll's cycles, audio taken out */
+    int np, lk;                     /* polls in this CPU window, its menu entry */
+    unsigned la, lt;                /* aud and CYC at the last poll */
+    int full;                       /* the audio takes almost the whole core: analysis paused (#55) */
 } St;
 
 #ifndef MS_ST
-#define MS_ST ((St *)0xC0115700)
-#define MS_BARS ((float *)0xC0111804)   /* [126] bars, [126] peak dots */
+#define MS_ST ((St *)0xC0115780)
+#define MS_BARS ((float *)0xC0111884)   /* [126] bars, [126] peak dots */
 #endif
 #define ST MS_ST
-typedef char st_fits[sizeof(St) <= 0x700 ? 1 : -1];   /* St ends before MS_INK (0xC0115E00) */
+typedef char st_fits[sizeof(St) <= 0x680 ? 1 : -1];   /* St ends before MS_INK (0xC0115E00) */
 #define BAR MS_BARS
 #define PKD (MS_BARS + 126)
 
@@ -983,9 +993,10 @@ static void init(void)
 #ifndef MS_HOST
 #pragma FUNCTION_OPTIONS(master_tap, "-ms0 --opt_for_speed=5")
 #endif
-void master_tap(void)
+void master_tap(unsigned t0)        /* t0: TSCL at the block's start (engine.c) */
 {
     St *s = ST;
+    unsigned ta = CYC;
     unsigned w = s->w;
     unsigned *m = (unsigned *)(MS_RING_M + (w & 4095)), *d = (unsigned *)(MS_RING_S + (w & 2047));
     const float *f = (const float *)MS_F, *ac = (const float *)MS_ACC, *sn = (const float *)MS_SNAP;
@@ -1018,22 +1029,49 @@ void master_tap(void)
     s->ims[1] += KI * (q1 * 0.125f - s->ims[1]);
     s->over |= ov;
     s->w = w + 8;
+    s->own += CYC - ta;
+    s->aud += CYC - t0;
 }
 
+static void poll(St *s)
+{
+    unsigned now = CYC, da = s->aud - s->la, dt = now - s->lt;
+    int f, post;
+    if (MS_MODE != 11 || MS_SCREEN != 11 || (MS_MENU_ENTRY != 3 && MS_MENU_ENTRY != 6)) { MS_ON = 0; return; }
+    /* The UI shares the core with the audio: near 100% DSP the 16 ms analysis never ends and starves the keys
+     * and footswitches (#55). Pause it above 7/8 audio, resume below 3/4. */
+    s->la = s->aud; s->lt = now;
+    f = s->full ? da > dt - (dt >> 2) : da > dt - (dt >> 3);
+    post = f != s->full;
+    s->full = f;
+    if (f) s->rd = s->w;
+    else if (MS_MENU_ENTRY == 6) {
+        kal_poll(s);
+        if ((++s->tick & 3) == 0) { kal_frame(s); post = 1; }
+    } else {
+        if (MS_CUR_PATCH != s->patch) { s->patch = MS_CUR_PATCH; reset_stats(); }
+        consume();
+        if ((++s->tick & 3) == 0) { advance(); post = 1; }
+    }
+    if (post) EVENT_POST(MAILBOX, 0x40);       /* one call site: a second one makes -ms3 use __c6xabi_call_stub */
+}
+
+/* 16 ms while open: the poll, and every 64 polls (1.02 s) MASTER's or KALEIDO's CPU load (its polls with
+ * the audio blocks that interrupted them taken out, plus master_tap) for the SYSTEM MODS page.
+ * ponytail: the screen's draw (UI task) is not counted; small next to the poll's frame work. */
 void master_poll(void)
 {
     St *s = ST;
-    if (MS_MODE != 11 || MS_SCREEN != 11 || MS_MENU_ENTRY < 5) { MS_ON = 0; return; }
-    if (MS_MENU_ENTRY == 6) {
-        kal_poll(s);
-        if ((++s->tick & 3) == 0) { kal_frame(s); EVENT_POST(MAILBOX, 0x40); }
-        return;
-    }
-    if (MS_CUR_PATCH != s->patch) { s->patch = MS_CUR_PATCH; reset_stats(); }
-    consume();
-    if ((++s->tick & 3) == 0) {
-        advance();
-        EVENT_POST(MAILBOX, 0x40);
+    unsigned a = s->aud, t = CYC;
+    int k = MS_MENU_ENTRY == 6;
+    poll(s);
+    if (!MS_ON) return;
+    if (k != s->lk) { s->lk = k; s->np = 0; s->ui = s->own = 0; }
+    s->ui += CYC - t - (s->aud - a);
+    if (++s->np == 64) {
+        MS_LOAD[k] = (int)((float)(s->ui + s->own) * (1000.0f / 307.2e6f) + 0.5f);   /* 64 x 16 ms x 300 MHz */
+        s->np = 0;
+        s->ui = s->own = 0;
     }
 }
 
@@ -1043,11 +1081,17 @@ void master_key(int ev, int steps)
     int i, p = s->page;
     if (MS_MENU_ENTRY == 6) {       /* KALEIDO: knob 1 zoom, knob 2 spin, knob 3 mirrors, EXIT */
         int *k = ev == 160 ? &s->kzs : ev == 161 ? &s->krs : ev == 162 ? &s->kmi : 0, hi = ev == 162 ? 6 : 10;
+        if (MS_IDLE_SHOWN) {        /* opened by IDLE KALEIDO: a knob turn or a key's release goes back to play */
+            if (!k && !(ev & 1 && (unsigned)(ev - 33) <= 44))  /* not a knob turn or a key release */
+                return;             /* presses and hold timers: nothing (the footswitch press is chain_keys.c idle_ev) */
+            MS_IDLE_SHOWN = 0; MS_ON = 0; MS_MODE = 0;
+            goto post;              /* share the EVENT_POST below: MASTER has no room for another call site */
+        }
         if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 6); }
         else if (k && steps) { i = *k + (steps > 0 ? 1 : -1); if (i >= (ev == 162 ? 0 : -10) && i <= hi) *k = i; }
         return;
     }
-    if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 5); return; }
+    if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 3); return; }
     if (ev == 67 || (ev == 162 && steps > 0)) s->page = p == 5 ? 0 : p + 1;     /* knob 3 press or turn: next page */
     else if (ev == 162 && steps < 0) s->page = p == 0 ? 5 : p - 1;             /* knob 3 turn back */
     else if (ev == 34) {
@@ -1058,6 +1102,7 @@ void master_key(int ev, int steps)
         i = s->opt[p] + (steps > 0 ? 1 : -1);
         if (i >= 0 && i < PNV[p]) s->opt[p] = i;
     }
+post:
     EVENT_POST(MAILBOX, 0x40);
 }
 
@@ -1069,6 +1114,12 @@ void master_draw(void)
     volatile unsigned *l = LCD0;
     if (!inited) { init(); inited = 1; }
     if (!MS_ON) { s->rd = s->w; MS_ON = 1; }
+    if (s->full) {
+        for (i = 0; i < 256; i++) l[i] = 0;
+        font7c("CPU FULL", 64, 28);           /* EXIT still works */
+        LCD_DIRTY(0);
+        return;
+    }
     if (MS_MENU_ENTRY == 6) { draw_kal(); LCD_DIRTY(0); return; }
     for (i = 0; i < 256; i++) l[i] = 0;
     o = icat(t, p + 1); scat(o, "/6");

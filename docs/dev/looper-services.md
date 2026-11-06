@@ -27,8 +27,9 @@ code), 128 bytes, loaded at boot.
 | 16 | 64 | ZDL | LED level 0..32 (its own PWM) |
 | 17, 18 | 68 | ZDL | 8 status characters, space padded |
 | 19 | 76 | ZDL | bits 0-15 box fill 0..256 (blink applied); 16-21 cycle C in bars; 22-27 bar 1..32 in the cycle; 28-29 beat - 1; 30 = no clock ("NO CLK"). Older ZDLs write the fill only (C = 0: no bar lines, no right text) |
-| 20 | 80 | ZDL | 1 = status box inverted (pulse, blink); GRDLOOP writes 0 and the new bar ignores it |
+| 20 | 80 | ZDL | GRDLOOP state for Perform: `st | pend << 8` (from v2.0.1; v2.0 wrote it to word 22, which the firmware owns). Was the status box invert flag, which the bar ignores |
 | 21 | 84 | Perform | the patch's Perform CYCLE in bars (1-32), 0 = none: the looper's Cycle knob is used. Zero at boot; Perform writes it every poll while its LOOPER row is ON, else 0 |
+| 22 | 88 | firmware only | params pointer (`ctx[1]`) of the effect under the cursor in play mode, 0 = none. The effect whose `ctx[1]` matches may drive the LED with words 13-15 (Takeoff; the looper uses word 12). When it changes, the firmware has the LED task write the stock LED again |
 | 24-26 | 96 | firmware | private (last heartbeat, polls without one, "was under the cursor") |
 | 27-29 | 108 | firmware | private (status text, progress / 4 + inverted x 256 last drawn) |
 | 30 | 120 | ZDL | left text as a code (the firmware spells it): bits 0-3 kind (0 = an older ZDL, use words 17-18; 1 EMPTY, 2 REC IN, 3 STOP IN, 4 PLAY IN, 5 REC n, 6 REC n/m, 7 PLAY n BARS, 8 STOPPED), 4-9 n, 10-15 m, 16 = n in beats (else bars), 17 = MONO |
@@ -40,10 +41,10 @@ Big buffer (RAM test, issue #19; nothing in the OS writes there):
 |---|---|---|
 | 3 | `0xC0636980` | 1,677,952 |
 | 2 | `0xC0198000` | 425,984 |
-| 1 | `0xC0116000` | 532,480 (region 1 above the 96 KB kept for MOD code and record 50, and 48 KB for MASTER) |
+| 1 | `0xC0118C00` | 521,216 (region 1 above the 96 KB kept for MOD code, 48 KB for MASTER and 11 KB for record 50 at `0xC0116000`) |
 
-With the looper's own 705 KB slot block that is about 3.4 MB: 25.4 s stereo
-or 49.7 s mono in 12-bit block float. The regions were confirmed free on the
+With the looper's own 705 KB slot block that is about 3.3 MB: 23.2 s stereo
+or 43.0 s mono in 12-bit block float (v2.0.1: GRDLOOP keeps only tiny floats in the arena, #41). The regions were confirmed free on the
 70CDR OS by the RAM test (2026-10-15).
 
 ## Rules
@@ -68,7 +69,10 @@ or 49.7 s mono in 12-bit block float. The regions were confirmed free on the
   (PWM); the LED task only writes on a change, so it stays out of the way.
   When the cursor leaves the looper the poll flips the LED task's "written"
   bit (`0xC00EEB10` bit 0) so it writes the new effect's state again.
-- **Screen:** while word 12 is 1 and no overlay or prompt is open, every
+- **Screen:** while the cursor is on word 10's slot (read at each draw: word 12
+  lags the screen by one poll, which put the bar on other effects' covers in the
+  v2.0 beta; the slot comes from `0xC00EE748[6 x view + cursor]`, as in mixer.S:
+  the old `0xC00EE948` table also showed it there) and no overlay or prompt is open, every
   screen draw adds a status bar to the Looper's Effect View, drawn like Perform
   mode's top bar (`asm/looper/lbox.c`, `docs/dev/perform-ui-mockup.html`): knob
   pages: none since PERFORM11; cover x 0-127,

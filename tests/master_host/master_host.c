@@ -44,8 +44,8 @@ static int tap(void)
     host_glim = 0.8f;
     for (i = 0; i < 16; i++) host_snap[i] = 0;
     host_snap[3] = -1.0f; host_snap[10] = 0.5f;      /* input: L at full scale, R at half */
-    master_tap();
-    master_tap();
+    master_tap(0);
+    master_tap(0);
     for (i = 0; i < 8; i++) {
         float l = host_f[i], r = host_f[8 + i];
         int m = _sat16(_spint((l + r) * 16384.0f)), d = _sat16(_spint((l - r) * 16384.0f));

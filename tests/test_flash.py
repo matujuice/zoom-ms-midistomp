@@ -40,3 +40,12 @@ def test_updater_accepts_all_three_models():
     off = lst - 0x43B000 + 0x3A400  # .rdata
     assert exe[off - 3:off + 5] == bytes([0x57, 0x61, 0, 0x57, 0x58, 0x5F, 0x61, 0])
     assert not flash.accept_models(exe)  # already done: the loop now reads 4 entries
+
+
+def test_set_title_every_copy():
+    old = b"ZOOM MS-70CDR v2.10 Updater"
+    exe = bytearray(b"x\0" + old + b"\0" + old + b" (%d)\0y\0" + old + b"\0z")
+    flash.set_title(exe, "MIDISTOMP V2.0.1 Updater")
+    new = b"MIDISTOMP V2.0.1 Updater"
+    pad = bytes(len(old) - len(new))
+    assert exe == b"x\0" + new + b"\0" + pad + new + b" (%d)\0" + pad + b"y\0" + new + b"\0" + pad + b"z"

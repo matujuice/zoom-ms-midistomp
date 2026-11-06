@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_looper_ui import ROOT, available, main as _main, build as _build  # noqa: E402,F401
 
 YAML = ROOT / "patches/mixer-m2.yaml"
-ADDR, END = 0xC010A000, 0xC0110400            # code and small data; the buffers above (asm/master/master.h)
+ADDR, END = 0xC010A000, 0xC0110480            # code and small data; the buffers above (asm/master/master.h)
 SOURCE = "asm/master/master.c"
 
 

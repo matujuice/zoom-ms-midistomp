@@ -6,7 +6,7 @@
         .global chain_key, chain_draw_h, chain_poll, s33_keys
         .global settings_key, settings_draw, settings_pack, settings_unpack
         .global engine_run, mix_get, mix_put, pages_key, pages_draw_h, ab_tag
-        .global r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw
+        .global r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw, idle_ev
         B       .S2     keys_e          ; +0  screen 3 key table entry
         NOP     5
         B       .S2     draw_e          ; +8  screen 3 draw table entry
@@ -46,6 +46,8 @@
         B       .S2     midi_keys_e     ; +144 screen 14 (MIDI) key table entry
         NOP     5
         B       .S2     midi_draw_e     ; +152 screen 14 draw table entry
+        NOP     5
+        B       .S2     idle_ev         ; +160 callp at 0xC00ACE08 (UI task, each event: A4 = event, B3 = return)
         NOP     5
 
 ; Switch-table entries: the event pair is in the dispatcher's frame (+8 event,
@@ -115,12 +117,14 @@ perf_draw_e:
         MVKH    .S2     perf_draw, B5
         MVKL    .S1     0xC010A018, A0  ; master_draw
         MVKH    .S1     0xC010A018, A0
-ms_or:                                  ; B5 = PERFORM's, A0 = MASTER's: MASTER when the menu entry was 5 or 6 (KALEIDO)
+ms_or:                                  ; B5 = PERFORM's, A0 = MASTER's: MASTER when the menu entry was 3 or 6 (KALEIDO)
         MVKL    .S1     0xC00F60BF, A1  ; MENUSCR[7] (mixer.S, menu_enter.S)
         MVKH    .S1     0xC00F60BF, A1
         LDBU    .D1T1   *A1, A1
         NOP     4
-        CMPLT   .L1     4, A1, A1
+        CMPEQ   .L1     3, A1, A2       ; A2 is free: the C we branch to may clobber it anyway
+        CMPEQ   .L1     6, A1, A1
+        OR      .L1     A1, A2, A1
   [A1]  MV      .L2X    A0, B5
         B       .S2     B5
         NOP     5

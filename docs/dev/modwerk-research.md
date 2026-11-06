@@ -132,7 +132,7 @@ record size table entry):
 |---|---|---|
 | 0 | 24 | stock globals |
 | 24 + 16n | 16 | mixer entry for patch n: 4 B hash, settings 0-10, pad (`pages.c:179,251-272`) |
-| 824 | 4 | magic `PRF1` (`asm/perform/perform_store.c:11,13`) |
+| 824 | 4 | magic `PRF2` (`asm/perform/perform_store.c:11,13`) |
 | 828 + 112n | 112 | PERFORM entry for patch n (`perform_store.c:14`, `perform.h:91`) |
 
 - The hash is FNV-1a over the six effect ids (bits 1-28 of each block: `b[0]&0xFE, b[1], b[2],
@@ -185,9 +185,9 @@ DSP 300 is a single write inside `diag.yaml` and the M0 probe.
 | Tempo screen, HOLD FOR, combos | tempo-hold | midi-settings | | needs the HOLD FOR choice screen |
 | Scroll | scroll | nothing | | DDR `0xC00F2100` |
 | Looper services | looper | midi-cc, midi-clock, tempo-hold (it retargets their trampolines, `looper.yaml:13`) | | DDR `0xC00F2200`, services block `0xC00F3000` (magic `0x5A4C5301`), big buffer regions 3, 2, 1 (`looper-services.md:39-43`) |
-| Mixer + Effect Chain screen | mixer-m2 | the release set above, midi-cc (its CC 85-101 sit on the handler, `mixer-m2.yaml:90-92`), midi-settings (menu and tables, `:96-125`) | looper (`mixer.S:108` checks `0x5A4C5301`; apply looper first) | slot-loop packet `0x1181BE00`, record 50 (`R50 0xC01086E0`), patch save/load/pack/dirty hooks, DDR `0xC00F6000-0xC0110400` |
+| Mixer + Effect Chain screen | mixer-m2 | the release set above, midi-cc (its CC 85-101 sit on the handler, `mixer-m2.yaml:90-92`), midi-settings (menu and tables, `:96-125`) | looper (`mixer.S:108` checks `0x5A4C5301`; apply looper first) | slot-loop packet `0x1181BE00`, record 50 (`R50 0xC01086E0`), patch save/load/pack/dirty hooks, DDR `0xC00F6000-0xC0110480` |
 | PERFORM | in mixer-m2 | mixer (hooks `mix_get/mix_put`, the hash, record 50) | transport (`perform_engine.c:96`), looper (`SV_OK`) | screen 11, PERFORM table in record 50 |
-| MASTER, KALEIDO | in mixer-m2 | mixer (menu entry byte `0xC00F60BF`, `master.h:34`) | transport (`master.c:872`) | DDR `0xC010A000-0xC0110400` |
+| MASTER, KALEIDO | in mixer-m2 | mixer (menu entry byte `0xC00F60BF`, `master.h:34`) | transport (`master.c:872`) | DDR `0xC010A000-0xC0110480` |
 | Diag | diag | mixer-m2 (engine calls `diag_end` only if its magic is there), midi-clock (its hook site expects midi-clock's callp), the mixer MENU7 slot "SYSTEM" | | DDR `0xC00F3100`; test builds only |
 | DSP 300 | write inside diag/m0-probe | nothing | | one write: `0xC00BB52C`, `eab02102` to `6acb2102` (`diag.yaml`, `asm/m0_probe/dsp_limit.S`) |
 
@@ -225,7 +225,7 @@ DSP 300 is a single write inside `diag.yaml` and the M0 probe.
 | DDR small patches | `0xC00F2000` version, `0xC00F2020` step, `0xC00F2100` scroll, `0xC00F2200` looper, `0xC00F2800` midi-cc | those patches |
 | DDR services block | `0xC00F3000-0xC00F307F` | looper |
 | DDR diag | `0xC00F3100-` | diag |
-| DDR mixer / perform / master | `0xC00F6000`, far `0xC00F7000`, C `0xC00F8000`, R50_COPY `0xC0106DC0`, R50 `0xC01086E0`, master `0xC010A000-0xC0110400` | mixer-m2 |
+| DDR mixer / perform / master | `0xC00F6000`, far `0xC00F7000`, C `0xC00F8000`, R50_COPY `0xC0106DC0`, R50 `0xC01086E0`, master `0xC010A000-0xC0110480` | mixer-m2 |
 | DDR looper buffer | `0xC0116000` (+ regions `0xC0198000`, `0xC0636980`) | looper (`block.S:8-10`) |
 | Flash records | 50 (globals, mixer, PERFORM), 51 (MIDI settings) | mixer-m2, midi-settings |
 
@@ -406,9 +406,9 @@ gid 8. Pack numbers equal to a stock number:
 |---|---|---|---|
 | DualShft | 8/480 | CRN_CHO 6/480 | no: other category, other 32-bit id |
 | Sweep | 8/496 | ANA234CH 6/496 | no: same reason (effects pack `docs/STEREO.md:177-178`) |
-| DubSiren 485, Choral 486, WaveFold 487, EuGate 488, S.GN_L 489, Scrub 490, DirtBox 491, Breather 493, GridDly 495, Looper 497 | 8/... | none | no |
+| DubSiren 485, Choral 486, WaveFold 487, EuGate 488, S.GN_L 489, Scrub 490, DirtBox 491, Breather 493, GRDELAY 495, Looper 497 | 8/... | none | no |
 
-Inside the pack, on purpose: GridDly/BarDelay 495, Breather/Pump 493, GRDLOOP/Looper 497
+Inside the pack, on purpose: GRDELAY/BarDelay 495, Breather/Pump 493, GRDLOOP/Looper 497
 (replacements; the old builds still sit in `dist/`). Probes 498-500 are never released. New
 effects take 481-484, 492, 494, 498+ (`NEW-EFFECTS.md:17`); 512 (CRN_TRI) is the only stock
 number above 496.
@@ -423,7 +423,7 @@ ledger (other packs also use group 8, 403-957).
 - Address and layout match on the MS-70CDR 2.10: `asm/midi_clock/transport.inc` (block
   `0x1181FF00`, magic `0x5A4D5401`, words 0-5), poll site `0xC00C6998`
   (`patches/midi-clock.yaml`). The pack reads it through `src/custom/common/zmt.h` (same
-  address, magic and sequence rule): Breather, DualShft, DubSiren, EuGate, Choral, GridDly,
+  address, magic and sequence rule): Breather, DualShft, DubSiren, EuGate, Choral, GRDELAY,
   Looper, Scrub, Sweep. The Looper also reads the looper services block `0xC00F3000`, magic
   `0x5A4C5301`.
 - Words 6 and 7 (footswitch down, hold claim): planned for v2.0, same magic
@@ -438,7 +438,7 @@ ledger (other packs also use group 8, 403-957).
 
 | Effect | Needs from MIDISTOMP | On stock firmware |
 |---|---|---|
-| DualShft, Choral, EuGate, DubSiren, Scrub, Breather, GridDly, Sweep | transport block (any MIDISTOMP) | 120 BPM, no clock sync (`zmt.h`) |
+| DualShft, Choral, EuGate, DubSiren, Scrub, Breather, GRDELAY, Sweep | transport block (any MIDISTOMP) | 120 BPM, no clock sync (`zmt.h`) |
 | WaveFold, S.GN_L, DirtBox | nothing | same as on MIDISTOMP |
 | Looper (GRDLOOP) | transport + looper services (v2.0) | ~10 s mono, every flip a press, LED means nothing (`EFFECTS.md:196-200`); not in a release |
 | RISER (planned) | words 6/7 (v2.0) | press-only sweep |

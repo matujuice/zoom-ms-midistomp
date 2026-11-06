@@ -10,6 +10,8 @@
         .equ    B_STARTS, 12                ; +1 on every Start
         .equ    B_TICKS, 16                 ; clocks since Start
         .equ    B_TEMPO, 20                 ; BPM x 100
+        .equ    B_FTSW, 24                  ; 1 while the footswitch is down (looper.S poll_pre)
+        .equ    B_CLAIM, 28                 ; hold claim: an effect's params pointer, 0 each poll
 
 ; MIDI SETTINGS (v0.5): the MIDI word, kept in the settings section
 ; (asm/midi_settings/settings.S, base + 0) and saved in flash record 51.

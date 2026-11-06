@@ -19,7 +19,7 @@ JUMP = WRITES[0x1181BE00]
 spec = importlib.util.spec_from_file_location("builder", ROOT / "scripts" / "midistomp_builder.py")
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-M2_SET = builder.PATCHES + ["m0-probe", "mixer-m2"]  # the M2 test build: release set, probe P1, mixer
+M2_SET = builder.BASE + ["m0-probe", "mixer-m2"]  # the M2 test build: release set, probe P1, mixer
 
 # mixer.S fixed offsets
 VEC = {"engine": 0, "unpack_live": 8, "unpack_saved": 16, "pack_dump": 24, "dirty": 32,
@@ -60,7 +60,7 @@ def b_target(addr, word):
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_bytes_match_assembly_sources():
-    assert asm.assemble(ROOT / SEC["source"], BASE, whole_packets=True) == _data(SEC)
+    # mixer.S itself is TI syntax (.string adds no NUL): test_sections_match_a_fresh_ti_build checks it
     for w in PATCH["write"]:
         if "source" in w:
             code, data = asm.assemble(ROOT / w["source"], w["addr"]), _data(w)
@@ -154,13 +154,11 @@ def test_menu_writes_match_the_settings_section():
     menu = sb[0x1181EB80 - 0x1181EA00:][:20]                         # settings.S menu_names
     m7 = _data(SEC)[MENU7:MENU7 + 28]
     stock = [menu[4 * i:4 * i + 4] for i in range(5)]
-    got = [m7[4 * i:4 * i + 4] for i in range(5)]
-    assert got[:2] + got[3:] == stock[:3] + stock[4:]                # stock without MIDI; PERFORM MODE 2
-    got.append(m7[20:24])
-    got.append(m7[24:28])
+    got = [m7[4 * i:4 * i + 4] for i in range(7)]
+    assert got[:2] + got[4:6] == stock[:3] + stock[4:]               # stock without MIDI; PERFORM MODE 2, MASTER 3
     sec = _data(SEC)
-    assert sec[MENUSCR + 2:MENUSCR + 8] == bytes([11, 1, 9, 11, 11, 0])   # PERFORM, SETTINGS (stock row 2), version, MASTER, KALEIDO
-    for i, name in ((2, b"PERFORM MODE\0"), (5, b"MASTER\0"), (6, b"KALEIDO\0")):
+    assert sec[MENUSCR + 2:MENUSCR + 8] == bytes([11, 11, 1, 9, 11, 0])   # PERFORM, MASTER, SETTINGS (stock row 2), version, KALEIDO
+    for i, name in ((2, b"PERFORM MODE\0"), (3, b"MASTER\0"), (6, b"KALEIDO\0")):
         off = _word(got[i]) - BASE
         assert sec[off:off + len(name)] == name
 
@@ -205,7 +203,7 @@ CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "s33_keys": 24,
         "settings_key": 32, "settings_draw": 40, "settings_pack": 48, "settings_unpack": 56,
         "engine_run": 64, "mix_get": 72, "mix_put": 80, "pages_key": 88, "pages_draw": 96,
         "ab_tag": 104, "r50_load": 112, "r50_save": 120, "perf_keys": 128, "perf_draw": 136,
-        "midi_key": 144, "midi_draw": 152}
+        "midi_key": 144, "midi_draw": 152, "idle_ev": 160}
 CMIX = {"C_POLL": "chain_poll", "C_ENGINE": "engine_run", "C_GET": "mix_get", "C_PUT": "mix_put",
         "C_KEYS": "pages_key", "C_DRAW": "pages_draw"}                # mixer.S names for them
 
@@ -238,6 +236,24 @@ def test_chain_screen_hooks():
         assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
 
 
+def test_idle_kaleido_hook_and_settings_bits():
+    site = 0xC00ACE08                                                # UI task loop: key class of each event, before dispatch
+    old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
+    assert callp_target(site, old) == 0xC00D13B4
+    assert callp_target(site, new) == CSEC["addr"] + CVEC["idle_ev"]
+    assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80                   # same op, same p-bit
+    assert _data(SEC)[PEDAL + 1:PEDAL + 3] == bytes(2)               # IDLE, IDLE_SHOWN: OFF until unpack
+    h = (ROOT / "asm/mixer/chain.h").read_text()
+    for name, off in {"IDLE": PEDAL + 1, "IDLE_SHOWN": PEDAL + 2}.items():
+        assert re.search(rf"#define {name} .*MIXER_BASE \+ {off}\)", h), name
+    m = (ROOT / "asm/master/master.h").read_text()
+    assert f"#define MS_IDLE_SHOWN (*(volatile unsigned char *)0x{BASE + PEDAL + 2:08X})" in m
+    src = (ROOT / "asm/mixer/pedal_in.c").read_text()                # record 50 byte 23: IDLE bits 1-3
+    assert "rec[23] |= PEDAL << 7 | IDLE << 1;" in src
+    assert "int v = rec[23] >> 1 & 7;" in src and "IDLE = v > 4 ? 0 : v;" in src
+    assert re.search(r"set_count\[ROWS\] = \{3, 2, 2, 2, 2, 4, 10, 2, 2, 5, 0\}", src)
+
+
 def test_perform_screen_11_hooks():
     tables = {0xC00EEFC8: (0xC00A8310, "perf_keys"), 0xC00EEBDC: (0xC00A9398, "perf_draw")}   # free screen 11, stock stubs
     for addr, (stock, name) in tables.items():
@@ -245,7 +261,7 @@ def test_perform_screen_11_hooks():
         assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
         assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
     hdr = (ROOT / "asm/perform/perform.h").read_text()
-    assert re.search(r"#define PT_SIZE 112\s", hdr)                 # 50 of them in record 50 (R50_SIZE)
+    assert re.search(r"#define PT_SIZE 208\s", hdr)                 # 50 of them in record 50 (R50_SIZE)
     build = (ROOT / "scripts/build_mixer_ui.py").read_text()
     for f in ("perform_engine.c", "perform_store.c", "perform_keys.c", "perform_draw.c"):
         assert f in build and (ROOT / "asm/perform" / f).exists()
@@ -254,10 +270,10 @@ def test_perform_screen_11_hooks():
 def test_record_50_holds_the_settings_table():
     hdr = (ROOT / "asm/mixer/chain.h").read_text()
     r50, copy = (int(re.search(rf"#define {n}\D*(0x[0-9A-Fa-f]+)", hdr).group(1), 0) for n in ("R50", "R50_COPY"))
-    assert re.search(r"#define R50_SIZE \(824 \+ 4 \+ 50 \* 112\)", hdr)
-    size = 24 + 16 * 50 + 4 + 50 * 112                               # stock globals, a mixer entry per patch, Perform
+    assert re.search(r"#define R50_SIZE \(824 \+ 4 \+ 50 \* 208\)", hdr)
+    size = 24 + 16 * 50 + 4 + 50 * 208                               # stock globals, a mixer entry per patch, Perform
     end = CSEC["addr"] + len(_data(CSEC))
-    assert end <= copy and copy + size <= r50 and r50 + size <= 0xC010A000   # above the C section, below the looper
+    assert end <= copy and copy + size <= 0xC010A000 and 0xC0116000 <= r50 and r50 + size <= 0xC0118C00   # copy below MASTER; R50 between MASTER and looper region 1
     assert re.search(rf"\.equ\s+R50,\s*0x{r50:08X}", (ROOT / "asm/mixer/mixer.S").read_text())
     table = WRITES[0xC00EA9A8]                                       # record size table, entry 50
     assert (table["expect"], table["data"]) == ("18000000", size.to_bytes(4, "little").hex())
@@ -321,6 +337,8 @@ def test_sections_match_a_fresh_ti_build():
     assert b.build_c() == _data(CSEC)                                # also: links without RTS, no B14
     far = PATCH["section"][2]                                        # the C's zeroed variables
     assert (far["addr"], _data(far)) == (b.FAR_ADDR, bytes(-(-b.FAR_LEN // 32) * 32))
+    (mid,) = [s for s in PATCH["section"] if s["source"] == "asm/mixer/mid"]   # chain_draw's .const
+    assert (mid["addr"], _data(mid)) == (b.MID_ADDR, b.MID_IMG) and b.MID_ADDR + len(b.MID_IMG) <= b.MID_END
 
 
 def test_m2_build_does_not_overlap():
@@ -336,6 +354,7 @@ def test_m2_build_does_not_overlap():
         hit = [p for s, t, p in other_writes if s < e and a < t]
         chained = {0xC00C82D0: ["midi-clock write"]}                 # the poll trampoline
         chained.update(dict.fromkeys(PEDAL_HOOKS, ["midi-settings write"]))
+        chained[0xC00A7638] = ["midi-settings write"]               # version EXIT row, moved again
         assert hit in ([], chained.get(a, [])), hex(a)
     assert BASE + len(_data(SEC)) <= 0xC0106DC0                     # inside the MOD code area (R50_COPY, R50, looper above)
 
@@ -363,7 +382,7 @@ def _stock_image():
 def test_effect_hooks_expect_the_stock_image():
     img = _stock_image()
     for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00A832C,
-                 0xC00CB284):
+                 0xC00CB284, 0xC00ACE08):
         assert img.read(site, 4).hex() == WRITES[site]["expect"]
 
 

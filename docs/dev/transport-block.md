@@ -2,7 +2,8 @@
 
 From MOD 0.4 the firmware publishes MIDI transport for custom effects in RAM.
 Effects read it with plain loads; nothing calls into the firmware.
-MS-50G 3.10 OS only (the build the MS-60B runs as MOD).
+MIDISTOMP v1.2 and later run on the MS-70CDR 2.10 OS (the MS-50G 3.10 builds up to v1.1 had
+the same block, words 0-5 only).
 
 ## Where
 
@@ -17,7 +18,8 @@ so it is valid before any MIDI arrives.
 | 3 | 12 | start counter: +1 on every Start |
 | 4 | 16 | clocks (`0xF8`) received since the last Start, counted only while running. The first clock after Start (value 1) is the downbeat, so the position in 24ths of a quarter note is value - 1 |
 | 5 | 20 | tempo, BPM x 100 (4000..25000). Always valid, see below |
-| 6, 7 | 24 | reserved, 0 |
+| 6 | 24 | footswitch down: 1 while the pedal's footswitch is down, 0 when up. Only on the effect screen with HOLD FOR set to the momentary option, and always in PERFORM MODE; 0 everywhere else (the stock hold runs). Lags the switch by at most 16 ms; MIDI CC never sets it. 0 on older firmware |
+| 7 | 28 | hold claim: an effect that owns the footswitch hold writes its params pointer here every audio block; the firmware writes 0 every 16 ms. In PERFORM MODE a hold on a Footsw target skips the stock hold action (TAP, tuner) while this equals that slot's params pointer |
 
 Continue (`0xFB`) and Song Position are ignored.
 
@@ -65,9 +67,15 @@ when not running.
   running; each clock adds 1 while running; each beat measurement writes the
   tempo.
 - `asm/midi_clock/poll.S` (Task_SwitchNrmlSpdRead, every 16 ms, in place of
-  its `Clock_getTicks` call at `0xC00CA630`): clears running after 0.5 s
+  its `Clock_getTicks` call at `0xC00C6998` on the 70CDR 2.10 OS; `0xC00CA630` on the MS-50G 3.10): clears running after 0.5 s
   without a clock (and 0.5 s after Start), and copies a changed patch TEMPO
   when the clock is not live.
+- `asm/looper/looper.S` (the same 16 ms round, `poll_pre`): writes word 6
+  (momentary hold armed `V_MARM`, or PERFORM's footswitch-down `V_PDOWN` while
+  PERFORM MODE is on screen) and clears word 7. `toggle_pre` also writes word 6
+  before the stock flip, so the flip and the flag land together.
+  `asm/perform/perform_keys.c` `perf_key` sets `V_PDOWN` and word 6 on the
+  footswitch press and clears them on release.
 - Layout constants: `asm/midi_clock/transport.inc`.
 - MIDI SETTINGS (v0.5, issue #26): with TRANSPORT RECEIVE set to OFF,
   Start, Stop and the clock count are ignored and turning it off clears

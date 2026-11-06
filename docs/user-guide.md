@@ -1,4 +1,4 @@
-<p align="center"><img src="img/banner.jpg" alt="MIDISTOMP MOD v2.0 on the screen of a Zoom MultiStomp" width="720"></p>
+<p align="center"><img src="img/banner.jpg" alt="MIDISTOMP MOD v2.0.1 on the screen of a Zoom MultiStomp" width="720"></p>
 
 <h1 align="center">MIDISTOMP 2.0 user guide</h1>
 
@@ -12,7 +12,7 @@ MS-70CDR product shots.</sub>
 New to MIDISTOMP? Read 1 to 3 in order, then jump to what you want to play with.
 
 1. [Overview](#1-overview): what 2.0 adds and which pedals it runs on
-2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
+2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [On Linux](#on-linux) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
 3. [Getting around](#3-getting-around): [The keys](#the-keys) · [Button combos and scrolling](#button-combos-and-scrolling) · [The MENU](#the-menu)
 4. [EFFECT CHAIN ROUTING](#4-effect-chain-routing): [Moving around](#moving-around) · [Routing modes](#routing-modes) · [Node knob pages](#node-knob-pages) · [Safety limiter](#safety-limiter) · [Saving](#saving)
 5. [PERFORM MODE](#5-perform-mode): [Getting in and out](#getting-in-and-out) · [The screen](#the-screen) · [Gestures](#gestures) · [Value, Next, Lag](#every-move-value-next-lag) · [SETUP](#setup) · [LOOPER menu](#the-looper-menu) · [Example](#example-a-transition)
@@ -53,7 +53,7 @@ One build runs on all three pedals:
 |---|---|
 | MS-70CDR | tested, with stereo input |
 | MS-60B | tested (v1.2), mono input |
-| MS-50G | tested (v1.2, from a Mac), mono input |
+| MS-50G | tested (v2.0, and v1.2 from a Mac), mono input |
 | MS-50G+, MS-70CDR+, MS-200D+ and the Four series | not supported: different hardware |
 
 You get 6 effects per patch, on every pedal. If you try it on a pedal not listed as tested, please
@@ -64,24 +64,28 @@ You get 6 effects per patch, on every pedal. If you try it on a pedal not listed
 ## 2. Install and recovery
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP updater yourself from Zoom's official one.
-This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below). It takes about five minutes.
+This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below; Linux can build but not flash, see [On Linux](#on-linux)). It takes about five minutes.
+
+Your patches are kept, but back them up first anyway, just in case (with your usual patch editor).
 
 1. Download [Zoom's **MS-70CDR v2.10** updater for Windows](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    from zoomcorp.com (a file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
-2. Download **MIDISTOMP-builder.exe** from the
+2. Download **MIDISTOMP-builder-Windows.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
-3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder.exe`. It writes **MIDISTOMP V2.0 Updater.exe** in
-   the same folder. It refuses any other file, so a wrong download can't produce a broken updater.
+3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
+   and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
+   window for a moment and writes a new file, **MIDISTOMP V2.0.1 Updater.exe**, in the same folder. It refuses any
+   other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
    power jack): the pedal shows the update screen.
 
    <img src="img/ms70cdr-usb.jpg" alt="The mini-USB port and the power jack on the side of the pedal" width="320">
 
-6. Run `MIDISTOMP V2.0 Updater.exe` and let it finish. Don't unplug during the update.
-7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0**, and MENU > SYSTEM shows **V2.0**.
+6. Run `MIDISTOMP V2.0.1 Updater.exe` and let it finish. Don't unplug during the update.
+7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0.1**, and MENU > SYSTEM shows **V2.0.1**.
 
-   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0 boot screen" width="300">
+   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0.1 boot screen" width="300">
 
 8. **On an MS-70CDR,** set SETTINGS > **INPUT** to **STEREO** to get the stereo routing modes (see
    [SETTINGS](#settings)). On the MS-50G and MS-60B leave it on MONO.
@@ -92,8 +96,6 @@ bootloader, so update mode is always there.
 
 ### On a Mac
 
-> A much easier Mac install is on the way. The steps below work today, but they need Python and Terminal.
-
 Zoom's Mac updater holds the same firmware files as the Windows one and runs the same flash steps, so a MIDISTOMP
 version of it can be built too. The build has been checked byte for byte against the Windows MIDISTOMP updater and
 flashed to an MS-50G from an Apple Silicon Mac.
@@ -101,24 +103,47 @@ flashed to an MS-50G from an Apple Silicon Mac.
 1. Download Zoom's **MS-70CDR v2.10** updater **for Mac** from the
    [MS-70CDR support page](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/)
    (a file like `MS-70CDR_v2.10_Mac_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
-2. Get this repository (`git clone`, or Code > Download ZIP on GitHub) and Python 3.10 or newer (from python.org or
-   Homebrew; the `python3` that comes with macOS is too old). Then in the repository's folder:
-   ```sh
-   python3 -m venv .venv && .venv/bin/pip install -e .
-   .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
-   ```
-   It writes **MIDISTOMP V2.0 Updater.app** next to Zoom's app, and refuses anything that is not Zoom's original.
-3. Changing the app breaks Zoom's code signature, so sign it for your own Mac:
-   ```sh
-   xattr -cr "/path/to/MIDISTOMP V2.0 Updater.app"
-   codesign --force --deep --sign - "/path/to/MIDISTOMP V2.0 Updater.app"
-   ```
-4. Put the pedal in update mode (step 5 above) and open the app. It is an Intel app, so Apple Silicon Macs run it
-   through Rosetta (macOS offers to install it). Its window reads **MIDISTOMP V2.0 Updater**; click Execute.
+2. Download the Mac builder from the [release page](https://github.com/matujuice/zoom-ms-midistomp/releases):
+   **MIDISTOMP-builder-Mac-AppleSilicon.zip** (M1 and newer) or **MIDISTOMP-builder-Mac-Intel.zip**
+   (Apple menu > About This Mac shows which). Unzip it.
+3. Double-click **MIDISTOMP-builder-Mac-…**. It is not notarized, so the first time macOS refuses it: open System
+   Settings > Privacy & Security, click **Open Anyway** next to it, and double-click it again.
+4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
+   Enter. It writes **MIDISTOMP V2.0.1 Updater.app** next to Zoom's app and signs it for your Mac. It refuses anything
+   that is not Zoom's original.
+5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0.1 Updater.app**. It is
+   an Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to install it). Its window reads
+   **MIDISTOMP V2.0.1 Updater**; click Execute.
+
+To run the builder from source instead of steps 2 to 4 (needs Python and Terminal): get this repository
+(`git clone`, or Code > Download ZIP on GitHub) and Python 3.10 or newer (from python.org or Homebrew; the `python3`
+that comes with macOS is too old). Then in the repository's folder:
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
+```
+
+It writes and signs **MIDISTOMP V2.0.1 Updater.app** the same way. If signing fails, it prints the two Terminal lines
+(`xattr -cr` and `codesign --force --deep --sign -`) to run on the app yourself.
 
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
 Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover
 with Zoom's MS-70CDR Mac updater (it accepts an MS-50G running MIDISTOMP) or the MIDISTOMP one.
+
+### On Linux
+
+There is no Linux updater: the flashing itself needs Windows or a Mac. You can still build the Windows updater on
+Linux from source (Python 3.10 or newer), then run it on a Windows machine:
+
+```sh
+git clone https://github.com/matujuice/zoom-ms-midistomp && cd zoom-ms-midistomp
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
+```
+
+It writes **MIDISTOMP V2.0.1 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
+machine with USB passed through, is not tested.
 
 ### Recovery and going back to stock
 
@@ -151,7 +176,8 @@ use the knobs the same way. The softkey above each knob names what its press doe
 | Knob 3 | next page (the right softkey names it) |
 
 In lists (MENU, SETTINGS, MIDI, PERFORM MODE), turn knob 1 to scroll, press knob 1 (**ENTER**) to open a row, turn
-knob 3 to change a row that has a value, and press knob 2 to go back.
+knob 3 to change a row that has a value (in SETTINGS and MIDI, arrows over knob 3 show it), and press knob 2 to go
+back.
 
 The Effect Chain screen itself and KALEIDO have their own keys, explained in [Moving around](#moving-around) and
 [KALEIDO](#kaleido).
@@ -161,8 +187,8 @@ The Effect Chain screen itself and KALEIDO have their own keys, explained in [Mo
 - In the effect chain or effect view, hold **down + right** about 1 s for the tuner, and **down + left** for the tempo
   screen. The pedal already marks them: the tuning fork sits under down + right, the note icon under down + left.
 - In the tuner, press knob 2 (**EXIT**) to go back to the effects.
-- Left and right move between the effects of a patch several times faster than stock. At the last effect, one more
-  press slides back to the first one, and the other way round.
+- On the effect select (carousel) screen, left and right scroll several times faster than stock. At the last
+  effect, one more press slides back to the first one, and the other way round.
 
 ### The MENU
 
@@ -170,7 +196,7 @@ The Effect Chain screen itself and KALEIDO have their own keys, explained in [Mo
 
 Press knob 1 in the effect view to open the MENU:
 
-**DELETE EFFECT UNIT, EFFECT CHAIN, PERFORM MODE, SETTINGS, SYSTEM, MASTER, KALEIDO.**
+**DELETE EFFECT UNIT, EFFECT CHAIN, PERFORM MODE, MASTER, SETTINGS, SYSTEM, KALEIDO.**
 
 - The title bar shows the patch's DSP use on the left (`DSP 135/300`: what the effects declare, out of the new limit
   of 300; stock stops at 225) and the pedal's CPU load on the right (`CPU 47%`).
@@ -340,6 +366,10 @@ control never has two. Each gesture moves its target and can schedule a follow m
 
 The knobs tell a turn, a press and a hold apart even if you click while turning or turn a little while pressing.
 
+**Footswitch hold on an effect.** When the footswitch's target is an effect's on/off (not GRDLOOP), holding it works
+like HOLD FOR MOMENTARY, whatever HOLD FOR is set to: the effect flips when you press and flips back when you let go.
+In Perform mode the hold never opens TAP or the tuner.
+
 ### Every move: Value, Next, Lag
 
 | Setting | Choices |
@@ -361,6 +391,10 @@ The knobs tell a turn, a press and a hold apart even if you click while turning 
   moves with a Next fire at once.
 - **MIDI Start or Stop, or a patch change,** cancel waiting moves and restart the grid. A tempo change just moves
   the grid with it.
+
+**Knobs speed up when turned fast**, exactly like the stock effect parameters: a slow turn moves 1 step per
+click, a fast spin moves several, so a knob crosses its range quickly and still lands exactly. This works on
+the Perform knobs and the mixer node knob pages. Lists and menus always move one row per click.
 
 ### SETUP
 
@@ -395,8 +429,8 @@ In SETUP > **LOOPER** (when the patch has GRDLOOP):
 - One row per loop event: **REC START, REC END, PLAY, STOP, DELETE, LOOP START** (every pass). Each has one target
   and one move (Value, Next, Lag), no Follow.
 
-A new patch with the looper starts with: footswitch → looper Ftsw; REC END → MIX XFade to B100 over 1 BAR;
-DELETE → MIX XFade to A100, MICRO.
+A new patch starts with PERFORM blank: no targets, no looper rows. Set the footswitch to the looper (Ftsw)
+yourself if you want it to drive GRDLOOP.
 
 ### Example: a transition
 
@@ -469,15 +503,16 @@ waits for its Next line, except with NOW.
 
 ### Memory
 
-Loops are stored in 12-bit, about 72 dB under the signal. The looper picks stereo or mono when recording starts,
+Loops are stored in 12-bit, about 72 dB under the signal: up to 23.2 s stereo or 43.0 s mono. The looper picks stereo or mono when recording starts,
 from the tempo and the cycle length:
 
 | Length | Stereo | Mono |
 |---|---|---|
-| 1-4 bars | any tempo | |
-| 8 bars | 79 BPM and up | 40-78 BPM |
-| 16 bars | 158 BPM and up | 81-157 BPM |
-| 32 bars | | 161 BPM and up |
+| 1-2 bars | any tempo | |
+| 4 bars | 42 BPM and up | 40-41 BPM |
+| 8 bars | 83 BPM and up | 45-82 BPM |
+| 16 bars | 165 BPM and up | 89-164 BPM |
+| 32 bars | | 178 BPM and up |
 
 If the cycle doesn't fit, the looper records what fits, halving the length, and the status says so (for example
 `REC 4/8`, or `REC 14/16 M` when it also went mono). At 120 BPM a 32-bar cycle records 16 bars mono; the counter
@@ -513,6 +548,10 @@ MENU > **KALEIDO** fills the screen with a mirrored pattern that moves with the 
 rings, mids warp it and switch the number of mirrors, highs speed it up and add sparkle, the level sets the contrast
 and the L/R balance turns it. With MIDI clock running it flashes on every beat. It does nothing useful and that's
 the point.
+
+With SETTINGS > **IDLE KALEIDO** set to a time, KALEIDO also opens at power-on and whenever the play screen has gone
+untouched that long (never from a menu, the tuner or an effect's knob pages). Any key or knob takes you back to the
+play screen; the footswitch also does its normal job, so a stomp both wakes the pedal and turns the effect on or off.
 
 | Knob | Turn |
 |---|---|
@@ -600,7 +639,11 @@ is its footswitch ([LOOPER](#the-footswitch)).
 CC 80 with a value of 64-127 loads the previous patch, CC 81 the next one, wrapping between patch 50 and patch 1.
 Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released steps once.
 
-All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down doesn't follow the PC settings.
+### Tap tempo
+
+CC 82 with a value of 64-127 taps the tempo once, as a tap on the tempo screen does, without opening the tempo screen. Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released taps once. While a MIDI clock is setting the tempo, taps do nothing, as on the pedal.
+
+All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down and tap tempo don't follow the PC settings.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 
@@ -608,7 +651,7 @@ All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down doesn't follow the PC 
 
 ### SETTINGS
 
-<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: INPUT and MIDI" width="260"></p>
+<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: TEMPO LOCK, INPUT, IDLE KALEIDO and MIDI" width="260"></p>
 
 MENU > **SETTINGS** holds the stock rows plus these:
 
@@ -617,13 +660,15 @@ MENU > **SETTINGS** holds the stock rows plus these:
 | **HOLD FOR** | TUNER / TEMPO / MOMENTARY | what holding the footswitch does (below) |
 | **TEMPO LOCK** | OFF / ON | ON: changing patch keeps the current tempo ([Tempo Lock](#tempo-lock)) |
 | **INPUT** | MONO / STEREO | which input the pedal has (below) |
+| **IDLE KALEIDO** | OFF / 10 S / 30 S / 1 MIN / 2 MIN | not OFF: [KALEIDO](#kaleido) opens at power-on and after that long untouched on the play screen |
 | **MIDI** | opens the MIDI menu | [MIDI menu](#midi-menu) |
 
 **HOLD FOR:**
 - TUNER (default): opens the tuner, as stock.
 - TEMPO: opens the tempo screen.
-- MOMENTARY: a short press flips the effect as usual. Hold it over half a second and it flips back when you let go.
-  The flip-back is never saved.
+- MOMENTARY: hold the footswitch and the effect flips while you hold it: a bypassed effect turns on, an active one
+  turns off. Let go and it goes back. A short press (under half a second) flips it as usual and it stays.
+  The hold is never saved.
 
 **INPUT:** the firmware can't tell the pedals apart, so tell it. **STEREO** on an MS-70CDR gives the Split and Mono
 Serial modes. **MONO** (default) is for the MS-50G and MS-60B: those modes are not offered, and a patch that uses
@@ -633,7 +678,7 @@ them plays Split as Parallel and Mono Serial as Serial.
 
 <p><img src="img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="300"> <img src="img/tempo-midi-clock.png" alt="Tempo screen while MIDI clock arrives" width="300"></p>
 
-Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps, or
+Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps (bigger steps when you turn fast), or
 tap the footswitch. It closes 2 s after the last turn or tap. While MIDI clock arrives it reads **MIDI CLOCK** and
 can't be changed by hand.
 
@@ -651,13 +696,14 @@ MENU > **SYSTEM** has 4 pages. Knob 1 scrolls, knob 3 press goes to the next pag
 
 | Page | Shows |
 |---|---|
-| 1 **VERSION** | MIDISTOMP version, commit, date and label of the build |
+| 1 **VERSION** | MIDISTOMP version, commit (RELEASE on a build from MIDISTOMP-builder), date and label (RELEASE, or DEV on your own build) |
 | 2 **LOAD** | CPU (all of it), CPU PEAK since the page opened, AUDIO (the effect chain) and AUDIO MAX, the free headroom, late audio blocks, and the patch's declared DSP out of 300 |
 | 3 **EFFECTS** | per effect: name, CPU share and declared DSP |
-| 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MASTER, KALEIDO, MIDI and DIAGNOSTICS itself |
+| 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MIDI and SYSTEM itself; then MASTER and KALEIDO, with their load from the last time they were open (`-` if not opened since power-on) |
 
 LOAD and MODS help you find what makes a heavy patch heavy. A late block means the CPU was full for a moment; a
-patch change makes one or two, which is normal. MASTER and KALEIDO cost nothing while closed.
+patch change makes one or two, which is normal. MASTER and KALEIDO cost nothing while closed, and SYSTEM's
+measuring runs only while SYSTEM or the MENU is open.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 
@@ -671,6 +717,15 @@ around MIDISTOMP. They follow the pedal's tempo, lock to the clock's grid, resta
 and keep going after Stop. The looper, GRDLOOP ([LOOPER](#6-looper-grdloop)), comes from the pack too, and new effects keep coming.
 
 See [what each knob does](https://github.com/matujuice/zoom-ms-zdl-effects-pack/blob/main/docs/EFFECTS.md).
+
+<img src="img/effect-select.png" alt="ADD EFFECT UNIT: DYN/FLTR, OD/DIST, AMP, MOD/SFX, DLY/REV, EXIT" width="300">
+
+**Effect categories.** The category screen (when you add or change an effect) is the MS-50G's: **DYN/FLTR**,
+**OD/DIST**, **AMP** on top, **MOD/SFX**, **DLY/REV**, **EXIT** below. ENTER on a category gives its first effect; turn the
+effect knob to scroll on, as on an MS-50G: filters follow DYN, SFX follow MOD, reverbs follow DLY. The pack effects
+are delays, so you find them under DLY/REV. OD/DIST and AMP hold drives and amps only when you load them (from an
+MS-50G or MS-60B set); ENTER on a category with nothing loaded puts a blank unit in, as on an MS-50G, and the
+effect knob then picks an effect. ENTER on EXIT leaves the screen.
 
 **Effect Manager.** Zoom's Effect Manager and Zoom Effect Manager 2 work in **normal mode** (adding, removing and
 ordering effects); MIDISTOMP stays installed. **Never use an Effect Manager's firmware update mode** on a MIDISTOMP
@@ -709,7 +764,6 @@ confusing, or an idea. Say which pedal and MIDISTOMP version you have (MENU > SY
 happened. A phone photo of the screen helps. Reports from MS-50G and MS-60B owners are especially welcome.
 
 MIDISTOMP is free and made by one person. If it's useful to you, you can buy me a coffee:
-[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice) ·
-[GitHub Sponsors](https://github.com/sponsors/matujuice)
+[PayPal](https://paypal.me/matujuice) · [Buy Me a Coffee](https://buymeacoffee.com/matujuice)
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>

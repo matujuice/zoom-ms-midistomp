@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("PIL")  # the preview script writes PNGs; CI has no Pillow
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("chain_draw_preview", ROOT / "scripts/chain_draw_preview.py")
 preview = importlib.util.module_from_spec(spec)

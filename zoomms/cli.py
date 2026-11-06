@@ -81,8 +81,9 @@ def build_stamp(patch_paths: list[str], given: list[str] = ()) -> dict:
         commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
                                 cwd=Path(__file__).parent, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
-        commit = "?"
-    stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": "DEV"}
+        commit = "RELEASE"  # the frozen builder runs without git
+    label = "RELEASE" if commit == "RELEASE" else "DEV"
+    stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": label}
     stamp.update(kv.split("=", 1) for kv in given)
     return stamp
 
@@ -105,6 +106,9 @@ def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], bu
     return new_os, (bytes(d133) if d133 != stock_133 else None), img
 
 
+WIN_TITLE = "MIDISTOMP V2.0.1 Updater"  # Windows window title
+
+
 def cmd_build(args) -> int:
     stock = Path(args.updater).read_bytes()
     found = parts.find_parts(args.updater)
@@ -117,7 +121,8 @@ def cmd_build(args) -> int:
         return 1
     new_os, new_133, img = patched
     d133 = new_133 or stock_133
-    exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps, new_133=new_133)
+    exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps, new_133=new_133,
+                               title=WIN_TITLE)
 
     # Re-read what we are about to write and check it.
     check = ais.parse(exe[os_part.offset:os_part.offset + os_part.size])
@@ -206,8 +211,12 @@ def cmd_build_mac(args) -> int:
     print(f"OS bytes changed: {changed_os}; Preset.bin bytes changed: {changed_133}")
     print("flash steps: " + "; ".join(s.describe() for s in steps))
     app_name = f"{out.stem}.app" if as_zip else str(out)
-    print(f"wrote {out}\nOn the Mac{', after unzipping' if as_zip else ''}, re-sign it before running: "
-          f"xattr -cr \"{app_name}\" && codesign --force --deep --sign - \"{app_name}\"")
+    if as_zip:
+        print(f"wrote {out}\nOn the Mac, unzip it and double-click {macapp.INSTALL} (the first time, "
+              "right-click > Open): it re-signs the app and opens it.")
+    else:
+        print(f"wrote {out}\nOn the Mac, re-sign it before running: "
+              f"xattr -cr \"{app_name}\" && codesign --force --deep --sign - \"{app_name}\"")
     return 0
 
 

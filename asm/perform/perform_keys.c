@@ -16,6 +16,7 @@
 #define CLICK_MIN_MS 30         /* a shorter click is bounce or a bump: ignored */
 #define TURN_GUARD_MS 150       /* a click this soon after the knob turned is ignored */
 #define HOLD_MS 400             /* held still this long: a hold */
+#define FTSW_HOLD_MS 500        /* the footswitch: as HOLD FOR MOMENTARY (asm/tempo_hold/hold.inc HOLD_MS) */
 #define DETENT 1                /* encoder counts per detent (probe) */
 #define WOBBLE 1                /* detents ignored while a knob is held; one more cancels the press and counts as a turn */
 #define REDRAW_POLLS 4          /* the play screen redraws every 4th poll (blink, countdown, values) */
@@ -36,10 +37,10 @@ int pu_t;                       /* ms since start, in polls */
 extern int pd_nrows(void), pd_nmod(void), pd_mod_of(int t), pd_target(int mod, int p, int ev);
 extern int pd_pidx(int t, int mod, int ev), pd_step(int t, int v, int a);
 extern unsigned char *pd_tgt(void);
-extern unsigned short *pd_move(void);
+extern unsigned *pd_move(void);
 
 static int seen = -1, polls;
-static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released */
+static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released, 4 MOMENTARY held */
 static int td[NCTL], moved[NCTL], tt[3];
 
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -83,19 +84,29 @@ static void turn(int k, int steps)
     perf_turn(k, steps);
 }
 
+/* A control works as the footswitch: the footswitch itself, or any control aimed at a Footsw target */
+static int sw(int c) { return c == C_FTSW || IS_FTSW(perf_patch.target[c]); }
+
 static void press(int c)
 {
+    if (st[c]) return;                           /* already down: a second press event is not a new press */
     st[c] = c < 3 && pu_t - tt[c] < TURN_GUARD_MS ? 3 : 1;
     td[c] = pu_t;
     moved[c] = 0;
+    if (st[c] == 1 && sw(c)) {                   /* acts on the press, as on the effect screen */
+        if (c != C_FTSW) V_PDOWN = ZMT_FTSW = 1; /* down while held: an effect can claim the hold (word 6) */
+        perf_gesture(c, G_PRESS, 0);
+    }
 }
 
 static void release(int c)
 {
     int s = st[c];
     st[c] = 0;
+    if (c != C_FTSW && sw(c)) V_PDOWN = ZMT_FTSW = 0;
+    if (s == 4) perf_momentary(c, 1);           /* MOMENTARY: the release flips it back */
     if (s == 2) perf_gesture(c, G_HOLD, 1);
-    else if (s == 1 && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
+    else if (s == 1 && !sw(c) && pu_t - td[c] >= CLICK_MIN_MS) perf_gesture(c, G_PRESS, 0);
 }
 
 /* ---- SETUP -------------------------------------------------------------------------------- */
@@ -105,7 +116,7 @@ static void quit(void) { perf_leave(); }        /* Cursor up while playing; STOR
 
 static void move_key(int ev, int a)              /* a move's knob page: the three knobs edit Value, Next and Lag */
 {
-    unsigned short *m = pd_move(), w = *m;
+    unsigned *m = pd_move(), w = *m;
     int v = MV_VALUE(w), nx = MV_NEXT(w), lg = MV_LAG(w), un = nx == NX_UNUSED;
     if (ev == 65) { pu_scr = pu_ev >= 0 ? SC_CTL : SC_GES; return; }
     if (ev == 160) {
@@ -157,7 +168,7 @@ static void setup_key(int ev, int a)
         if (open) {
             *pd_tgt() = (unsigned char)pd_target(pu_mod, *pos, pu_ev >= 0);
             if (IS_FTSW(*pd_tgt())) {                /* a new Footsw target presses on a click (and a hold) */
-                unsigned short *a = pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][M_PRESS_A];
+                unsigned *a = pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][M_PRESS_A];
                 if (MV_NEXT(*a) == NX_UNUSED) *a = MV(127, NX_NOW, LG_OFF);
                 if (pu_ev < 0 && MV_NEXT(perf_patch.move[pu_ctl][M_HOLD_A]) == NX_UNUSED) perf_patch.move[pu_ctl][M_HOLD_A] = MV(127, NX_NOW, LG_OFF);
             }
@@ -178,6 +189,7 @@ void perf_key(int ev, int steps)
 {
     int c;
     sync();
+    if ((ev | 1) == 33) V_PDOWN = ZMT_FTSW = !(ev & 1);   /* footswitch down: RISER's word 6, the poll keeps it on this screen */
     if ((ev | 1) == 69) { if (ev == 69 && perf_on == 1) quit(); return; }   /* Cursor up leaves the play screen only, on release: the press would reach the effect screen */
     if (perf_on != 1) {                          /* lists: knob 1 press opens, as stock; knob 3 press does nothing */
         if (ev == 67 || ev == 35) return;
@@ -201,6 +213,18 @@ void perf_key(int ev, int steps)
     if (ev & 1) release(c); else press(c);
 }
 
+/* A hold of the footswitch, or of a control aimed at a Footsw target (not the looper), works as HOLD FOR MOMENTARY on the effect
+ * screen, whatever HOLD FOR is (never TAP or the tuner): the release flips it back. Nothing while
+ * the effect claims the hold (transport word 7, written within the last 16 ms: looper.S clears it
+ * after this poll). Else the hold gesture. */
+static int ftsw_hold(int c)
+{
+    int t = perf_patch.target[c], s = t & 7;
+    if (!IS_FTSW(t) || s == LOOPER_SLOT) return 2;
+    if (ZMT_CLAIM && ZMT_CLAIM == SLOT_PARAMS(s)) return 3;
+    return 4;
+}
+
 void perf_poll(void)
 {
     int c;
@@ -208,6 +232,10 @@ void perf_poll(void)
     sync();
     if (perf_on != 1) return;
     for (c = 0; c < NCTL; c++)
-        if (st[c] == 1 && pu_t - td[c] >= HOLD_MS) { st[c] = 2; perf_gesture(c, G_HOLD, 0); }
+        if (st[c] == 1 && pu_t - td[c] >= (c == C_FTSW ? FTSW_HOLD_MS : HOLD_MS)) {
+            st[c] = ftsw_hold(c);
+            if (st[c] == 2) perf_gesture(c, G_HOLD, 0);
+            if (st[c] == 4) perf_momentary(c, 0);
+        }
     if (++polls >= REDRAW_POLLS) { polls = 0; EVENT_POST(MAILBOX, 0x40); }
 }

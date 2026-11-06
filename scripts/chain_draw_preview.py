@@ -4,6 +4,7 @@ tests/chain_draw_host.c, draw the preview states (the chain screen; the node pag
 
 Usage: py scripts/chain_draw_preview.py [outdir]
 Exit code 2 when no host C compiler is found."""
+import os
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,7 @@ def find_cc():
             return [shutil.which(name)]
     for p in EXTRA:
         if Path(p).exists():
+            os.environ["PATH"] = str(Path(p).parent) + os.pathsep + os.environ["PATH"]  # msys gcc needs its own DLLs
             return [p]
     if subprocess.run([sys.executable, "-m", "ziglang", "version"], capture_output=True).returncode == 0:
         return [sys.executable, "-m", "ziglang", "cc"]   # pip install ziglang

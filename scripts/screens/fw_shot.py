@@ -21,9 +21,9 @@ from zoomms import ais, cli, parts, patcher  # noqa: E402
 UPDATER = Path(os.environ.get("ZOOM_UPDATER", Path.home() / "Downloads/ZOOM MS-70CDR v2.10 Updater.exe"))
 FB, B14, STOP, SP = 0x11816800, 0xC00EF748, 0xDEAD0000, 0x1180CF78
 RELEASE = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
-# v2 = the 2.0 set (diag takes the m0 probe's place, looper goes before mixer-m2)
-STAMP = ["version=V2.0", "commit=08f3ed8", "date=2026-10-24"]  # fixed diag.c build stamps, so the shots do not change per run
-IMAGES = {"release": RELEASE, "v2": RELEASE + ["looper", "mixer-m2", "diag"]}
+# v2 = the 2.0 release set, midistomp_builder.PATCHES
+STAMP = ["version=V2.0.1", "commit=RELEASE", "date=2026-11-06", "label=RELEASE"]  # a released build's stamps, fixed so the shots do not change per run
+IMAGES = {"release": RELEASE, "v2": ["version-2.0.1"] + RELEASE[1:] + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]}
 
 
 def available():
@@ -196,9 +196,16 @@ def diag_measure(cpu):
         cpu.t = t0 + (15800 if n != 2000 else 21300)  # the chain, one slower block for AUDIO MAX
         call(cpu, DIAG, t0, cyc)
         t0 += 25580
-    blocks = [a for a in range(DIAG, DIAG + 0x2300, 4) if cpu.mem.read(a, 4) == 4097]
-    assert len(blocks) == 1, blocks  # diag.c's block counter: the only word that counted every call
-    w32(cpu, blocks[0], round(5512.5 * (3600 + 23 * 60 + 45)))  # UPTIME 1:23:45
+    # UPTIME counts diag_poll calls (16 ms): poll 3 times off the menu, find the counter, set 1:23:45
+    mode = cpu.mem.read(B14 + 320, 4)
+    w32(cpu, B14 + 320, 0)
+    cpu.hooks[0xC00C82D0] = lambda c: c.R[35]  # POLL_TRAMP: the stock poll is not needed here
+    for _ in range(3):
+        call(cpu, DIAG + 8)
+    w32(cpu, B14 + 320, mode)
+    polls = [a for a in range(DIAG, DIAG + 0x2300, 4) if cpu.mem.read(a, 4) == 3]
+    assert len(polls) == 1, polls  # diag.c's polls: the only word that counted every poll
+    w32(cpu, polls[0], round((3600 + 23 * 60 + 45) / 0.016))
 
 
 def system(page):
@@ -208,6 +215,14 @@ def system(page):
         for _ in range(page):
             call(cpu, DIAG + 24, 67)  # knob 3 click: next page
         screen_list(cpu, 9)
+    return draw
+
+
+def effect_select(row=0):
+    """Screen 33 (ADD EFFECT UNIT, the category select) with drives loaded: fx-category's copy of the MS-50G screen, OD/DIST top middle."""
+    def draw(cpu):
+        w32(cpu, 0xC00ED9F0 + 3 * 12, 4)  # stock lists (count at gid * 12): 4 drives loaded
+        screen_list(cpu, 33, row)
     return draw
 
 
@@ -231,13 +246,14 @@ SCREENS = {
     "midi_menu_2": ("v2", lambda cpu: screen_list(cpu, 14, row=3, top=2)),
     "settings": ("v2", settings(3, 4)),
     "settings_2": ("v2", settings(0, 0)),
-    "settings_3": ("v2", settings(3, 6)),  # pedal_in.c: 10 rows, MIDI last
+    "settings_3": ("v2", settings(3, 7)),  # pedal_in.c: 11 rows, IDLE KALEIDO, MIDI last
     "menu": ("v2", menu()),
-    "menu_2": ("v2", menu(1, 3)),  # row is relative to top: the cursor on SYSTEM
+    "menu_2": ("v2", menu(2, 3)),  # row is relative to top: the cursor on SYSTEM
+    "effect_select": ("v2", effect_select(0)),
     "hold_for": ("release", hold_for),  # v2 changes HOLD FOR in the list (pedal_in.c), no choice screen
     "tempo_turn_tap": ("release", tempo(False)),
     "tempo_clock": ("release", tempo(True)),
-    "boot": ("release", boot_screen("v2.0")),
+    "boot": ("release", boot_screen("v2.0.1")),
     **{f"mixer_{n}": ("v2", mixer_page(pg)) for n, pg in [("in", 0), ("route", 1), ("mix_1", 3), ("mix_2", 4), ("mix_3", 5), ("out", 6)]},
     **{f"system_{n}": ("v2", system(i)) for i, n in enumerate(["version", "load", "effects", "mods"])},
 }
