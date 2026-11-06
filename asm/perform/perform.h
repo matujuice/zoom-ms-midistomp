@@ -102,6 +102,7 @@ typedef struct {
 extern PerfPatch perf_patch;    /* the patch played */
 extern PerfGrid perf_grid;
 extern volatile int perf_on;    /* 1 while screen 11 shows PERFORM (play), 2 SETUP, 0 out */
+extern volatile int perf_led;   /* the play screen's blink for the LED, -1 = the looper's level */
 
 /* Engine API (audio block and 16 ms poll). */
 void perf_block(void);                        /* top of engine_run: grid, due moves, lags, LED */

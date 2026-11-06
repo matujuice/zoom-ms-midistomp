@@ -148,6 +148,7 @@ const char *host_desc(int s, int p)              /* descriptor entries: the name
 PerfPatch perf_patch;
 PerfGrid perf_grid;
 volatile int perf_on;
+volatile int perf_led = -1;
 static int host_val[256], host_pend[8];
 int perf_native(int t) { return host_val[t & 255]; }
 int perf_pending(int c) { return host_pend[c]; }

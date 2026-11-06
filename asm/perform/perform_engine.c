@@ -424,6 +424,7 @@ int perf_pending(int ctl)
 
 /* ---- Footswitch LED: its target owns it in Perform ----------------------- */
 static int led_own, pwm;
+volatile int perf_led = -1;     /* play screen: 0/1 while our move waits on the looper (the bar's blink), -1 its own level */
 static Tgt led_x;               /* tgt(the footswitch's target), from the poll: no descriptor call a block */
 
 static void led(void)
@@ -434,7 +435,7 @@ static void led(void)
         x = led_x;
         if (x.k == K_FTSW && (int)SV[W_SLOT] == x.a) {
             pwm = (pwm + 1) & 31;
-            lit = pwm < (int)SV[W_LEVEL];       /* the looper's level: countdown, pulse, on */
+            lit = perf_on == 1 && perf_led >= 0 ? perf_led : pwm < (int)SV[W_LEVEL];   /* the looper's level: countdown, pulse, on */
         } else if ((x.k == K_FTSW && x.a < COUNT) || (x.k == K_FX && x.b == 0))
             lit = FX_REC(x.a)[0] != 0;          /* Footsw or on / off: the effect's on state */
     }

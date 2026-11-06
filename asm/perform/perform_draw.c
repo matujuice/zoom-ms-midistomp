@@ -355,20 +355,24 @@ static void play(void)
     static const unsigned char AR[3][5] = { { 4, 14, 31 }, { 1, 3, 7, 3, 1 }, { 31, 14, 4 } };
     static const unsigned char ARN[3] = { 3, 5, 3 };
     char left[24], right[16], a[16], l[16], v[8], *o;
-    int C = perf_patch.cycle, run = perf_grid.running && perf_grid.beat >= 0, w = 0, i, j, h, x, y, lp = -1, t, n, k, lk, b = beatms();
+    int C = perf_patch.cycle, run = perf_grid.running && perf_grid.beat >= 0, w = 0, i, j, h, x, y, lp = -1, t, n, k, lk;
     Par p;
 
     left[0] = 0;
     lk = loop_live() ? left_text(left) : 0;
     if (lk) lp = loop_pending();
     for (i = 0; i < 11; i++) for (j = 0; j < 16; j++) ink[i][j] = 0;
-    if (run) {                                   /* the top bar is the cycle counter: it fills over the cycle */
+    perf_led = lp >= 0 ? blinkon(PEND_MS(lp)) : -1;  /* our move waits on the looper: the LED blinks with the bar */
+    if (lk >= 2 && lp < 0 && !(SVC(19) >> 30 & 1)) {   /* the looper's own bar (word 19, blink applied): the same block as its LED */
+        n = SVC(19);
+        w = udiv(126u * (n & 0xFFFF), 256);
+        o = ncat(right, n >> 22 & 63);
+        o = ncat(scat(o, "."), 1 + (n >> 28 & 3));
+        if (n >> 16 & 63) ncat(scat(o, "/"), n >> 16 & 63);
+    } else if (run) {                            /* the top bar is the cycle counter: it fills over the cycle */
         k = C ? C : 1;
         w = udiv(126u * (umod(perf_grid.beat, 4 * k) * 65536u + perf_grid.frac), 4u * k * 65536u);
-        if (lp >= 0 && !blinkon(PEND_MS(lp))) w = 0;     /* an action waits: the fill blinks faster as it comes */
-        if (lp < 0 && (lk == 5 || lk == 6) && umod(gms(), 2 * b) < (unsigned)b / 2) w = 0;   /* recording: off an 1/8 every 2 beats */
-        n = SVC(30);                             /* the GRDLOOP's own action waits (its Next): the same grid-locked blink, from its count */
-        if (lp < 0 && lk >= 2 && lk <= 4 && !blinkon((n >> 4 & 63) * (n >> 16 & 1 ? b : 4 * b))) w = 0;
+        if (lp >= 0 && !perf_led) w = 0;         /* an action waits: the fill blinks faster as it comes */
         o = ncat(right, 1 + (C ? umod(perf_grid.beat >> 2, C) : perf_grid.beat >> 2));
         o = ncat(scat(o, "."), 1 + (perf_grid.beat & 3));
         if (C) ncat(scat(o, "/"), C);
