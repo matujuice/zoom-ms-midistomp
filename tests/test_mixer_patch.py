@@ -337,6 +337,8 @@ def test_sections_match_a_fresh_ti_build():
     assert b.build_c() == _data(CSEC)                                # also: links without RTS, no B14
     far = PATCH["section"][2]                                        # the C's zeroed variables
     assert (far["addr"], _data(far)) == (b.FAR_ADDR, bytes(-(-b.FAR_LEN // 32) * 32))
+    (mid,) = [s for s in PATCH["section"] if s["source"] == "asm/mixer/mid"]   # chain_draw's .const
+    assert (mid["addr"], _data(mid)) == (b.MID_ADDR, b.MID_IMG) and b.MID_ADDR + len(b.MID_IMG) <= b.MID_END
 
 
 def test_m2_build_does_not_overlap():

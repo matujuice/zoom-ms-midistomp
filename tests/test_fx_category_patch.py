@@ -77,7 +77,7 @@ def test_writes_point_at_the_section():
 
 
 def test_section_fits_its_gap():
-    assert 0xC00F29A0 <= SEC["addr"] and SEC["addr"] + len(_data(SEC["data"])) <= 0xC00F3000
+    assert 0xC00F29A0 <= SEC["addr"] and SEC["addr"] + len(_data(SEC["data"])) <= 0xC00F2BA0   # mixer-m2 asm/mixer/mid above
 
 
 def test_section_matches_a_fresh_ti_build():
