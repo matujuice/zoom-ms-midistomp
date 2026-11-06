@@ -118,13 +118,14 @@ Your patches are kept, but back them up first anyway, just in case (with your us
 
 1. Download [Zoom's official **MS-70CDR 2.10** updater](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/).
    Use it for every pedal, also the MS-50G and MS-60B.
-2. Drag it onto **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
-   It writes the MIDISTOMP updater next to it.
+2. Download **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
+   In File Explorer, drag Zoom's updater (`ZOOM MS-70CDR v2.10 Updater.exe`) and drop it on the builder's icon.
+   The builder writes **MIDISTOMP V2.0 Updater.exe** in the same folder.
 3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater.
 4. On the pedal, go to MENU > SETTINGS > **INPUT** and choose your input: **STEREO** on an MS-70CDR (needed for the
    Split routing modes), **MONO** on the MS-50G and MS-60B.
 
-Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
+Full steps, Mac and Linux, and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
 
 **On a Mac:** the same, with Zoom's **Mac** updater and **MIDISTOMP-builder-Mac** from the
 [releases](https://github.com/matujuice/zoom-ms-midistomp/releases) (AppleSilicon or Intel, to match your Mac): open

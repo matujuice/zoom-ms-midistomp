@@ -12,7 +12,7 @@ MS-70CDR product shots.</sub>
 New to MIDISTOMP? Read 1 to 3 in order, then jump to what you want to play with.
 
 1. [Overview](#1-overview): what 2.0 adds and which pedals it runs on
-2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
+2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [On Linux](#on-linux) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
 3. [Getting around](#3-getting-around): [The keys](#the-keys) · [Button combos and scrolling](#button-combos-and-scrolling) · [The MENU](#the-menu)
 4. [EFFECT CHAIN ROUTING](#4-effect-chain-routing): [Moving around](#moving-around) · [Routing modes](#routing-modes) · [Node knob pages](#node-knob-pages) · [Safety limiter](#safety-limiter) · [Saving](#saving)
 5. [PERFORM MODE](#5-perform-mode): [Getting in and out](#getting-in-and-out) · [The screen](#the-screen) · [Gestures](#gestures) · [Value, Next, Lag](#every-move-value-next-lag) · [SETUP](#setup) · [LOOPER menu](#the-looper-menu) · [Example](#example-a-transition)
@@ -64,7 +64,7 @@ You get 6 effects per patch, on every pedal. If you try it on a pedal not listed
 ## 2. Install and recovery
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP updater yourself from Zoom's official one.
-This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below). It takes about five minutes.
+This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below; Linux can build but not flash, see [On Linux](#on-linux)). It takes about five minutes.
 
 Your patches are kept, but back them up first anyway, just in case (with your usual patch editor).
 
@@ -72,8 +72,10 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    from zoomcorp.com (a file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
 2. Download **MIDISTOMP-builder-Windows.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
-3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder-Windows.exe`. It writes **MIDISTOMP V2.0 Updater.exe** in
-   the same folder. It refuses any other file, so a wrong download can't produce a broken updater.
+3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
+   and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
+   window for a moment and writes a new file, **MIDISTOMP V2.0 Updater.exe**, in the same folder. It refuses any
+   other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
    power jack): the pedal shows the update screen.
@@ -128,6 +130,20 @@ It writes and signs **MIDISTOMP V2.0 Updater.app** the same way. If signing fail
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
 Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover
 with Zoom's MS-70CDR Mac updater (it accepts an MS-50G running MIDISTOMP) or the MIDISTOMP one.
+
+### On Linux
+
+There is no Linux updater: the flashing itself needs Windows or a Mac. You can still build the Windows updater on
+Linux from source (Python 3.10 or newer), then run it on a Windows machine:
+
+```sh
+git clone https://github.com/matujuice/zoom-ms-midistomp && cd zoom-ms-midistomp
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
+```
+
+It writes **MIDISTOMP V2.0 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
+machine with USB passed through, is not tested.
 
 ### Recovery and going back to stock
 
