@@ -25,8 +25,8 @@
 #define MENUSCR ((volatile unsigned char *)(MIXER_BASE + 184))
 #define LIVE ((volatile unsigned char *)(MIXER_BASE + 224))   /* [24] settings of the patch played */
 #define LAYOUT (LIVE + 12)      /* [6] bus of each slot (settings 12-17) */
-#define R50 ((volatile unsigned char *)0xC01086E0u)  /* record 50 as in flash: globals + settings table (pages.c) + Perform (perform_store.c) */
-#define R50_SIZE (824 + 4 + 50 * 112)
+#define R50 ((volatile unsigned char *)0xC0116000u)  /* record 50 as in flash (below looper region 1): globals + settings table (pages.c) + Perform (perform_store.c) */
+#define R50_SIZE (824 + 4 + 50 * 208)
 #define R50_COPY 0xC0106DC0u    /* [R50_SIZE] the record store compaction buffer (mixer-m2.yaml) */
 
 /* Settings: LIVE[S_*]. Levels 0-150, 100 = unity; Send and Crossfade 0-100. */

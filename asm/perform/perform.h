@@ -51,14 +51,14 @@
 #define T_FTSW 0x80
 #define IS_FTSW(t) (((t) & 0xF8) == T_FTSW)
 
-/* ---- A move: two bytes (storage E) ------------------------------------- *
- * bits 0-6   VALUE 0-127, in CC units (the screen shows the target's range)
- * bits 7-11  NEXT 0-10 (table below), 31 = unused move (VALUE "-")
- * bits 12-15 LAG 0-15 (table below) */
-#define MV_VALUE(m) ((m) & 127)
-#define MV_NEXT(m) ((m) >> 7 & 31)
-#define MV_LAG(m) ((m) >> 12 & 15)
-#define MV(v, n, l) ((unsigned short)((v) | (n) << 7 | (l) << 12))
+/* ---- A move: four bytes ---------------------------------------------- *
+ * bits 0-15  VALUE in the target's own units (an effect knob's own steps, a mixer level)
+ * bits 16-20 NEXT 0-10 (table below), 31 = unused move (VALUE "-")
+ * bits 21-24 LAG 0-15 (table below) */
+#define MV_VALUE(m) ((m) & 0xFFFF)
+#define MV_NEXT(m) ((m) >> 16 & 31)
+#define MV_LAG(m) ((m) >> 21 & 15)
+#define MV(v, n, l) ((unsigned)((v) | (n) << 16 | (l) << 21))
 #define MV_UNUSED MV(0, NX_UNUSED, 0)
 
 /* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR (v2.0 saved 11-16 = CYC: now 32 BAR).
@@ -84,10 +84,10 @@ typedef struct {
     unsigned char target[NCTL];             /* T_* */
     unsigned char loop_target[NLOOP];
     unsigned char loop_on;                  /* LOOPER menu: 1 = the loop events fire (byte 15, the alignment gap, is perform_store's PT_OK) */
-    unsigned short move[NCTL][NMOVE_CTL];   /* [ctl][M_*]; buttons/footswitch leave M_TURN_F unused */
-    unsigned short loop_move[NLOOP];
-} PerfPatch;                                /* 1 + 7 + 6 + 1 + 84 + 12 = 111 -> 112 with alignment */
-#define PT_SIZE 112
+    unsigned move[NCTL][NMOVE_CTL];         /* [ctl][M_*]; buttons/footswitch leave M_TURN_F unused */
+    unsigned loop_move[NLOOP];
+} PerfPatch;                                /* 1 + 7 + 6 + 1 + 1 pad + 168 + 24 = 208 */
+#define PT_SIZE 208
 
 /* ---- Runtime (perform_engine.c owns it) -------------------------------- */
 #define NSLOT 16                /* moves at once: a lag running or a move waiting */

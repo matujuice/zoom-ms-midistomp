@@ -69,7 +69,7 @@ def test_block_layout():
     regions = [(word(8 + 8 * k), word(12 + 8 * k)) for k in range(3)]
     assert regions == [(0xC0636980, 0xC07D0000 - 0xC0636980),   # RAM test region 3
                        (0xC0198000, 0xC0200000 - 0xC0198000),   # region 2
-                       (0xC0116000, 0xC0198000 - 0xC0116000)]   # region 1 above MOD code, record 50 and MASTER
+                       (0xC0118C00, 0xC0198000 - 0xC0118C00)]   # region 1 above MOD code, MASTER and record 50
     assert word(40) == 0xFFFFFFFF  # no slot claimed
     hooks_end = HOOKS["addr"] + len(bytes.fromhex("".join(HOOKS["data"].split())))
     assert hooks_end <= BLOCK["addr"]

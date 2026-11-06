@@ -37,7 +37,7 @@ int pu_t;                       /* ms since start, in polls */
 extern int pd_nrows(void), pd_nmod(void), pd_mod_of(int t), pd_target(int mod, int p, int ev);
 extern int pd_pidx(int t, int mod, int ev), pd_step(int t, int v, int a);
 extern unsigned char *pd_tgt(void);
-extern unsigned short *pd_move(void);
+extern unsigned *pd_move(void);
 
 static int seen = -1, polls;
 static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released, 4 MOMENTARY held */
@@ -116,7 +116,7 @@ static void quit(void) { perf_leave(); }        /* Cursor up while playing; STOR
 
 static void move_key(int ev, int a)              /* a move's knob page: the three knobs edit Value, Next and Lag */
 {
-    unsigned short *m = pd_move(), w = *m;
+    unsigned *m = pd_move(), w = *m;
     int v = MV_VALUE(w), nx = MV_NEXT(w), lg = MV_LAG(w), un = nx == NX_UNUSED;
     if (ev == 65) { pu_scr = pu_ev >= 0 ? SC_CTL : SC_GES; return; }
     if (ev == 160) {
@@ -168,7 +168,7 @@ static void setup_key(int ev, int a)
         if (open) {
             *pd_tgt() = (unsigned char)pd_target(pu_mod, *pos, pu_ev >= 0);
             if (IS_FTSW(*pd_tgt())) {                /* a new Footsw target presses on a click (and a hold) */
-                unsigned short *a = pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][M_PRESS_A];
+                unsigned *a = pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][M_PRESS_A];
                 if (MV_NEXT(*a) == NX_UNUSED) *a = MV(127, NX_NOW, LG_OFF);
                 if (pu_ev < 0 && MV_NEXT(perf_patch.move[pu_ctl][M_HOLD_A]) == NX_UNUSED) perf_patch.move[pu_ctl][M_HOLD_A] = MV(127, NX_NOW, LG_OFF);
             }

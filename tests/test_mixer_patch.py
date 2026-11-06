@@ -261,7 +261,7 @@ def test_perform_screen_11_hooks():
         assert int.from_bytes(bytes.fromhex(w["expect"]), "little") == stock
         assert int.from_bytes(bytes.fromhex(w["data"]), "little") == CSEC["addr"] + CVEC[name]
     hdr = (ROOT / "asm/perform/perform.h").read_text()
-    assert re.search(r"#define PT_SIZE 112\s", hdr)                 # 50 of them in record 50 (R50_SIZE)
+    assert re.search(r"#define PT_SIZE 208\s", hdr)                 # 50 of them in record 50 (R50_SIZE)
     build = (ROOT / "scripts/build_mixer_ui.py").read_text()
     for f in ("perform_engine.c", "perform_store.c", "perform_keys.c", "perform_draw.c"):
         assert f in build and (ROOT / "asm/perform" / f).exists()
@@ -270,10 +270,10 @@ def test_perform_screen_11_hooks():
 def test_record_50_holds_the_settings_table():
     hdr = (ROOT / "asm/mixer/chain.h").read_text()
     r50, copy = (int(re.search(rf"#define {n}\D*(0x[0-9A-Fa-f]+)", hdr).group(1), 0) for n in ("R50", "R50_COPY"))
-    assert re.search(r"#define R50_SIZE \(824 \+ 4 \+ 50 \* 112\)", hdr)
-    size = 24 + 16 * 50 + 4 + 50 * 112                               # stock globals, a mixer entry per patch, Perform
+    assert re.search(r"#define R50_SIZE \(824 \+ 4 \+ 50 \* 208\)", hdr)
+    size = 24 + 16 * 50 + 4 + 50 * 208                               # stock globals, a mixer entry per patch, Perform
     end = CSEC["addr"] + len(_data(CSEC))
-    assert end <= copy and copy + size <= r50 and r50 + size <= 0xC010A000   # above the C section, below the looper
+    assert end <= copy and copy + size <= 0xC010A000 and 0xC0116000 <= r50 and r50 + size <= 0xC0118C00   # copy below MASTER; R50 between MASTER and looper region 1
     assert re.search(rf"\.equ\s+R50,\s*0x{r50:08X}", (ROOT / "asm/mixer/mixer.S").read_text())
     table = WRITES[0xC00EA9A8]                                       # record size table, entry 50
     assert (table["expect"], table["data"]) == ("18000000", size.to_bytes(4, "little").hex())

@@ -67,7 +67,7 @@
         .equ    MAXES, BASE + 296           ; [24] maximum of each setting
         .equ    DEFAULTS, BASE + 320        ; [24]
         .equ    NSET, 24
-        .equ    R50, 0xC01086E0             ; [6428] record 50 (chain.h)
+        .equ    R50, 0xC0116000             ; [11228] record 50 (chain.h)
         .equ    CUR_PATCH, 324              ; B14 offset: the patch played
 
         .equ    C_SEC, 0xC00F8000           ; chain_vec.asm vectors

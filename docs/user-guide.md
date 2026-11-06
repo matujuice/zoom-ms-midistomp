@@ -503,7 +503,7 @@ waits for its Next line, except with NOW.
 
 ### Memory
 
-Loops are stored in 12-bit, about 72 dB under the signal: up to 23.3 s stereo or 43.2 s mono. The looper picks stereo or mono when recording starts,
+Loops are stored in 12-bit, about 72 dB under the signal: up to 23.2 s stereo or 43.0 s mono. The looper picks stereo or mono when recording starts,
 from the tempo and the cycle length:
 
 | Length | Stereo | Mono |

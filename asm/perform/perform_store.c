@@ -8,7 +8,7 @@
 #include "chain.h"
 #include "stock.h"
 
-#define PT_MAGIC 0x50524632u    /* "PRF2": clears the beta1 entries, saved with the old looper / MIX XFade defaults */
+#define PT_MAGIC 0x50524633u    /* "PRF3": clears older entries (v2.0 moves were 2-byte CC values) */
 #define PT_OK 0xA5
 #define MAGIC_W (*(volatile unsigned *)(R50 + 824))
 #define PT(n) ((volatile unsigned char *)R50 + 828 + PT_SIZE * (n))

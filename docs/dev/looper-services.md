@@ -41,10 +41,10 @@ Big buffer (RAM test, issue #19; nothing in the OS writes there):
 |---|---|---|
 | 3 | `0xC0636980` | 1,677,952 |
 | 2 | `0xC0198000` | 425,984 |
-| 1 | `0xC0116000` | 532,480 (region 1 above the 96 KB kept for MOD code and record 50, and 48 KB for MASTER) |
+| 1 | `0xC0118C00` | 521,216 (region 1 above the 96 KB kept for MOD code, 48 KB for MASTER and 11 KB for record 50 at `0xC0116000`) |
 
-With the looper's own 705 KB slot block that is about 3.3 MB: 23.3 s stereo
-or 43.2 s mono in 12-bit block float (v2.0.1: GRDLOOP keeps only tiny floats in the arena, #41). The regions were confirmed free on the
+With the looper's own 705 KB slot block that is about 3.3 MB: 23.2 s stereo
+or 43.0 s mono in 12-bit block float (v2.0.1: GRDLOOP keeps only tiny floats in the arena, #41). The regions were confirmed free on the
 70CDR OS by the RAM test (2026-10-15).
 
 ## Rules

@@ -140,45 +140,30 @@ static void pinfo(int t, Par *p)
     }
 }
 
-static int disp(int t, const Par *p, int v)     /* CC -> the target's range, as perform_engine.c fwd() */
+static int disp(const Par *p, int v)            /* a default's CC -> the target's range, as mixer.S */
 {
-    int d, h = p->max >> 1;
-    if (t_node(t) < 0) {
-        if (p->max <= 127) return udiv(v * p->max + 63, 127);
-        return v <= 64 ? (v * h + 32) >> 6 : h + (int)udiv((v - 64) * (p->max - h) + 31, 63);   /* finer than a CC: 64 is the exact centre */
-    }
-    d = ((v * p->max + 63) * 259) >> 15;
+    int d = ((v * p->max + 63) * 259) >> 15;
     return d > p->max ? p->max : d;
 }
-static int tocc(int t, const Par *p, int d)     /* the smallest CC that shows d */
-{
-    int lo = 0, hi = 127, m;
-    while (lo < hi) { m = (lo + hi) >> 1; if (disp(t, p, m) >= d) hi = m; else lo = m + 1; }
-    return lo;
-}
 
-int pd_step(int t, int v, int a)                 /* a move's VALUE (CC units, -1 unused) turned a steps */
+int pd_step(int t, int v, int a)                 /* a move's VALUE (the target's own units, -1 unused) turned a steps */
 {
     Par p;
-    int d, d2;
     pinfo(t, &p);
     if (p.look == TRIG) return a > 0 ? 127 : -1;   /* a press: set or unused */
     if (v < 0) return a > 0 ? 0 : -1;
     if (v == 0 && a < 0) return -1;
-    d = disp(t, &p, v);
-    d2 = d + a;                                  /* one value a click (a knob turned fast steps more) */
-    d2 = d2 < 0 ? 0 : d2 > p.max ? p.max : d2;
-    if (d2 == d) return v;
-    return a > 0 ? tocc(t, &p, d2) : tocc(t, &p, d2 + 1) - 1;   /* the CC nearest d2 on the way; a value no CC shows is passed, never stuck on */
+    v += a;                                      /* one value a click (a knob turned fast steps more) */
+    return v < 0 ? 0 : v > p.max ? p.max : v;
 }
 
-static void nat_text(int t, int v, int d, char *o)   /* v in CC units (-1 unused), d the native value it shows */
+static void nat_text(int t, int d, char *o)      /* d in the target's own units, -1 unused */
 {
     Par p;
     pinfo(t, &p);
-    if (v < 0) { scat(o, "-"); return; }
+    if (d < 0) { scat(o, "-"); return; }
     if (p.look == TRIG) { scat(o, "TAP"); return; }
-    if (d < 0) d = disp(t, &p, v);
+    if (d > p.max) d = p.max;
     if (p.gs) {
         char g[16];
         int n = p.gs(d, g);
@@ -260,15 +245,15 @@ int pd_pidx(int t, int mod, int ev)              /* the target's row in its modu
 }
 
 unsigned char *pd_tgt(void) { return pu_ev >= 0 ? &perf_patch.loop_target[pu_ev] : &perf_patch.target[pu_ctl]; }
-unsigned short *pd_move(void) { return pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][pu_mv]; }
+unsigned *pd_move(void) { return pu_ev >= 0 ? &perf_patch.loop_move[pu_ev] : &perf_patch.move[pu_ctl][pu_mv]; }
 
 /* ---- the stock controls ------------------------------------------------------------------ */
-static void ctl(int t, int v, int x, int y)       /* v: CC units */
+static void ctl(int t, int d, int x, int y)       /* d: the target's own units */
 {
     Par p;
-    int d;
+    int v = d;
     pinfo(t, &p);
-    d = disp(t, &p, v);
+    d = d < 0 ? 0 : d > p.max ? p.max : d;
     if (p.look == TRIG) KP_TOGGLE(0, v > 0, x, y);
     else if (p.look == TOGGLE) KP_TOGGLE(0, d >= 1, x, y);
     else if (p.look == FADER) KP_FADER(0, x, y, d, 0, p.max);
@@ -368,7 +353,7 @@ static void play(void)
     static const unsigned char AR[3][5] = { { 4, 14, 31 }, { 1, 3, 7, 3, 1 }, { 31, 14, 4 } };
     static const unsigned char ARN[3] = { 3, 5, 3 };
     char left[24], right[16], a[16], l[16], v[8], *o;
-    int C = perf_patch.cycle, run = perf_grid.running && perf_grid.beat >= 0, w = 0, i, j, h, x, y, lp = -1, t, d, n, k, lk, b = beatms();
+    int C = perf_patch.cycle, run = perf_grid.running && perf_grid.beat >= 0, w = 0, i, j, h, x, y, lp = -1, t, n, k, lk, b = beatms();
     Par p;
 
     left[0] = 0;
@@ -404,10 +389,9 @@ static void play(void)
         small(a, 42 * i + 22 - ((softw(a) - 1) >> 1), 13);
         small(l, 42 * i + 22 - ((softw(l) - 1) >> 1), 19);
         pinfo(t, &p);
-        n = IS_FTSW(t) ? -1 : perf_native(t);   /* the live value in the effect's own steps */
-        d = IS_FTSW(t) ? (ftsw_on(t) ? 127 : 0) : tocc(t, &p, n);   /* a Footsw target shows its effect's state */
-        ctl(t, d, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
-        nat_text(t, d, n, v); upper(v);
+        n = IS_FTSW(t) ? ftsw_on(t) : perf_native(t);   /* the live value in the effect's own steps; a Footsw target its effect's state */
+        ctl(t, n, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
+        nat_text(t, n, v); upper(v);
         small(v, 42 * i + 22 - ((softw(v) - 1) >> 1), 50);
         if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 55);   /* a waiting move: the column fills when the loop bar fills */
     }
@@ -422,7 +406,7 @@ static void play(void)
         if (IS_FTSW(t)) {                        /* a footswitch: a box when off, filled when on */
             if (perf_pending(3 + i) >= 0 ? shown(3 + i) : ftsw_on(t)) invert(42 * i + 2, 57, 42 * i + 41, 63);   /* waiting: it blinks */
             else rect(42 * i + 2, 57, 42 * i + 41, 63, 3);
-        } else if (shown(3 + i) && (!SOFT_AWAY || (p.dcc != 255 && tocc(t, &p, perf_native(t)) != p.dcc))) invert(42 * i + 2, 57, 42 * i + 41, 63);
+        } else if (shown(3 + i) && (!SOFT_AWAY || (p.dcc != 255 && perf_native(t) != disp(&p, p.dcc)))) invert(42 * i + 2, 57, 42 * i + 41, 63);
         h = ARN[i] == 3 ? 5 : 3;
         for (j = 0; j < ARN[i]; j++) for (y = 0; y < h; y++) if (AR[i][j] >> y & 1) px(42 * i + 5 + j, 60 - (h >> 1) + y, 2);
     }
@@ -438,23 +422,23 @@ static const char *const LN[NLOOP] = { "REC START", "REC END", "PLAY", "STOP", "
 static const char *const GN[3] = { "TURN", "PRESS", "HOLD" };
 static const char *const MN[NMOVE_CTL] = { "FOLLOW", "ACTION", "FOLLOW", "ACTION", "RELEASE", "FOLLOW" };
 
-static void mv_text(int t, unsigned short m, char *o)    /* "80 1BAR", "-" */
+static void mv_text(int t, unsigned m, char *o)    /* "80 1BAR", "-" */
 {
     if (MV_NEXT(m) == NX_UNUSED) { scat(o, "-"); return; }
-    nat_text(t, MV_VALUE(m), -1, o);
+    nat_text(t, MV_VALUE(m), o);
     scat(scat(o + slen(o), " "), WHEN[MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1]);
 }
 
 static void ges_text(int c, int g, char *o)              /* a gesture's moves: 80>30 */
 {
     int first = g == 0 ? 0 : g == 1 ? M_PRESS_A : M_HOLD_A, n = g == 0 ? 1 : g == 1 ? 2 : 3, i, any = 0, t = perf_patch.target[c];
-    unsigned short m;
+    unsigned m;
     o[0] = 0;
     for (i = 0; i < n; i++) {
         m = perf_patch.move[c][first + i];
         if (MV_NEXT(m) == NX_UNUSED) continue;
         if (any) o = scat(o, ">");
-        nat_text(t, MV_VALUE(m), -1, o);
+        nat_text(t, MV_VALUE(m), o);
         while (*o) o++;
         any = 1;
     }
@@ -559,7 +543,7 @@ static void list(const char *name, int n, int cur, int turn3)   /* stock list: t
 
 static void move(void)                           /* a stock knob page: frame, tabs, Value in the target's own control, Next, Lag */
 {
-    unsigned short m = *pd_move();
+    unsigned m = *pd_move();
     int t = *pd_tgt(), un = MV_NEXT(m) == NX_UNUSED, x = 0, k;
     char a[24], b[24];
     Par p;
@@ -571,7 +555,7 @@ static void move(void)                           /* a stock knob page: frame, ta
     pinfo(t, &p);
     if (t == T_NONE) font7("Value", 8, 16); else { lab_text(t, a); font7(a, 8, 16); }
     ctl(t, un ? 0 : MV_VALUE(m), 8, 24);
-    a[0] = 0; nat_text(t, un ? -1 : MV_VALUE(m), -1, a);
+    a[0] = 0; nat_text(t, un ? -1 : (int)MV_VALUE(m), a);
     font7r(a, 8 + 30, 48);
     k = un ? 0 : MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1;
     font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k], 48 + 30, 48);

@@ -181,31 +181,6 @@ static Tgt tgt(int t)
     return r;                                   /* ponytail: other CCs are no target yet */
 }
 
-static int fwd(const Tgt *t, int cc)            /* CC 0-127 -> native, as MIDI moves it */
-{
-    int v;
-    if (t->k == K_MIX) {
-        v = ((cc * t->max + 63) * 259) >> 15;
-        return v > t->max ? t->max : v;
-    }
-    if (t->b == 0) return cc >= 64;
-    if (t->max > 127) {                         /* finer than a CC: 64 is the exact centre (as perform_draw.c disp) */
-        v = t->max >> 1;
-        return cc <= 64 ? (cc * v + 32) >> 6 : v + (int)(((float)((cc - 64) * (t->max - v) + 31) + 0.5f) * (1.0f / 63.0f));
-    }
-    return (int)(((float)(cc * t->max + 63) + 0.5f) * (1.0f / 127.0f));
-}
-
-static int back(const Tgt *t, int v)            /* native -> the smallest CC that reaches it */
-{
-    int lo = 0, hi = 127, m;
-    while (lo < hi) {
-        m = (lo + hi) >> 1;
-        if (fwd(t, m) >= v) hi = m; else lo = m + 1;
-    }
-    return lo;
-}
-
 static int now(const Tgt *t)
 {
     if (t->k == K_MIX) return LIVE[t->a];
@@ -258,7 +233,7 @@ static void fx_flush(void)
 
 typedef struct {
     unsigned char st, ctl, t, lag, tf;   /* tf: a Turn's Follow */
-    unsigned short mv, fol;     /* fol: the Follow scheduled when this lands */
+    unsigned mv, fol;           /* fol: the Follow scheduled when this lands */
     int due;
     Tgt x;                      /* the target, from land: no descriptor call a block while it lags */
     float from, to, pos;
@@ -321,7 +296,7 @@ static void land(Slot *s)
     }
     for (i = 0; i < NSLOT; i++)                 /* newest wins */
         if (sl[i].st == F_LAG && sl[i].t == s->t) sl[i].st = F_FREE;
-    v = fwd(&t, MV_VALUE(s->mv));
+    v = MV_VALUE(s->mv);
     s->lag = MV_LAG(s->mv);
     if (t.k == K_NONE || s->lag == LG_OFF) { follow(s, s->due); put(&t, v); s->st = F_FREE; return; }
     s->x = t;
@@ -364,7 +339,7 @@ void perf_reset(void)
 void perf_gesture(int ctl, int gesture, int phase)
 {
     int t = perf_patch.target[ctl];
-    const unsigned short *m = perf_patch.move[ctl];
+    const unsigned *m = perf_patch.move[ctl];
     DINT;
     if (ctl == C_FTSW && phase == 0 && g.anchor && !g.run) {   /* no clock: this press is bar 1 */
         g.gu = 0; g.gf = 0.0f; g.anchor = 0;
@@ -386,7 +361,7 @@ void perf_gesture(int ctl, int gesture, int phase)
 void perf_momentary(int ctl, int phase)
 {
     int t = perf_patch.target[ctl], i, w = 0;
-    const unsigned short *m = perf_patch.move[ctl];
+    const unsigned *m = perf_patch.move[ctl];
     unsigned h = MV_NEXT(m[M_HOLD_A]) != NX_UNUSED ? m[M_HOLD_A] : m[M_PRESS_A];
     if (phase && MV_NEXT(m[M_HOLD_R]) != NX_UNUSED) h = m[M_HOLD_R];
     DINT;
