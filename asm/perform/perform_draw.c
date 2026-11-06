@@ -142,8 +142,11 @@ static void pinfo(int t, Par *p)
 
 static int disp(int t, const Par *p, int v)     /* CC -> the target's range, as perform_engine.c fwd() */
 {
-    int d;
-    if (t_node(t) < 0) return udiv(v * p->max + 63, 127);
+    int d, h = p->max >> 1;
+    if (t_node(t) < 0) {
+        if (p->max <= 127) return udiv(v * p->max + 63, 127);
+        return v <= 64 ? (v * h + 32) >> 6 : h + (int)udiv((v - 64) * (p->max - h) + 31, 63);   /* finer than a CC: 64 is the exact centre */
+    }
     d = ((v * p->max + 63) * 259) >> 15;
     return d > p->max ? p->max : d;
 }
@@ -157,14 +160,13 @@ static int tocc(int t, const Par *p, int d)     /* the smallest CC that shows d 
 int pd_step(int t, int v, int a)                 /* a move's VALUE (CC units, -1 unused) turned a steps */
 {
     Par p;
-    int d, d2, st;
+    int d, d2;
     pinfo(t, &p);
     if (p.look == TRIG) return a > 0 ? 127 : -1;   /* a press: set or unused */
     if (v < 0) return a > 0 ? 0 : -1;
     if (v == 0 && a < 0) return -1;
     d = disp(t, &p, v);
-    st = p.max > 20 ? 5 : 1;
-    d2 = d + a * st;
+    d2 = d + a;                                  /* one value a click (a knob turned fast steps more) */
     d2 = d2 < 0 ? 0 : d2 > p.max ? p.max : d2;
     return d2 == d ? v : tocc(t, &p, d2);
 }

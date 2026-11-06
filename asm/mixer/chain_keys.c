@@ -23,6 +23,7 @@ static int down;            /* 1: knob 2's press (64) came on this screen, its r
  * also needs the switch down, and the next 64 / 65 resets it); add a SW_STATE check if not. */
 static int skip65;          /* the release of a hold that went long is not EXIT */
 static int idle = -62;      /* 16 ms polls with no key on the play screen; from -62 at boot: KALEIDO ~1 s in */
+static int boot = 625;      /* polls left of the power-on window (10 s): the OS can still change the screen, so KALEIDO retries */
 static int fdown;           /* the footswitch is down (its 32 came, its 33 not yet) */
 static const unsigned short idle_polls[5] = {0, 625, 1875, 3750, 7500};   /* OFF, 10 S, 30 S, 1, 2 MIN */
 
@@ -377,8 +378,9 @@ void blit_fb(unsigned char fb[64][16])
 void chain_poll(void)
 {
     int n = IDLE, ev = 0;
+    if (boot) boot--;
     if (!n || MODE || VIEW_KNOBS || fdown) { if (idle > 0) idle = 0; }   /* the boot count (< 0) waits */
-    else if (++idle == 0 || idle == idle_polls[n]) ev = EV_IDLE;
+    else if (++idle == 0 || idle == idle_polls[n]) { ev = EV_IDLE; if (boot) idle = -62; }   /* power-on: again 1 s after it is closed */
     if (MODE != 11 || SCREEN != 11) IDLE_SHOWN = 0;
     if (MODE != 11 || SCREEN != 3) held = 0;
     else {
@@ -397,7 +399,7 @@ int idle_ev(int ev)
 {
     int key = KEY_CLASS(ev);
     if (!key) {
-        idle = 0;
+        idle = boot && !IDLE_SHOWN ? -62 : 0;   /* power-on: a key (or a stray boot event) only delays it */
         if (ev == 32 || ev == 33) fdown = ev == 32;
         if (ev == 32 && IDLE_SHOWN) {        /* set only on KALEIDO; every way out clears it */
             IDLE_SHOWN = 0;

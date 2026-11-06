@@ -189,6 +189,10 @@ static int fwd(const Tgt *t, int cc)            /* CC 0-127 -> native, as MIDI m
         return v > t->max ? t->max : v;
     }
     if (t->b == 0) return cc >= 64;
+    if (t->max > 127) {                         /* finer than a CC: 64 is the exact centre (as perform_draw.c disp) */
+        v = t->max >> 1;
+        return cc <= 64 ? (cc * v + 32) >> 6 : v + (int)(((float)((cc - 64) * (t->max - v) + 31) + 0.5f) * (1.0f / 63.0f));
+    }
     return (int)(((float)(cc * t->max + 63) + 0.5f) * (1.0f / 127.0f));
 }
 
