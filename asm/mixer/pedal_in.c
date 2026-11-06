@@ -6,8 +6,8 @@
  * Row 8 is PEDAL INPUT (MONO/STEREO, default MONO), bit 7 of byte 23 of record 50
  * (settings.S packs bits 0, 5 and 6 there); it lives in mixer.S data (PEDAL, chain.h):
  * STEREO draws double lines from IN and allows the Split and Mono Serial modes; MONO
- * plays them as Parallel and Serial. Row 9, MIDI, opens screen 14, whose EXIT comes
- * back here. */
+ * plays them as Parallel and Serial. Row 9 is IDLE KALEIDO (IDLE: OFF, 10 S .. 2 MIN, bits
+ * 1-3 of byte 23; chain_keys.c idle_ev). Row 10, MIDI, opens screen 14, whose EXIT comes back here. */
 #include "chain.h"
 #include "stock.h"
 
@@ -41,8 +41,9 @@
 #define EV_TURN 160
 #define EV_TURN3 162
 #define ROW_PEDAL 8
-#define ROW_MIDI 9
-#define ROWS 10
+#define ROW_IDLE 9
+#define ROW_MIDI 10
+#define ROWS 11
 #define MROWS 6
 #define COLS 18                 /* 6 px characters from x 12 to the narrow highlight's edge */
 
@@ -52,15 +53,17 @@ static unsigned char icons[7 * ROWS];
 static int dirty;               /* a value changed: save when the list is left */
 static const unsigned char plug[14] = {0x08, 0x08, 0x1c, 0x3e, 0x3e, 0x3e, 0x08,
                                        0x1c, 0x22, 0x55, 0x41, 0x55, 0x22, 0x1c};   /* + a DIN socket */
+static const unsigned char gem[7] = {0x08, 0x14, 0x22, 0x49, 0x22, 0x14, 0x08};   /* IDLE KALEIDO */
 static const char *const set_names[ROWS] = {"HOLD FOR", "TUNER OUT", "POWER SAVE", "AUTO SAVE",
-    "BATTERY", "BACKLIGHT", "LCD CONTRAST", "TEMPO LOCK", "INPUT", "MIDI"};
+    "BATTERY", "BACKLIGHT", "LCD CONTRAST", "TEMPO LOCK", "INPUT", "IDLE KALEIDO", "MIDI"};
 static const char *const hold_names[3] = {"TUNER", "TEMPO", "MOMENTARY"};
 static const char *const input_names[2] = {"MONO", "STEREO"};
+static const char *const idle_names[5] = {"OFF", "10 S", "30 S", "1 MIN", "2 MIN"};
 /* stock settings words of rows 1-5 and 6 (contrast), their choices and label tables */
 static const int set_word[7] = {0, 0xC009D900, 0xC009D91C, 0xC009D918, 0xC009D914, 0xC009D910,
                                 0xC009D8FC};
 static const int set_labels[6] = {0, 0xC00ECD40, 0xC00ECD38, 0xC00ECD38, 0xC00ECD28, 0xC00ECB08};
-static const char set_count[ROWS] = {3, 2, 2, 2, 2, 4, 10, 2, 2, 0};
+static const char set_count[ROWS] = {3, 2, 2, 2, 2, 4, 10, 2, 2, 5, 0};
 static const char *const midi_names[MROWS] = {"CLOCK RECEIVE", "TRANSPORT", "PC RECEIVE",
     "PC START NO.", "CC RECEIVE", "MIDI CHANNEL"};
 /* settings.S items: value = (MIDI_FLAGS >> shift & mask) ^ xor */
@@ -104,6 +107,8 @@ static int set_get(int r)
         return TLOCK;
     if (r == ROW_PEDAL)
         return PEDAL;
+    if (r == ROW_IDLE)
+        return IDLE;
     return W(set_word[r]);
 }
 
@@ -121,6 +126,8 @@ static void set_put(int r, int v)
         PEDAL = v;
         if (!PEDAL && LIVE[S_MODE] > 1)     /* the patch played falls back, as the mockup */
             LIVE[S_MODE] = LIVE[S_MODE] == 2;
+    } else if (r == ROW_IDLE) {
+        IDLE = v;
     } else {
         W(set_word[r]) = v;
         if (r == 5)
@@ -185,12 +192,16 @@ void settings_draw(void)
     const char *val;
     for (i = 0; i < 7 * ROW_PEDAL; i++)
         icons[i] = SETTINGS_ICONS[i];
-    for (i = 0; i < 14; i++)
+    for (i = 0; i < 7; i++) {
         icons[7 * ROW_PEDAL + i] = plug[i];
+        icons[7 * ROW_IDLE + i] = gem[i];
+        icons[7 * ROW_MIDI + i] = plug[7 + i];
+    }
     for (i = 0; i < ROWS; i++) {
         v = i == ROW_MIDI ? 0 : set_get(i);
         val = i == 0 ? hold_names[v] : i == 6 ? number(v + 1) : i == 7 ? OFF_ON[v]
-            : i == ROW_PEDAL ? input_names[v] : i == ROW_MIDI ? ""
+            : i == ROW_PEDAL ? input_names[v] : i == ROW_IDLE ? idle_names[v]
+            : i == ROW_MIDI ? ""
             : ((const char *const *)set_labels[i])[v];
         names[i] = row_text(i, set_names[i], val);
     }
@@ -236,11 +247,13 @@ void midi_draw(void)
 void settings_pack(unsigned char *rec, int *words)
 {
     PACK_HOOK(rec, words);
-    rec[23] |= PEDAL << 7;
+    rec[23] |= PEDAL << 7 | IDLE << 1;   /* bits 1-4 were free (settings.S clears them) */
 }
 
 void settings_unpack(int *words, unsigned char *rec)
 {
+    int v = rec[23] >> 1 & 7;
     UNPACK_HOOK(words, rec);
     PEDAL = rec[23] >> 7;
+    IDLE = v > 4 ? 0 : v;
 }

@@ -20,6 +20,9 @@
 #define MIXER_BASE 0xC00F6000u
 #define SHOWN (*(volatile unsigned char *)(MIXER_BASE + 78))  /* LIMIT tag shown */
 #define PEDAL (*(volatile unsigned char *)(MIXER_BASE + 176)) /* PEDAL INPUT: 1 = STEREO (pedal_in.c) */
+#define IDLE (*(volatile unsigned char *)(MIXER_BASE + 177))  /* IDLE KALEIDO 0 OFF, 1-4 10 S..2 MIN (pedal_in.c) */
+#define IDLE_SHOWN (*(volatile unsigned char *)(MIXER_BASE + 178)) /* KALEIDO opened by idle_ev (master.c MS_IDLE_SHOWN) */
+#define MENUSCR ((volatile unsigned char *)(MIXER_BASE + 184))
 #define LIVE ((volatile unsigned char *)(MIXER_BASE + 224))   /* [24] settings of the patch played */
 #define LAYOUT (LIVE + 12)      /* [6] bus of each slot (settings 12-17) */
 #define R50 ((volatile unsigned char *)0xC01086E0u)  /* record 50 as in flash: globals + settings table (pages.c) + Perform (perform_store.c) */

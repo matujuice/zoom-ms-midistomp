@@ -6,7 +6,7 @@
         .global chain_key, chain_draw_h, chain_poll, s33_keys
         .global settings_key, settings_draw, settings_pack, settings_unpack
         .global engine_run, mix_get, mix_put, pages_key, pages_draw_h, ab_tag
-        .global r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw
+        .global r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw, idle_ev
         B       .S2     keys_e          ; +0  screen 3 key table entry
         NOP     5
         B       .S2     draw_e          ; +8  screen 3 draw table entry
@@ -46,6 +46,8 @@
         B       .S2     midi_keys_e     ; +144 screen 14 (MIDI) key table entry
         NOP     5
         B       .S2     midi_draw_e     ; +152 screen 14 draw table entry
+        NOP     5
+        B       .S2     idle_ev         ; +160 callp at 0xC00ACE08 (UI task, each event: A4 = event, B3 = return)
         NOP     5
 
 ; Switch-table entries: the event pair is in the dispatcher's frame (+8 event,

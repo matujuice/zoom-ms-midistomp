@@ -545,6 +545,10 @@ rings, mids warp it and switch the number of mirrors, highs speed it up and add 
 and the L/R balance turns it. With MIDI clock running it flashes on every beat. It does nothing useful and that's
 the point.
 
+With SETTINGS > **IDLE KALEIDO** set to a time, KALEIDO also opens at power-on and whenever the play screen has gone
+untouched that long (never from a menu, the tuner or an effect's knob pages). Any key or knob takes you back to the
+play screen; the footswitch also does its normal job, so a stomp both wakes the pedal and turns the effect on or off.
+
 | Knob | Turn |
 |---|---|
 | Knob 1 | zoom |
@@ -643,7 +647,7 @@ All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down and tap tempo don't fo
 
 ### SETTINGS
 
-<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: INPUT and MIDI" width="260"></p>
+<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: TEMPO LOCK, INPUT, IDLE KALEIDO and MIDI" width="260"></p>
 
 MENU > **SETTINGS** holds the stock rows plus these:
 
@@ -652,6 +656,7 @@ MENU > **SETTINGS** holds the stock rows plus these:
 | **HOLD FOR** | TUNER / TEMPO / MOMENTARY | what holding the footswitch does (below) |
 | **TEMPO LOCK** | OFF / ON | ON: changing patch keeps the current tempo ([Tempo Lock](#tempo-lock)) |
 | **INPUT** | MONO / STEREO | which input the pedal has (below) |
+| **IDLE KALEIDO** | OFF / 10 S / 30 S / 1 MIN / 2 MIN | not OFF: [KALEIDO](#kaleido) opens at power-on and after that long untouched on the play screen |
 | **MIDI** | opens the MIDI menu | [MIDI menu](#midi-menu) |
 
 **HOLD FOR:**

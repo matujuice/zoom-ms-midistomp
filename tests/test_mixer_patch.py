@@ -203,7 +203,7 @@ CVEC = {"keys": 0, "draw": 8, "chain_poll": 16, "s33_keys": 24,
         "settings_key": 32, "settings_draw": 40, "settings_pack": 48, "settings_unpack": 56,
         "engine_run": 64, "mix_get": 72, "mix_put": 80, "pages_key": 88, "pages_draw": 96,
         "ab_tag": 104, "r50_load": 112, "r50_save": 120, "perf_keys": 128, "perf_draw": 136,
-        "midi_key": 144, "midi_draw": 152}
+        "midi_key": 144, "midi_draw": 152, "idle_ev": 160}
 CMIX = {"C_POLL": "chain_poll", "C_ENGINE": "engine_run", "C_GET": "mix_get", "C_PUT": "mix_put",
         "C_KEYS": "pages_key", "C_DRAW": "pages_draw"}                # mixer.S names for them
 
@@ -234,6 +234,24 @@ def test_chain_screen_hooks():
         assert callp_target(site, old) == stock
         assert callp_target(site, new) == CSEC["addr"] + CVEC[name]
         assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80               # same op, same p-bit
+
+
+def test_idle_kaleido_hook_and_settings_bits():
+    site = 0xC00ACE08                                                # UI task loop: key class of each event, before dispatch
+    old, new = (int.from_bytes(bytes.fromhex(WRITES[site][k]), "little") for k in ("expect", "data"))
+    assert callp_target(site, old) == 0xC00D13B4
+    assert callp_target(site, new) == CSEC["addr"] + CVEC["idle_ev"]
+    assert old & ~0x0FFFFF80 == new & ~0x0FFFFF80                   # same op, same p-bit
+    assert _data(SEC)[PEDAL + 1:PEDAL + 3] == bytes(2)               # IDLE, IDLE_SHOWN: OFF until unpack
+    h = (ROOT / "asm/mixer/chain.h").read_text()
+    for name, off in {"IDLE": PEDAL + 1, "IDLE_SHOWN": PEDAL + 2}.items():
+        assert re.search(rf"#define {name} .*MIXER_BASE \+ {off}\)", h), name
+    m = (ROOT / "asm/master/master.h").read_text()
+    assert f"#define MS_IDLE_SHOWN (*(volatile unsigned char *)0x{BASE + PEDAL + 2:08X})" in m
+    src = (ROOT / "asm/mixer/pedal_in.c").read_text()                # record 50 byte 23: IDLE bits 1-3
+    assert "rec[23] |= PEDAL << 7 | IDLE << 1;" in src
+    assert "int v = rec[23] >> 1 & 7;" in src and "IDLE = v > 4 ? 0 : v;" in src
+    assert re.search(r"set_count\[ROWS\] = \{3, 2, 2, 2, 2, 4, 10, 2, 2, 5, 0\}", src)
 
 
 def test_perform_screen_11_hooks():
@@ -362,7 +380,7 @@ def _stock_image():
 def test_effect_hooks_expect_the_stock_image():
     img = _stock_image()
     for site in (0xC00B76A4, 0xC00A7BE0, 0xC00A8294, 0xC00EEFA8, 0xC00EEBBC, 0xC00A832C,
-                 0xC00CB284):
+                 0xC00CB284, 0xC00ACE08):
         assert img.read(site, 4).hex() == WRITES[site]["expect"]
 
 

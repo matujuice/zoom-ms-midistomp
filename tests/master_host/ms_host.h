@@ -12,7 +12,7 @@ static short host_rm[4096], host_rs[2048];
 static unsigned short host_hist[1408];
 static long long host_st[256];
 static int host_on, host_mode = 11, host_screen = 11, host_patch, host_posts, host_scr_calls;
-static unsigned char host_entry = 5;
+static unsigned char host_entry = 5, host_idle_shown;
 static unsigned host_zt[8];
 #define MS_ZT host_zt
 
@@ -43,6 +43,7 @@ static unsigned host_ink[128];
 #define MS_SCREEN host_screen
 #define MS_CUR_PATCH host_patch
 #define MS_MENU_ENTRY host_entry
+#define MS_IDLE_SHOWN host_idle_shown
 
 static int F2I(float x) { int i; memcpy(&i, &x, 4); return i; }
 static float I2F(int i) { float x; memcpy(&x, &i, 4); return x; }

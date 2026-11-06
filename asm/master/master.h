@@ -32,5 +32,6 @@
 #define MS_CUR_PATCH  (*(volatile int *)(MS_B14 + 324))
 #define MS_MAILBOX    (*(volatile int *)(MS_B14 + 656))
 #define MS_MENU_ENTRY (*(volatile unsigned char *)0xC00F60BF)   /* MENUSCR[7] (menu_enter.S): 3 = MASTER, 6 = KALEIDO */
+#define MS_IDLE_SHOWN (*(volatile unsigned char *)0xC00F60B2)   /* KALEIDO opened by IDLE KALEIDO (chain_keys.c idle_ev) */
 
 #endif

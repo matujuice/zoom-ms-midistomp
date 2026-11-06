@@ -173,7 +173,7 @@ vectors:
         .word   0, 0                        ; +128 PAGE
         .byte   0, 0, BUS_A, 0, NONE, 0, 0, PG_OUT ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .word   0, 0, 0, 0, 0, F_ONE, 0, 0  ; +144 GAINS: In, SendA, SendB, cA, cB, limiter, InR, MasterR
-        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, then free to +184
+        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, +177 IDLE, +178 IDLE_SHOWN (chain.h), then free to +184
         ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 MASTER (11), 4 SETTINGS (1),
         ; 5 the version entry (9), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
         ; MIDI SETTINGS is the last SETTINGS row (pedal_in.c).

@@ -13,12 +13,18 @@
 
 #define EV_KNOB2_LONG 225   /* key event chain_poll posts (stock: footswitch hold timer 1, play mode only) */
 #define LONG_POLLS 38       /* 16 ms polls: about 0.6 s, the mockup's long press */
+#define EV_IDLE 240         /* chain_poll posts it after the IDLE KALEIDO time; no stock handler */
+#define KEY_CLASS FN(0xC00D13B4, int, (int ev))          /* 0 = a key event, -1 = not */
+#define VIEW_KNOBS (*(volatile int *)0xC009D398)         /* play mode showing an effect's knob pages */
 
 static int held;            /* polls knob 2 has been down since its press here (chain_poll) */
 static int down;            /* 1: knob 2's press (64) came on this screen, its release (65) not yet */
 /* ponytail: a knob 2 release that lands off screen 3 leaves down = 1; harmless (the poll
  * also needs the switch down, and the next 64 / 65 resets it); add a SW_STATE check if not. */
 static int skip65;          /* the release of a hold that went long is not EXIT */
+static int idle = -62;      /* 16 ms polls with no key on the play screen; from -62 at boot: KALEIDO ~1 s in */
+static int fdown;           /* the footswitch is down (its 32 came, its 33 not yet) */
+static const unsigned short idle_polls[5] = {0, 625, 1875, 3750, 7500};   /* OFF, 10 S, 30 S, 1, 2 MIN */
 
 #define FX(it) ((it) < 6)
 #define ZONE(s) (LAYOUT[s] & 3)
@@ -366,14 +372,45 @@ void blit_fb(unsigned char fb[64][16])
     BLIT(0, 0, 0, 128, 64, pg);
 }
 
-/* Every 16 ms (mixer.S poll, the switch task): the knob 2 long press as a key
- * event, and a display redraw (Event flag 0x40) when LIMIT changes. */
+/* Every 16 ms (mixer.S poll, the switch task): the IDLE KALEIDO timer, the knob 2
+ * long press as a key event, and a display redraw (Event flag 0x40) when LIMIT changes. */
 void chain_poll(void)
 {
-    if (MODE != 11 || SCREEN != 3) { held = 0; return; }
-    if (!down || SW_STATE & SW_KNOB2) held = 0;
-    else if (++held == LONG_POLLS) KEY_POST(EV_KNOB2_LONG);
-    if ((HOLD != 0) != SHOWN) EVENT_POST(MAILBOX, 0x40);
+    int n = IDLE, ev = 0;
+    if (!n || MODE || VIEW_KNOBS || fdown) { if (idle > 0) idle = 0; }   /* the boot count (< 0) waits */
+    else if (++idle == 0 || idle == idle_polls[n]) ev = EV_IDLE;
+    if (MODE != 11 || SCREEN != 11) IDLE_SHOWN = 0;
+    if (MODE != 11 || SCREEN != 3) held = 0;
+    else {
+        if (!down || SW_STATE & SW_KNOB2) held = 0;
+        else if (++held == LONG_POLLS) ev = EV_KNOB2_LONG;
+        if ((HOLD != 0) != SHOWN) EVENT_POST(MAILBOX, 0x40);
+    }
+    if (ev) KEY_POST(ev);   /* one call site */
+}
+
+/* Every event, in the UI task before its dispatch (callp at 0xC00ACE08, in place of
+ * stock KEY_CLASS): a key restarts the idle count, and the footswitch press leaves an
+ * idle KALEIDO (then plays as in play mode); EV_IDLE opens KALEIDO from the play screen.
+ * MODE changes here, so the stock mode-change handler runs after the dispatch. */
+int idle_ev(int ev)
+{
+    int key = KEY_CLASS(ev);
+    if (!key) {
+        idle = 0;
+        if (ev == 32 || ev == 33) fdown = ev == 32;
+        if (ev == 32 && IDLE_SHOWN) {        /* set only on KALEIDO; every way out clears it */
+            IDLE_SHOWN = 0;
+            MODE = 0;
+            EVENT_POST(MAILBOX, 0x40);
+        }
+    } else if (ev == EV_IDLE && !MODE && !VIEW_KNOBS && IDLE) {
+        MENUSCR[7] = 6;                      /* KALEIDO, as menu_enter.S */
+        MODE = 11;
+        SET_SCREEN(11, 0);
+        IDLE_SHOWN = 1;                      /* last: chain_poll clears it off screen 11 */
+    }
+    return key;
 }
 
 /* Screens 32 / 33 keys (callp at 0xC00A832C): stock, and when an add from the

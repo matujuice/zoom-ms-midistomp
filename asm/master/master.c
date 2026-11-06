@@ -1081,6 +1081,12 @@ void master_key(int ev, int steps)
     int i, p = s->page;
     if (MS_MENU_ENTRY == 6) {       /* KALEIDO: knob 1 zoom, knob 2 spin, knob 3 mirrors, EXIT */
         int *k = ev == 160 ? &s->kzs : ev == 161 ? &s->krs : ev == 162 ? &s->kmi : 0, hi = ev == 162 ? 6 : 10;
+        if (MS_IDLE_SHOWN) {        /* opened by IDLE KALEIDO: a knob turn or a key's release goes back to play */
+            if (ev >= 160 ? ev <= 162 : (ev & 1) && ev >= 33 && ev <= 77) {
+                MS_IDLE_SHOWN = 0; MS_ON = 0; MS_MODE = 0; EVENT_POST(MAILBOX, 0x40);
+            }
+            return;                 /* presses and hold timers: nothing (the footswitch press is chain_keys.c idle_ev) */
+        }
         if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 6); }
         else if (k && steps) { i = *k + (steps > 0 ? 1 : -1); if (i >= (ev == 162 ? 0 : -10) && i <= hi) *k = i; }
         return;
