@@ -60,7 +60,7 @@ def b_target(addr, word):
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
 def test_bytes_match_assembly_sources():
-    assert asm.assemble(ROOT / SEC["source"], BASE, whole_packets=True) == _data(SEC)
+    # mixer.S itself is TI syntax (.string adds no NUL): test_sections_match_a_fresh_ti_build checks it
     for w in PATCH["write"]:
         if "source" in w:
             code, data = asm.assemble(ROOT / w["source"], w["addr"]), _data(w)

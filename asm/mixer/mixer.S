@@ -693,7 +693,7 @@ pl_ret:
         mvkl    .S2     LP_MAGIC, b1
         mvkh    .S2     LP_MAGIC, b1
         nop     3
-        cmpeq   .L2X    a0, b1, b1          ; looper.yaml applied first: chain its poll
+        cmpeq   .L2X    b1, a0, b1          ; looper.yaml applied first: chain its poll
         addk    .S2     16, b15
         mvkl    .S2     POLL, b0
         mvkh    .S2     POLL, b0

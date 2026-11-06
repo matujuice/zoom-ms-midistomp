@@ -10,6 +10,7 @@ Exit code 2 when no host C compiler is found, 1 when a check fails."""
 import base64
 import json
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -400,6 +401,7 @@ def find_cc():
             return [shutil.which(name)]
     for p in EXTRA:
         if Path(p).exists():
+            os.environ["PATH"] = str(Path(p).parent) + os.pathsep + os.environ["PATH"]  # msys gcc needs its own DLLs
             return [p]
     if subprocess.run([sys.executable, "-m", "ziglang", "version"], capture_output=True).returncode == 0:
         return [sys.executable, "-m", "ziglang", "cc"]
