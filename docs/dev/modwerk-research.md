@@ -185,9 +185,9 @@ DSP 300 is a single write inside `diag.yaml` and the M0 probe.
 | Tempo screen, HOLD FOR, combos | tempo-hold | midi-settings | | needs the HOLD FOR choice screen |
 | Scroll | scroll | nothing | | DDR `0xC00F2100` |
 | Looper services | looper | midi-cc, midi-clock, tempo-hold (it retargets their trampolines, `looper.yaml:13`) | | DDR `0xC00F2200`, services block `0xC00F3000` (magic `0x5A4C5301`), big buffer regions 3, 2, 1 (`looper-services.md:39-43`) |
-| Mixer + Effect Chain screen | mixer-m2 | the release set above, midi-cc (its CC 85-101 sit on the handler, `mixer-m2.yaml:90-92`), midi-settings (menu and tables, `:96-125`) | looper (`mixer.S:108` checks `0x5A4C5301`; apply looper first) | slot-loop packet `0x1181BE00`, record 50 (`R50 0xC01086E0`), patch save/load/pack/dirty hooks, DDR `0xC00F6000-0xC0110400` |
+| Mixer + Effect Chain screen | mixer-m2 | the release set above, midi-cc (its CC 85-101 sit on the handler, `mixer-m2.yaml:90-92`), midi-settings (menu and tables, `:96-125`) | looper (`mixer.S:108` checks `0x5A4C5301`; apply looper first) | slot-loop packet `0x1181BE00`, record 50 (`R50 0xC01086E0`), patch save/load/pack/dirty hooks, DDR `0xC00F6000-0xC0110480` |
 | PERFORM | in mixer-m2 | mixer (hooks `mix_get/mix_put`, the hash, record 50) | transport (`perform_engine.c:96`), looper (`SV_OK`) | screen 11, PERFORM table in record 50 |
-| MASTER, KALEIDO | in mixer-m2 | mixer (menu entry byte `0xC00F60BF`, `master.h:34`) | transport (`master.c:872`) | DDR `0xC010A000-0xC0110400` |
+| MASTER, KALEIDO | in mixer-m2 | mixer (menu entry byte `0xC00F60BF`, `master.h:34`) | transport (`master.c:872`) | DDR `0xC010A000-0xC0110480` |
 | Diag | diag | mixer-m2 (engine calls `diag_end` only if its magic is there), midi-clock (its hook site expects midi-clock's callp), the mixer MENU7 slot "SYSTEM" | | DDR `0xC00F3100`; test builds only |
 | DSP 300 | write inside diag/m0-probe | nothing | | one write: `0xC00BB52C`, `eab02102` to `6acb2102` (`diag.yaml`, `asm/m0_probe/dsp_limit.S`) |
 
@@ -225,7 +225,7 @@ DSP 300 is a single write inside `diag.yaml` and the M0 probe.
 | DDR small patches | `0xC00F2000` version, `0xC00F2020` step, `0xC00F2100` scroll, `0xC00F2200` looper, `0xC00F2800` midi-cc | those patches |
 | DDR services block | `0xC00F3000-0xC00F307F` | looper |
 | DDR diag | `0xC00F3100-` | diag |
-| DDR mixer / perform / master | `0xC00F6000`, far `0xC00F7000`, C `0xC00F8000`, R50_COPY `0xC0106DC0`, R50 `0xC01086E0`, master `0xC010A000-0xC0110400` | mixer-m2 |
+| DDR mixer / perform / master | `0xC00F6000`, far `0xC00F7000`, C `0xC00F8000`, R50_COPY `0xC0106DC0`, R50 `0xC01086E0`, master `0xC010A000-0xC0110480` | mixer-m2 |
 | DDR looper buffer | `0xC0116000` (+ regions `0xC0198000`, `0xC0636980`) | looper (`block.S:8-10`) |
 | Flash records | 50 (globals, mixer, PERFORM), 51 (MIDI settings) | mixer-m2, midi-settings |
 

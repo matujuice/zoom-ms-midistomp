@@ -26,6 +26,8 @@ C_ADDR, C_END = 0xC00F8000, 0xC0106DC0         # MOD code area, record 50 (R50, 
 FAR_ADDR = 0xC00F7000                           # the C's zeroed variables (.far), after mixer.S, below C_ADDR
 LOW_ADDR = 0xC00F6900                           # the C's .switch, .fardata, some .const (C space is full): right after mixer.S, below FAR_ADDR
 LOW_IMG = b""
+MID_ADDR, MID_END = 0xC00F2BA0, 0xC00F3000      # chain_draw's .const: free DDR after fx-category, below the looper services block
+MID_IMG = b""
 PERF = ROOT / "asm/perform"
 CL = ["-mv6740", "--abi=eabi", "-q"]
 
@@ -97,23 +99,28 @@ def build_c(stub: bool = False, listing: list | None = None) -> bytes:
             f"SECTIONS {{ GROUP: load = 0x{C_ADDR:08X} {{ .vectors .text .const .neardata .rodata }}\n"
             f"  GROUP: load = 0x{LOW_ADDR:08X} {{ .switch .fardata\n"
             f"    .lconst {{ pages.obj(.const) pedal_in.obj(.const) perform_engine.obj(.const) }} }}\n"
+            f"  GROUP: load = 0x{MID_ADDR:08X} {{ .mconst {{ chain_draw*.obj(.const) }} }}\n"
             f"  GROUP: load = 0x{FAR_ADDR:08X} {{ .far .bss }} }}\n")
         # no library: an RTS helper call (division, struct copy...) fails the link
         _run(CL + ["-z", *objs, "l.cmd", "-o", "c.out", "--ram_model", "--entry_point=chain_key",
                    "--unused_section_elimination=off", "--warn_sections"], tmp)
         secs = _alloc_sections(Path(tmp, "c.out"))
         far = [s for s in secs if FAR_ADDR <= s[0] < C_ADDR]
-        low = [s for s in secs if s[0] < FAR_ADDR]
+        low = [s for s in secs if LOW_ADDR <= s[0] < FAR_ADDR]
+        mid = [s for s in secs if s[0] < LOW_ADDR]
         img, _ = _image(None, C_ADDR, [s for s in secs if s[0] >= C_ADDR])
         dis = subprocess.run([str(CGT / "bin/dis6x"), "c.out"], cwd=tmp, check=True,
                              capture_output=True, text=True).stdout
     names = {n for _, n, _ in secs}
-    assert names <= {".vectors", ".text", ".const", ".switch", ".fardata", ".far", ".bss", ".neardata", ".rodata", ".lconst"}, names
+    assert names <= {".vectors", ".text", ".const", ".switch", ".fardata", ".far", ".bss", ".neardata", ".rodata", ".lconst", ".mconst"}, names
     assert not re.search(r"\bB14\b", dis), "the C must not use B14 (the OS's data pointer)"
     assert C_ADDR + len(img) <= C_END, hex(C_ADDR + len(img))
     assert all(FAR_ADDR <= a and a + len(b) <= C_ADDR for a, _, b in far), far
     assert all(LOW_ADDR <= a and a + len(b) <= FAR_ADDR for a, _, b in low), low
-    global FAR_LEN, LOW_IMG
+    assert all(MID_ADDR <= a and a + len(b) <= MID_END for a, _, b in mid), mid
+    global FAR_LEN, LOW_IMG, MID_IMG
+    MID_IMG = _image(None, MID_ADDR, mid)[0] if mid else b""
+    MID_IMG += b"\0" * (-len(MID_IMG) % 32)
     LOW_IMG = _image(None, LOW_ADDR, low)[0] if low else b""
     LOW_IMG += b"\0" * (-len(LOW_IMG) % 32)
     FAR_LEN = max((a + len(b) for a, _, b in far), default=FAR_ADDR) - FAR_ADDR
@@ -133,7 +140,8 @@ def main(argv):
     builds = {"asm/mixer/mixer.S": lambda a: assemble(MIX / "mixer.S", a),
               "asm/mixer/chain_keys.c": lambda a: build_c("--stub" in argv),
               "asm/mixer/far": lambda a: bytes(-(-FAR_LEN // 32) * 32),   # after chain_keys.c in the yaml
-              "asm/mixer/low": lambda a: LOW_IMG}
+              "asm/mixer/low": lambda a: LOW_IMG,
+              "asm/mixer/mid": lambda a: MID_IMG}         # after asm/mixer/low in the yaml
     text, ok = YAML.read_text(), True
     for sec in patcher.load(YAML)["section"]:
         if sec["source"] not in builds:   # asm/master/master.c: scripts/build_master_ui.py

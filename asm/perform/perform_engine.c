@@ -10,6 +10,7 @@
 #include "perform.h"
 #include "chain.h"
 #include "stock.h"
+#include "knob_step.h"
 
 /* ---- Tunables ----------------------------------------------------------- */
 #define DU_BPM 2.4187211e-5f    /* grid units (1/8 beat) per 8-sample block per BPM */
@@ -26,7 +27,7 @@
 #define W_LEDMASK 15
 #define W_LEVEL 16
 #define W_CYCLE 21
-#define W_STATE 22              /* GRDLOOP: st | pend << 8 */
+#define W_STATE 20              /* GRDLOOP: st | pend << 8 (was 22, which the firmware writes: v2.0.1) */
 #define W_PASS 23               /* GRDLOOP: +1 per loop pass */
 #define ZT ((volatile const unsigned *)0x1181FF00u)   /* MIDI transport block (zmt.h) */
 #define LED_WANT (*(volatile unsigned *)0xC00EEB08u)  /* LED task: bit 0 wanted */
@@ -79,11 +80,9 @@ static int line(int m)          /* the next line of grid m, counted from bar 1 *
 
 static int len(int n)           /* NEXT in units; 0 = NOW */
 {
-    int c = perf_patch.cycle ? perf_patch.cycle : 1;  /* ponytail: CYC with no CYCLE set = 1 bar */
-    if (n <= 0 || n >= NX_N) return 0;
+    if (n <= 0 || n == NX_UNUSED) return 0;
     if (n < NX_BAR) return 8 << (n - NX_BEAT);
-    if (n < NX_CYC) return 32 << (n - NX_BAR);
-    return (c << 5) << (n - NX_CYC);
+    return 32 << ((n < NX_N ? n : NX_N - 1) - NX_BAR);   /* a v2.0 CYC value: 32 bars */
 }
 
 static void grid(void)
@@ -182,27 +181,6 @@ static Tgt tgt(int t)
     return r;                                   /* ponytail: other CCs are no target yet */
 }
 
-static int fwd(const Tgt *t, int cc)            /* CC 0-127 -> native, as MIDI moves it */
-{
-    int v;
-    if (t->k == K_MIX) {
-        v = ((cc * t->max + 63) * 259) >> 15;
-        return v > t->max ? t->max : v;
-    }
-    if (t->b == 0) return cc >= 64;
-    return (int)(((float)(cc * t->max + 63) + 0.5f) * (1.0f / 127.0f));
-}
-
-static int back(const Tgt *t, int v)            /* native -> the smallest CC that reaches it */
-{
-    int lo = 0, hi = 127, m;
-    while (lo < hi) {
-        m = (lo + hi) >> 1;
-        if (fwd(t, m) >= v) hi = m; else lo = m + 1;
-    }
-    return lo;
-}
-
 static int now(const Tgt *t)
 {
     if (t->k == K_MIX) return LIVE[t->a];
@@ -254,8 +232,8 @@ static void fx_flush(void)
 #define F_LAG 2                 /* ramps from -> to */
 
 typedef struct {
-    unsigned char st, ctl, t, lag;
-    unsigned short mv, fol;     /* fol: the Follow scheduled when this lands */
+    unsigned char st, ctl, t, lag, tf;   /* tf: a Turn's Follow */
+    unsigned mv, fol;           /* fol: the Follow scheduled when this lands */
     int due;
     Tgt x;                      /* the target, from land: no descriptor call a block while it lags */
     float from, to, pos;
@@ -278,12 +256,13 @@ static Slot *slot_new(void)
     return 0;                   /* ponytail: 16 busy, the move is dropped */
 }
 
-static void wait(int ctl, int t, unsigned mv, unsigned fol, int due)
+static Slot *wait(int ctl, int t, unsigned mv, unsigned fol, int due)
 {
     Slot *s;
-    if (MV_NEXT(mv) == NX_UNUSED || !(s = slot_new())) return;
-    s->st = F_WAIT; s->ctl = ctl; s->t = t; s->mv = mv; s->fol = fol; s->due = due;
+    if (MV_NEXT(mv) == NX_UNUSED || !(s = slot_new())) return 0;
+    s->st = F_WAIT; s->ctl = ctl; s->t = t; s->mv = mv; s->fol = fol; s->due = due; s->tf = 0;
     busy = 1;
+    return s;
 }
 
 static int due_of(unsigned mv)  /* Action / Release: the next line of its NEXT */
@@ -300,22 +279,26 @@ static void ftsw(int s)         /* a Footsw press on slot s: the looper counts i
     else ftsw_q ^= 1u << s;     /* the stock toggle takes the effect semaphore: not from the audio block */
 }
 
+static void follow(Slot *s, int at)  /* the Follow: exactly its NEXT after the action completed (v2.0.1: not on the press) */
+{
+    if (MV_NEXT(s->fol) != NX_UNUSED) wait(s->ctl, s->t, s->fol, MV_UNUSED, at + len(MV_NEXT(s->fol)));
+}
+
 static void land(Slot *s)
 {
     Tgt t = tgt(s->t);
     int i, v;
-    if (MV_NEXT(s->fol) != NX_UNUSED)          /* exactly NEXT after this landed */
-        wait(s->ctl, s->t, s->fol, MV_UNUSED, s->due + len(MV_NEXT(s->fol)));
     if (t.k == K_FTSW) {
+        follow(s, s->due);
         ftsw(t.a);
         s->st = F_FREE;
         return;
     }
     for (i = 0; i < NSLOT; i++)                 /* newest wins */
         if (sl[i].st == F_LAG && sl[i].t == s->t) sl[i].st = F_FREE;
-    v = fwd(&t, MV_VALUE(s->mv));
+    v = MV_VALUE(s->mv);
     s->lag = MV_LAG(s->mv);
-    if (t.k == K_NONE || s->lag == LG_OFF) { put(&t, v); s->st = F_FREE; return; }
+    if (t.k == K_NONE || s->lag == LG_OFF) { follow(s, s->due); put(&t, v); s->st = F_FREE; return; }
     s->x = t;
     s->st = F_LAG; s->from = (float)now(&t); s->to = (float)v; s->pos = 0.0f;
 }
@@ -332,9 +315,9 @@ static void tick(void)
         if (s->pos >= 1.0f) s->pos = 1.0f;
         n = (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
         put(&s->x, n);                          /* every block: Perform wins over a CC */
-        if (s->pos >= 1.0f) s->st = F_FREE;
-        b |= s->st;
+        if (s->pos >= 1.0f) { follow(s, g.gu); s->st = F_FREE; }   /* the lag done: the action completed */
     }
+    for (i = 0; i < NSLOT; i++) b |= sl[i].st;  /* after the loop: a Follow may sit below i */
     busy = b;
 }
 
@@ -356,7 +339,7 @@ void perf_reset(void)
 void perf_gesture(int ctl, int gesture, int phase)
 {
     int t = perf_patch.target[ctl];
-    const unsigned short *m = perf_patch.move[ctl];
+    const unsigned *m = perf_patch.move[ctl];
     DINT;
     if (ctl == C_FTSW && phase == 0 && g.anchor && !g.run) {   /* no clock: this press is bar 1 */
         g.gu = 0; g.gf = 0.0f; g.anchor = 0;
@@ -373,23 +356,43 @@ void perf_gesture(int ctl, int gesture, int phase)
     RINT;
 }
 
+/* HOLD FOR MOMENTARY on a Footsw target: phase 0 the hold is seen, 1 the release. The hold
+ * flips at its own Next (HOLD's Action, else the press's), not the press's (v2.0.1). */
+void perf_momentary(int ctl, int phase)
+{
+    int t = perf_patch.target[ctl], i, w = 0;
+    const unsigned *m = perf_patch.move[ctl];
+    unsigned h = MV_NEXT(m[M_HOLD_A]) != NX_UNUSED ? m[M_HOLD_A] : m[M_PRESS_A];
+    if (phase && MV_NEXT(m[M_HOLD_R]) != NX_UNUSED) h = m[M_HOLD_R];
+    DINT;
+    for (i = 0; i < NSLOT; i++)
+        if (sl[i].st == F_WAIT && sl[i].ctl == ctl) {
+            w = 1;
+            if (phase) sl[i].st = F_FREE;       /* released before it flipped: nothing */
+            else { sl[i].due = due_of(h); sl[i].fol = MV_UNUSED; }
+        }
+    if (phase && !w) wait(ctl, t, h, MV_UNUSED, due_of(h));   /* flips it back */
+    RINT;
+}
+
 void perf_turn(int ctl, int steps)
 {
     int t = perf_patch.target[ctl], i, n;
     unsigned f = perf_patch.move[ctl][M_TURN_F];
+    Slot *s;
     Tgt x = tgt(t);
     if (x.k == K_FTSW) {                        /* a turn sets the effect's on / off (right on, left off); on the looper only a press counts */
         if (SV_OK && (int)SV[W_SLOT] == x.a) return;
         x = tgt(14 + 10 * x.a);
     }
     if (x.k != K_MIX && x.k != K_FX) return;
+    steps = knob_step(160 + ctl, steps, x.max);  /* ctl 0-2 = knob 1-3 (perform_keys.c turn) */
     DINT;
-    cancel(ctl);
-    for (i = 0; i < NSLOT; i++)
-        if (sl[i].st == F_LAG && sl[i].t == t) sl[i].st = F_FREE;
+    for (i = 0; i < NSLOT; i++)                 /* the last turn's Follow and a lag go; a queued press stays (v2.0.1) */
+        if ((sl[i].st == F_WAIT && sl[i].ctl == ctl && sl[i].tf) || (sl[i].st == F_LAG && sl[i].t == t)) sl[i].st = F_FREE;
     put(&x, (x.k == K_FX && fxw[x.a][x.b] >= 0 ? fxw[x.a][x.b] : now(&x)) + steps);
     n = len(MV_NEXT(f));
-    wait(ctl, t, f, MV_UNUSED, n ? line(n) : g.gu);   /* a Turn's Follow waits for the next line */
+    if ((s = wait(ctl, t, f, MV_UNUSED, n ? line(n) : g.gu))) s->tf = 1;   /* a Turn's Follow waits for the next line */
     RINT;
 }
 
@@ -402,12 +405,13 @@ void perf_loop_event(int ev)
     RINT;
 }
 
-int perf_value(int target)
+int perf_native(int target)
 {
     Tgt t = tgt(target);
-    if (t.k != K_MIX && t.k != K_FX) return 0;
-    return back(&t, t.k == K_FX && fxw[t.a][t.b] >= 0 ? fxw[t.a][t.b] : now(&t));
+    if (t.k != K_MIX && t.k != K_FX) return -1;
+    return t.k == K_FX && fxw[t.a][t.b] >= 0 ? fxw[t.a][t.b] : now(&t);
 }
+
 
 int perf_pending(int ctl)
 {
@@ -420,6 +424,7 @@ int perf_pending(int ctl)
 
 /* ---- Footswitch LED: its target owns it in Perform ----------------------- */
 static int led_own, pwm;
+volatile int perf_led = -1;     /* play screen: 0/1 while our move waits on the looper (the bar's blink), -1 its own level */
 static Tgt led_x;               /* tgt(the footswitch's target), from the poll: no descriptor call a block */
 
 static void led(void)
@@ -430,7 +435,7 @@ static void led(void)
         x = led_x;
         if (x.k == K_FTSW && (int)SV[W_SLOT] == x.a) {
             pwm = (pwm + 1) & 31;
-            lit = pwm < (int)SV[W_LEVEL];       /* the looper's level: countdown, pulse, on */
+            lit = perf_on == 1 && perf_led >= 0 ? perf_led : pwm < (int)SV[W_LEVEL];   /* the looper's level: countdown, pulse, on */
         } else if ((x.k == K_FTSW && x.a < COUNT) || (x.k == K_FX && x.b == 0))
             lit = FX_REC(x.a)[0] != 0;          /* Footsw or on / off: the effect's on state */
     }

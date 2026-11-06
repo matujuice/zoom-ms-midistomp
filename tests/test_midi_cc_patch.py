@@ -56,3 +56,24 @@ def test_handler_falls_through_to_step():
     m = re.search(r"\.equ\s+STEP,\s*(0x[0-9A-Fa-f]+)", (ROOT / handler["source"]).read_text())
     assert int(m.group(1), 16) == step["addr"]
     assert step["source"] == "asm/midi_cc/step.S"
+
+
+def test_cc82_taps_through_tempo_hold_trampoline():
+    # No assembler needed: decode the hand-checked hex. The CC 82 branch ends
+    # in mvkl/mvkh B0 + b B0 to tempo-hold's tap trampoline (the tap with the
+    # MIDI clock check), and CC 82 is the compare against 2 (80 + 2).
+    step = PATCH["section"][1]
+    raw = bytes.fromhex(step["data"])
+    words = [int.from_bytes(raw[i:i + 4], "little") for i in range(0, len(raw), 4)]
+    hold = patcher.load(ROOT / "patches/tempo-hold.yaml")
+    tramp = next(e["addr"] for e in hold["write"] if e.get("source") == "asm/tempo_hold/tap_trampoline.S")
+    assert f"TAP_TRAMPOLINE, 0x{tramp:X}" in (ROOT / "asm/midi_cc/step.S").read_text()
+    const = lambda w: (w >> 7) & 0xFFFF
+    mvk2 = [i for i, w in enumerate(words) if w == (2 << 7) | 0x28]          # mvk .S1 2,a0
+    assert len(mvk2) == 1
+    assert words[mvk2[0] + 1] == 0x01002A78                                  # cmpeq .L1 a1,a0,a2
+    lo = [i for i, w in enumerate(words) if w & 0x7F == 0x2A and w >> 23 == 0 and const(w) == tramp & 0xFFFF]
+    assert len(lo) == 1 and const(words[lo[0] + 1]) == tramp >> 16
+    assert words[lo[0] + 2] == 0x00000362                                    # b .S2 b0
+    # the CC 80/81 range check now branches to this code, not to stock
+    assert ((words[4] >> 7) & 0x1FFFFF) == mvk2[0]

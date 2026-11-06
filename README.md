@@ -57,6 +57,7 @@ Everything is saved in the patch: routing, levels, the looper settings and the P
 | **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#8-midi-and-the-cc-chart) |
 | **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
 | **Patch up/down by CC** | CC 80 / 81 load the previous / next patch |
+| **Tap tempo by CC** | CC 82 taps the tempo, without the tempo screen |
 | **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
 
 ## QOL improvements
@@ -68,11 +69,13 @@ Small things that make the stock pedal nicer to live with.
 | Change | What it does |
 |---|---|
 | **Tempo Lock** | set the tempo by turning the knob or tapping, and keep one tempo across patches |
-| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or works as a momentary switch |
+| **Fast knobs** | Perform, node and tempo knobs take bigger steps when turned fast, like the stock effect knobs |
+| **HOLD FOR** | a footswitch hold opens the tuner or the tempo, or flips the effect only while held |
 | **Faster scrolling** | on the effect select (carousel) screen, left/right scroll faster and wrap around from the last effect to the first |
 | **Button combos** | down + right = tuner, down + left = tempo |
 | **EXIT goes back** | EXIT returns to the MENU entry you left |
 | **INPUT MONO/STEREO** | tell the pedal which input it has, in SETTINGS |
+| **IDLE KALEIDO** | KALEIDO as a screen saver: at power-on and after 10 s to 2 min untouched, in SETTINGS |
 | **Levels up to 150** | Input and Master levels go past unity (100) |
 | **MS-50G effect select** | the category screen is the MS-50G's: DYN/FLTR, OD/DIST, AMP, MOD/SFX, DLY/REV and EXIT |
 
@@ -118,13 +121,14 @@ Your patches are kept, but back them up first anyway, just in case (with your us
 
 1. Download [Zoom's official **MS-70CDR 2.10** updater](https://zoomcorp.com/en/us/multi-effects/multistomp-pedals/ms-70cdr/ms-70cdr-support/).
    Use it for every pedal, also the MS-50G and MS-60B.
-2. Drag it onto **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
-   It writes the MIDISTOMP updater next to it.
+2. Download **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
+   In File Explorer, drag Zoom's updater (`ZOOM MS-70CDR v2.10 Updater.exe`) and drop it on the builder's icon.
+   The builder writes **MIDISTOMP V2.0 Updater.exe** in the same folder.
 3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater.
 4. On the pedal, go to MENU > SETTINGS > **INPUT** and choose your input: **STEREO** on an MS-70CDR (needed for the
    Split routing modes), **MONO** on the MS-50G and MS-60B.
 
-Full steps and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
+Full steps, Mac and Linux, and recovery are in the [user guide](docs/user-guide.md#2-install-and-recovery).
 
 **On a Mac:** the same, with Zoom's **Mac** updater and **MIDISTOMP-builder-Mac** from the
 [releases](https://github.com/matujuice/zoom-ms-midistomp/releases) (AppleSilicon or Intel, to match your Mac): open

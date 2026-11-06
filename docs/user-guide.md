@@ -12,7 +12,7 @@ MS-70CDR product shots.</sub>
 New to MIDISTOMP? Read 1 to 3 in order, then jump to what you want to play with.
 
 1. [Overview](#1-overview): what 2.0 adds and which pedals it runs on
-2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
+2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [On Linux](#on-linux) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
 3. [Getting around](#3-getting-around): [The keys](#the-keys) · [Button combos and scrolling](#button-combos-and-scrolling) · [The MENU](#the-menu)
 4. [EFFECT CHAIN ROUTING](#4-effect-chain-routing): [Moving around](#moving-around) · [Routing modes](#routing-modes) · [Node knob pages](#node-knob-pages) · [Safety limiter](#safety-limiter) · [Saving](#saving)
 5. [PERFORM MODE](#5-perform-mode): [Getting in and out](#getting-in-and-out) · [The screen](#the-screen) · [Gestures](#gestures) · [Value, Next, Lag](#every-move-value-next-lag) · [SETUP](#setup) · [LOOPER menu](#the-looper-menu) · [Example](#example-a-transition)
@@ -64,7 +64,7 @@ You get 6 effects per patch, on every pedal. If you try it on a pedal not listed
 ## 2. Install and recovery
 
 The release does not contain Zoom's firmware, so you make the MIDISTOMP updater yourself from Zoom's official one.
-This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below). It takes about five minutes.
+This needs Windows, or a Mac (see [On a Mac](#on-a-mac) below; Linux can build but not flash, see [On Linux](#on-linux)). It takes about five minutes.
 
 Your patches are kept, but back them up first anyway, just in case (with your usual patch editor).
 
@@ -72,8 +72,10 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    from zoomcorp.com (a file like `MS-70CDR_v2.10_Win_E.zip`) and unzip it. Use this one for the MS-50G and MS-60B too.
 2. Download **MIDISTOMP-builder-Windows.exe** from the
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
-3. Drag `ZOOM MS-70CDR v2.10 Updater.exe` onto `MIDISTOMP-builder-Windows.exe`. It writes **MIDISTOMP V2.0 Updater.exe** in
-   the same folder. It refuses any other file, so a wrong download can't produce a broken updater.
+3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
+   and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
+   window for a moment and writes a new file, **MIDISTOMP V2.0 Updater.exe**, in the same folder. It refuses any
+   other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
    power jack): the pedal shows the update screen.
@@ -81,7 +83,7 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    <img src="img/ms70cdr-usb.jpg" alt="The mini-USB port and the power jack on the side of the pedal" width="320">
 
 6. Run `MIDISTOMP V2.0 Updater.exe` and let it finish. Don't unplug during the update.
-7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0**, and MENU > SYSTEM shows **V2.0**.
+7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0.1**, and MENU > SYSTEM shows **V2.0.1**.
 
    <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0 boot screen" width="300">
 
@@ -128,6 +130,20 @@ It writes and signs **MIDISTOMP V2.0 Updater.app** the same way. If signing fail
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
 Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover
 with Zoom's MS-70CDR Mac updater (it accepts an MS-50G running MIDISTOMP) or the MIDISTOMP one.
+
+### On Linux
+
+There is no Linux updater: the flashing itself needs Windows or a Mac. You can still build the Windows updater on
+Linux from source (Python 3.10 or newer), then run it on a Windows machine:
+
+```sh
+git clone https://github.com/matujuice/zoom-ms-midistomp && cd zoom-ms-midistomp
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
+```
+
+It writes **MIDISTOMP V2.0 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
+machine with USB passed through, is not tested.
 
 ### Recovery and going back to stock
 
@@ -376,6 +392,10 @@ In Perform mode the hold never opens TAP or the tuner.
 - **MIDI Start or Stop, or a patch change,** cancel waiting moves and restart the grid. A tempo change just moves
   the grid with it.
 
+**Knobs speed up when turned fast**, exactly like the stock effect parameters: a slow turn moves 1 step per
+click, a fast spin moves several, so a knob crosses its range quickly and still lands exactly. This works on
+the Perform knobs and the mixer node knob pages. Lists and menus always move one row per click.
+
 ### SETUP
 
 <p><img src="img/perform-setup.png" alt="PERFORM SETUP list" width="260"> <img src="img/perform-setup-knob.png" alt="KNOB 2: target and gestures" width="260"> <img src="img/perform-setup-gesture.png" alt="K2 PRESS: Action and Follow" width="260"></p>
@@ -483,15 +503,16 @@ waits for its Next line, except with NOW.
 
 ### Memory
 
-Loops are stored in 12-bit, about 72 dB under the signal. The looper picks stereo or mono when recording starts,
+Loops are stored in 12-bit, about 72 dB under the signal: up to 23.2 s stereo or 43.0 s mono. The looper picks stereo or mono when recording starts,
 from the tempo and the cycle length:
 
 | Length | Stereo | Mono |
 |---|---|---|
-| 1-4 bars | any tempo | |
-| 8 bars | 79 BPM and up | 40-78 BPM |
-| 16 bars | 158 BPM and up | 81-157 BPM |
-| 32 bars | | 161 BPM and up |
+| 1-2 bars | any tempo | |
+| 4 bars | 42 BPM and up | 40-41 BPM |
+| 8 bars | 83 BPM and up | 45-82 BPM |
+| 16 bars | 165 BPM and up | 89-164 BPM |
+| 32 bars | | 178 BPM and up |
 
 If the cycle doesn't fit, the looper records what fits, halving the length, and the status says so (for example
 `REC 4/8`, or `REC 14/16 M` when it also went mono). At 120 BPM a 32-bar cycle records 16 bars mono; the counter
@@ -527,6 +548,10 @@ MENU > **KALEIDO** fills the screen with a mirrored pattern that moves with the 
 rings, mids warp it and switch the number of mirrors, highs speed it up and add sparkle, the level sets the contrast
 and the L/R balance turns it. With MIDI clock running it flashes on every beat. It does nothing useful and that's
 the point.
+
+With SETTINGS > **IDLE KALEIDO** set to a time, KALEIDO also opens at power-on and whenever the play screen has gone
+untouched that long (never from a menu, the tuner or an effect's knob pages). Any key or knob takes you back to the
+play screen; the footswitch also does its normal job, so a stomp both wakes the pedal and turns the effect on or off.
 
 | Knob | Turn |
 |---|---|
@@ -614,7 +639,11 @@ is its footswitch ([LOOPER](#the-footswitch)).
 CC 80 with a value of 64-127 loads the previous patch, CC 81 the next one, wrapping between patch 50 and patch 1.
 Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released steps once.
 
-All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down doesn't follow the PC settings.
+### Tap tempo
+
+CC 82 with a value of 64-127 taps the tempo once, as a tap on the tempo screen does, without opening the tempo screen. Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released taps once. While a MIDI clock is setting the tempo, taps do nothing, as on the pedal.
+
+All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down and tap tempo don't follow the PC settings.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 
@@ -622,7 +651,7 @@ All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down doesn't follow the PC 
 
 ### SETTINGS
 
-<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: INPUT and MIDI" width="260"></p>
+<p><img src="img/settings-2.png" alt="SETTINGS: HOLD FOR, TUNER OUT, POWER SAVE, AUTO SAVE" width="260"> <img src="img/settings.png" alt="SETTINGS: BATTERY to TEMPO LOCK" width="260"> <img src="img/settings-3.png" alt="SETTINGS: TEMPO LOCK, INPUT, IDLE KALEIDO and MIDI" width="260"></p>
 
 MENU > **SETTINGS** holds the stock rows plus these:
 
@@ -631,13 +660,15 @@ MENU > **SETTINGS** holds the stock rows plus these:
 | **HOLD FOR** | TUNER / TEMPO / MOMENTARY | what holding the footswitch does (below) |
 | **TEMPO LOCK** | OFF / ON | ON: changing patch keeps the current tempo ([Tempo Lock](#tempo-lock)) |
 | **INPUT** | MONO / STEREO | which input the pedal has (below) |
+| **IDLE KALEIDO** | OFF / 10 S / 30 S / 1 MIN / 2 MIN | not OFF: [KALEIDO](#kaleido) opens at power-on and after that long untouched on the play screen |
 | **MIDI** | opens the MIDI menu | [MIDI menu](#midi-menu) |
 
 **HOLD FOR:**
 - TUNER (default): opens the tuner, as stock.
 - TEMPO: opens the tempo screen.
-- MOMENTARY: a short press flips the effect as usual. Hold it over half a second and it flips back when you let go.
-  The flip-back is never saved.
+- MOMENTARY: hold the footswitch and the effect flips while you hold it: a bypassed effect turns on, an active one
+  turns off. Let go and it goes back. A short press (under half a second) flips it as usual and it stays.
+  The hold is never saved.
 
 **INPUT:** the firmware can't tell the pedals apart, so tell it. **STEREO** on an MS-70CDR gives the Split and Mono
 Serial modes. **MONO** (default) is for the MS-50G and MS-60B: those modes are not offered, and a patch that uses
@@ -647,7 +678,7 @@ them plays Split as Parallel and Mono Serial as Serial.
 
 <p><img src="img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="300"> <img src="img/tempo-midi-clock.png" alt="Tempo screen while MIDI clock arrives" width="300"></p>
 
-Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps, or
+Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps (bigger steps when you turn fast), or
 tap the footswitch. It closes 2 s after the last turn or tap. While MIDI clock arrives it reads **MIDI CLOCK** and
 can't be changed by hand.
 

@@ -246,7 +246,7 @@ SCREENS = {
     "midi_menu_2": ("v2", lambda cpu: screen_list(cpu, 14, row=3, top=2)),
     "settings": ("v2", settings(3, 4)),
     "settings_2": ("v2", settings(0, 0)),
-    "settings_3": ("v2", settings(3, 6)),  # pedal_in.c: 10 rows, MIDI last
+    "settings_3": ("v2", settings(3, 7)),  # pedal_in.c: 11 rows, IDLE KALEIDO, MIDI last
     "menu": ("v2", menu()),
     "menu_2": ("v2", menu(2, 3)),  # row is relative to top: the cursor on SYSTEM
     "effect_select": ("v2", effect_select(0)),

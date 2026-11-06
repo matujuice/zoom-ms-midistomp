@@ -6,11 +6,11 @@
 #define MASTER_H
 
 #define MS_BASE   0xC010A000u
-#define MS_FFT    ((float *)0xC0110400)           /* [1024] 512 complex: the 1024-point real FFT */
-#define MS_SIN    ((float *)0xC0111400)           /* [257] sin(2 pi k / 1024), k = 0..256: twiddles and Hann; built at first open */
-#define MS_RING_M ((short *)0xC0111C00)           /* [4096] mono (L + R) / 2, int16: scope, FFT */
-#define MS_RING_S ((short *)0xC0113C00)           /* [2048] side (L - R) / 2, int16: stereo, loudness */
-#define MS_HIST   ((unsigned short *)0xC0114C00)  /* [2][704] loudness histograms (I, LRA), 0.1 LU */
+#define MS_FFT    ((float *)0xC0110480)           /* [1024] 512 complex: the 1024-point real FFT */
+#define MS_SIN    ((float *)0xC0111480)           /* [257] sin(2 pi k / 1024), k = 0..256: twiddles and Hann; built at first open */
+#define MS_RING_M ((short *)0xC0111C80)           /* [4096] mono (L + R) / 2, int16: scope, FFT */
+#define MS_RING_S ((short *)0xC0113C80)           /* [2048] side (L - R) / 2, int16: stereo, loudness */
+#define MS_HIST   ((unsigned short *)0xC0114C80)  /* [2][704] loudness histograms (I, LRA), 0.1 LU */
 #define MS_END    0xC0116000u
 #define RING_M_N  4096
 #define RING_S_N  2048
@@ -32,5 +32,6 @@
 #define MS_CUR_PATCH  (*(volatile int *)(MS_B14 + 324))
 #define MS_MAILBOX    (*(volatile int *)(MS_B14 + 656))
 #define MS_MENU_ENTRY (*(volatile unsigned char *)0xC00F60BF)   /* MENUSCR[7] (menu_enter.S): 3 = MASTER, 6 = KALEIDO */
+#define MS_IDLE_SHOWN (*(volatile unsigned char *)0xC00F60B2)   /* KALEIDO opened by IDLE KALEIDO (chain_keys.c idle_ev) */
 
 #endif

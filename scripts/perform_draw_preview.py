@@ -10,6 +10,7 @@ Exit code 2 when no host C compiler is found, 1 when a check fails."""
 import base64
 import json
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -147,8 +148,9 @@ const char *host_desc(int s, int p)              /* descriptor entries: the name
 PerfPatch perf_patch;
 PerfGrid perf_grid;
 volatile int perf_on;
+volatile int perf_led = -1;
 static int host_val[256], host_pend[8];
-int perf_value(int t) { return host_val[t & 255]; }
+int perf_native(int t) { return host_val[t & 255]; }
 int perf_pending(int c) { return host_pend[c]; }
 extern int pu_scr, pu_pos[8], pu_ctl, pu_ev, pu_ges, pu_mv, pu_mod;
 #include "host_data.h"
@@ -253,6 +255,8 @@ static char log_[512];
 static int leaves, saves;
 static void plog(const char *s) { strcat(log_, s); }
 void perf_gesture(int c, int g, int ph) { char b[24]; sprintf(b, "G%d.%d.%d;", c, g, ph); plog(b); }
+int knob_step(int ev, int s, int r) { return s; }
+void perf_momentary(int c, int ph) { char b[24]; sprintf(b, "M%d.%d;", c, ph); plog(b); }
 void perf_turn(int c, int n) { char b[24]; sprintf(b, "T%d.%d;", c, n); plog(b); }
 void perf_leave(void) { leaves++; }
 int perf_save(int p) { saves += p == 7; return 1; }
@@ -269,7 +273,7 @@ static void op(void) { k(34, 1); k(35, 1); }    /* lists: knob 1 opens on releas
 
 static int keys(void)
 {
-    unsigned short m;
+    unsigned m;
     perf_on = 0; k(160, 1); k(160, 1); op(); check("the ENTER / SETUP choice opens SETUP", perf_on == 2); perf_on = 0; k(160, -5); op();
     check("... and ENTER", perf_on == 1);
     perf_poll(); polls(5);
@@ -283,7 +287,7 @@ static int keys(void)
     polls(12); k(64, 1); polls(30); k(161, -3); k(65, 1); expect("two detents cancel a hold", "G1.2.0;G1.2.1;T1.-3;");
     k(161, 1); k(161, -1); expect("turns pass", "T1.1;T1.-1;");
     k(32, 1); polls(7); k(33, 1); expect("footswitch press", "G6.1.0;");
-    k(32, 1); polls(30); k(33, 1); expect("footswitch hold", "G6.2.0;G6.2.1;");
+    k(32, 1); polls(40); k(33, 1); expect("footswitch hold (acts on the press, hold at 500 ms)", "G6.1.0;G6.2.0;G6.2.1;");
     k(72, 1); polls(7); k(73, 1); k(70, 1); polls(7); k(71, 1); k(74, 1); polls(30); k(75, 1);
     expect("cursor buttons", "G3.1.0;G4.1.0;G5.2.0;G5.2.1;");
     k(68, 1); k(69, 1); check("cursor up leaves on release", leaves == 1);
@@ -400,6 +404,7 @@ def find_cc():
             return [shutil.which(name)]
     for p in EXTRA:
         if Path(p).exists():
+            os.environ["PATH"] = str(Path(p).parent) + os.pathsep + os.environ["PATH"]  # msys gcc needs its own DLLs
             return [p]
     if subprocess.run([sys.executable, "-m", "ziglang", "version"], capture_output=True).returncode == 0:
         return [sys.executable, "-m", "ziglang", "cc"]

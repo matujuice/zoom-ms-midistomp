@@ -1,18 +1,18 @@
-# MIDISTOMP V2.0: the VERSION menu entry reads "V2.0", and the boot screen
-# prints "v2.0" under the MIDISTOMP MOD logo instead of the OS version.
+# MIDISTOMP V2.0.1: the VERSION menu entry reads "V2.0.1", and the boot screen
+# prints "v2.0.1" under the MIDISTOMP MOD logo instead of the OS version.
 name: version-2.0
-description: VERSION entry reads "V2.0"; boot screen version line reads "v2.0"
+description: VERSION entry reads "V2.0.1"; boot screen version line reads "v2.0.1"
 replace:
   - find: "VERSION\0"
     with: "V2.0\0\0\0\0"
     count: 2   # the menu list and the version screen title
 section:
-  # "v2.0", in DDR the RAM test (#19) found unused
+  # "v2.0.1", in DDR the RAM test (#19) found unused
   - model: ms70cdr-2.10
     addr: 0xC00F2000
-    data: "76322e3000000000"
+    data: "76322e302e310000"
 write:
-  # Boot screen: sprintf(buf, "v%s", version) -> format = our "v2.0" string.
+  # Boot screen: sprintf(buf, "v%s", version) -> format = our "v2.0.1" string.
   # mvk/mvkh .S2 0xC00E4914,b0 -> 0xC00F2000 (keeps the mvkh parallel bit)
   - model: ms70cdr-2.10
     addr: 0xC00CD7C0

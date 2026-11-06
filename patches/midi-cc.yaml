@@ -2,13 +2,14 @@
 #   effect n (1-6) on/off  = CC 10n+4  (14, 24, 34, 44, 54, 64; value >= 64 = on)
 #   effect n, knob k (1-9) = CC 10n+4+k (e.g. effect 1 knob 1 = CC 15)
 #   CC 80 / 81 (value >= 64) = previous / next patch, wrapping (issue #34)
+#   CC 82 (value >= 64) = one tap of tap tempo (issue #53)
 # Any MIDI channel. Other CCs (and Program Change, SysEx) behave as stock.
 # Design and addresses: docs/dev/os-reverse-engineering.md, "MIDI CC patch".
 # The hex below is generated from asm/midi_cc/*.S with
 #   zoomms asm <file> --addr <addr>   (add --section for a section)
 # and tests/test_midi_cc_patch.py checks it still matches the source.
 name: midi-cc
-description: Effect on/off and knobs from MIDI CC 14-73, patch up/down from CC 80/81
+description: Effect on/off and knobs from MIDI CC 14-73, patch up/down from CC 80/81, tap tempo from CC 82
 builds: [ms70cdr-2.10]
 write:
   # Task_MIDI's CC call site: callp midi_channel_msg -> callp trampoline
@@ -46,7 +47,8 @@ section:
     addr: 0xC00F2020
     source: asm/midi_cc/step.S
     data: >-
-      28280000f8c08000a8000000f8290001100b00a000800000a2c9180062030c30
+      28280000f8c08000a8000000f8290001100d00a000800000a2c9180062030c30
       008000006c5100037820840058e0870028190000280080020000000078c00403
       f8ca140178c000a3f8ca0001f8c000b358a304025aa300032a906f006a056000
-      6203000000800000000000000000000000000000000000000000000000000000
+      620300000080000028010000782a000110ffffbf00800000a2c9180010ffff3f
+      008000002af80d00ea0660006203000000800000000000000000000000000000

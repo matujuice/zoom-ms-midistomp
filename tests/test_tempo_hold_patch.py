@@ -108,7 +108,13 @@ def test_strings():
 
 
 def test_sections_fit_free_l2():
-    a, b, c = PATCH["section"]
+    a, b, c, d = PATCH["section"]
+    # knob_accel.S: the end of looper.S's DDR budget, before midi-cc's handler
+    assert d["addr"] == 0xC00F2700 and d["addr"] + len(bytes.fromhex(d["data"])) <= 0xC00F2800
+    looper, cc = (patcher.load(ROOT / f"patches/{n}.yaml") for n in ("looper", "midi-cc"))
+    l2 = next(e for e in looper["section"] if e["addr"] == 0xC00F2200)
+    assert l2["addr"] + len(bytes.fromhex(l2["data"])) <= 0xC00F2700
+    assert any(e["addr"] == 0xC00F2800 for e in cc["section"])
     assert c["addr"] == 0x1181E7C0 and len(bytes.fromhex(c["data"])) <= 64  # clock vars end .. poll.S
     assert a["addr"] == H and H + len(bytes.fromhex(a["data"])) <= 0x1181FF00  # transport block
     assert b["addr"] == H2 and H2 + len(bytes.fromhex(b["data"])) <= 0x11820000  # end of L2
@@ -125,3 +131,21 @@ def test_no_overlap():
     for i, (a, b) in enumerate(ours):
         for c, d in ours[i + 1:] + theirs:
             assert b <= c or d <= a, hex(a)
+
+
+def _accel(same, steps, iv):
+    """knob_accel.S, written out: the mixer's knob_step with range 210."""
+    if not same or not steps or iv >= 20:
+        return steps
+    x = (21 - iv) * steps * 210
+    s = abs(x) // 150 * (1 if x > 0 else -1)  # C6x signed divide truncates
+    return s or steps
+
+
+def test_knob_accel_curve():
+    src = (ROOT / "asm/tempo_hold/knob_accel.S").read_text()
+    assert "mvk     .S1     210, a6" in src and "mvk     .S2     150, b4" in src
+    assert "mvk     .S1     20, a0" in src and "mvk     .S1     21, a0" in src
+    assert "KNOB_ACCEL, 0xC00F2700" in (ROOT / "asm/tempo_hold/hold.inc").read_text()
+    assert [_accel(False, 1, 0), _accel(True, 1, 25), _accel(True, 1, 19),
+            _accel(True, 1, 0), _accel(True, -2, 10), _accel(True, 0, 0)] == [1, 1, 2, 29, -30, 0]

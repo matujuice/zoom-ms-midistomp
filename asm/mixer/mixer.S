@@ -67,7 +67,7 @@
         .equ    MAXES, BASE + 296           ; [24] maximum of each setting
         .equ    DEFAULTS, BASE + 320        ; [24]
         .equ    NSET, 24
-        .equ    R50, 0xC01086E0             ; [6428] record 50 (chain.h)
+        .equ    R50, 0xC0116000             ; [11228] record 50 (chain.h)
         .equ    CUR_PATCH, 324              ; B14 offset: the patch played
 
         .equ    C_SEC, 0xC00F8000           ; chain_vec.asm vectors
@@ -173,7 +173,7 @@ vectors:
         .word   0, 0                        ; +128 PAGE
         .byte   0, 0, BUS_A, 0, NONE, 0, 0, PG_OUT ; +136 UI (chain.h): CUR SEL BUSROW DELP ADDBUS FROMCHAIN PFIRST PLAST
         .word   0, 0, 0, 0, 0, F_ONE, 0, 0  ; +144 GAINS: In, SendA, SendB, cA, cB, limiter, InR, MasterR
-        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, then free to +184
+        .byte   0, 0, 0, 0, 0, 0, 0, 0  ; +176 PEDAL, +177 IDLE, +178 IDLE_SHOWN (chain.h), then free to +184
         ; +184 MENUSCR: entries 0-1 stock, 2 PERFORM MODE (screen 11), 3 MASTER (11), 4 SETTINGS (1),
         ; 5 the version entry (9), 6 KALEIDO (11); [7] the entry last opened (menu_enter.S).
         ; MIDI SETTINGS is the last SETTINGS row (pedal_in.c).
@@ -693,7 +693,7 @@ pl_ret:
         mvkl    .S2     LP_MAGIC, b1
         mvkh    .S2     LP_MAGIC, b1
         nop     3
-        cmpeq   .L2X    a0, b1, b1          ; looper.yaml applied first: chain its poll
+        cmpeq   .L2X    b1, a0, b1          ; looper.yaml applied first: chain its poll
         addk    .S2     16, b15
         mvkl    .S2     POLL, b0
         mvkh    .S2     POLL, b0
