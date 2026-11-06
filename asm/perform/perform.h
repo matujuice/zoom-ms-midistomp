@@ -110,7 +110,7 @@ void perf_momentary(int ctl, int phase);       /* HOLD FOR MOMENTARY: 0 hold see
 void perf_turn(int ctl, int steps);           /* knob turn: moves the target now, schedules TURN_F */
 void perf_loop_event(int ev);                 /* L_*: from the looper's state words */
 void perf_reset(void);                        /* MIDI Start/Stop, patch change: cancel all */
-int perf_value(int target);                   /* live value 0-127 of a target, for the screen */
+int perf_native(int target);                  /* live value in the target's own range, -1 none */
 int perf_pending(int ctl);                    /* grid units (1/8 beat) to its next waiting move, -1 none (blink) */
 
 /* Storage (perform_store.c): the patch's entry in record 50, keyed like the mixer table. */

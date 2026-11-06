@@ -168,17 +168,17 @@ int pd_step(int t, int v, int a)                 /* a move's VALUE (CC units, -1
     d = disp(t, &p, v);
     d2 = d + a;                                  /* one value a click (a knob turned fast steps more) */
     d2 = d2 < 0 ? 0 : d2 > p.max ? p.max : d2;
-    return d2 == d ? v : tocc(t, &p, d2);
+    if (d2 == d) return v;
+    return a > 0 ? tocc(t, &p, d2) : tocc(t, &p, d2 + 1) - 1;   /* the CC nearest d2 on the way; a value no CC shows is passed, never stuck on */
 }
 
-static void val_text(int t, int v, char *o)      /* v in CC units, -1 unused */
+static void nat_text(int t, int v, int d, char *o)   /* v in CC units (-1 unused), d the native value it shows */
 {
     Par p;
-    int d;
     pinfo(t, &p);
     if (v < 0) { scat(o, "-"); return; }
     if (p.look == TRIG) { scat(o, "TAP"); return; }
-    d = disp(t, &p, v);
+    if (d < 0) d = disp(t, &p, v);
     if (p.gs) {
         char g[16];
         int n = p.gs(d, g);
@@ -404,9 +404,10 @@ static void play(void)
         small(a, 42 * i + 22 - ((softw(a) - 1) >> 1), 13);
         small(l, 42 * i + 22 - ((softw(l) - 1) >> 1), 19);
         pinfo(t, &p);
-        d = IS_FTSW(t) ? (ftsw_on(t) ? 127 : 0) : perf_value(t);   /* a Footsw target shows its effect's state */
+        n = IS_FTSW(t) ? -1 : perf_native(t);   /* the live value in the effect's own steps */
+        d = IS_FTSW(t) ? (ftsw_on(t) ? 127 : 0) : tocc(t, &p, n);   /* a Footsw target shows its effect's state */
         ctl(t, d, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
-        val_text(t, d, v); upper(v);
+        nat_text(t, d, n, v); upper(v);
         small(v, 42 * i + 22 - ((softw(v) - 1) >> 1), 50);
         if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 55);   /* a waiting move: the column fills when the loop bar fills */
     }
@@ -421,7 +422,7 @@ static void play(void)
         if (IS_FTSW(t)) {                        /* a footswitch: a box when off, filled when on */
             if (perf_pending(3 + i) >= 0 ? shown(3 + i) : ftsw_on(t)) invert(42 * i + 2, 57, 42 * i + 41, 63);   /* waiting: it blinks */
             else rect(42 * i + 2, 57, 42 * i + 41, 63, 3);
-        } else if (shown(3 + i) && (!SOFT_AWAY || (p.dcc != 255 && perf_value(t) != p.dcc))) invert(42 * i + 2, 57, 42 * i + 41, 63);
+        } else if (shown(3 + i) && (!SOFT_AWAY || (p.dcc != 255 && tocc(t, &p, perf_native(t)) != p.dcc))) invert(42 * i + 2, 57, 42 * i + 41, 63);
         h = ARN[i] == 3 ? 5 : 3;
         for (j = 0; j < ARN[i]; j++) for (y = 0; y < h; y++) if (AR[i][j] >> y & 1) px(42 * i + 5 + j, 60 - (h >> 1) + y, 2);
     }
@@ -440,7 +441,7 @@ static const char *const MN[NMOVE_CTL] = { "FOLLOW", "ACTION", "FOLLOW", "ACTION
 static void mv_text(int t, unsigned short m, char *o)    /* "80 1BAR", "-" */
 {
     if (MV_NEXT(m) == NX_UNUSED) { scat(o, "-"); return; }
-    val_text(t, MV_VALUE(m), o);
+    nat_text(t, MV_VALUE(m), -1, o);
     scat(scat(o + slen(o), " "), WHEN[MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1]);
 }
 
@@ -453,7 +454,7 @@ static void ges_text(int c, int g, char *o)              /* a gesture's moves: 8
         m = perf_patch.move[c][first + i];
         if (MV_NEXT(m) == NX_UNUSED) continue;
         if (any) o = scat(o, ">");
-        val_text(t, MV_VALUE(m), o);
+        nat_text(t, MV_VALUE(m), -1, o);
         while (*o) o++;
         any = 1;
     }
@@ -570,7 +571,7 @@ static void move(void)                           /* a stock knob page: frame, ta
     pinfo(t, &p);
     if (t == T_NONE) font7("Value", 8, 16); else { lab_text(t, a); font7(a, 8, 16); }
     ctl(t, un ? 0 : MV_VALUE(m), 8, 24);
-    a[0] = 0; val_text(t, un ? -1 : MV_VALUE(m), a);
+    a[0] = 0; nat_text(t, un ? -1 : MV_VALUE(m), -1, a);
     font7r(a, 8 + 30, 48);
     k = un ? 0 : MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1;
     font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k], 48 + 30, 48);

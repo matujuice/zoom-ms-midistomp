@@ -149,7 +149,7 @@ PerfPatch perf_patch;
 PerfGrid perf_grid;
 volatile int perf_on;
 static int host_val[256], host_pend[8];
-int perf_value(int t) { return host_val[t & 255]; }
+int perf_native(int t) { return host_val[t & 255]; }
 int perf_pending(int c) { return host_pend[c]; }
 extern int pu_scr, pu_pos[8], pu_ctl, pu_ev, pu_ges, pu_mv, pu_mod;
 #include "host_data.h"

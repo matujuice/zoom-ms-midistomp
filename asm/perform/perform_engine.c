@@ -430,12 +430,13 @@ void perf_loop_event(int ev)
     RINT;
 }
 
-int perf_value(int target)
+int perf_native(int target)
 {
     Tgt t = tgt(target);
-    if (t.k != K_MIX && t.k != K_FX) return 0;
-    return back(&t, t.k == K_FX && fxw[t.a][t.b] >= 0 ? fxw[t.a][t.b] : now(&t));
+    if (t.k != K_MIX && t.k != K_FX) return -1;
+    return t.k == K_FX && fxw[t.a][t.b] >= 0 ? fxw[t.a][t.b] : now(&t);
 }
+
 
 int perf_pending(int ctl)
 {
