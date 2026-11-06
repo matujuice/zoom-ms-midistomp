@@ -11,6 +11,7 @@
  * next page of the range the chain opened (MENU > MIXER: every page); knob 2: EXIT. */
 #include "chain.h"
 #include "stock.h"
+#include "knob_accel.h"
 
 #define UI_REFRESH FN(0xC00ACD84, void, (void))  /* the edited mark, then the auto save timer */
 #define DEFAULTS ((const unsigned char *)(MIXER_BASE + 320))  /* [24] */
@@ -109,6 +110,25 @@ void pages_build(Pages *p)
     }
 }
 
+static int ka[3][4];            /* knob_accel() state per knob */
+
+#define KA_MAX 32
+int knob_accel(int *st, int steps, int now)
+{
+    int q;
+    if ((st[3] ^ steps) < 0) st[0] = st[1] = 0;      /* turned back: start slow, drop the other way's fraction */
+    st[3] = steps;
+    if (now - st[2] > 1000) st[1] = 0, st[2] = now;   /* idle (or first turn): skip the decay loop */
+    for (; now - st[2] >= 16; st[2] += 16) st[1] -= (st[1] >> 3) + 1;
+    st[1] = (st[1] < 0 ? 0 : st[1]) + 32 * (steps < 0 ? -steps : steps);
+    if (st[1] > 1024) st[1] = 1024;
+    q = st[1] > 48 ? 4 + ((st[1] - 48) >> 3) : 4;
+    st[0] += steps * (q > KA_MAX ? KA_MAX : q);
+    steps = st[0] / 4;
+    st[0] -= steps * 4;
+    return steps;
+}
+
 /* Screen 15 key entry (chain_vec.asm): event, knob steps; 1 = redraw. */
 int pages_key(int ev, int steps)
 {
@@ -117,7 +137,9 @@ int pages_key(int ev, int steps)
     if (ev >= 160 && ev <= 162) {
         kn = knob_at(pg, ev - 160);
         if (!kn) return 0;
-        v = value(kn) + steps * (kn->opt || kn->max <= 20 ? 1 : 5);
+        v = kn->opt || kn->max <= 20 ? 1 : 5;
+        if (v == 5 && KNOB_ACCEL()) v = 1, steps = knob_accel(ka[ev - 160], steps, TICKS());   /* fine while slow */
+        v = value(kn) + steps * v;
         LIVE[kn->s] = v < 0 ? 0 : v > kn->max ? kn->max : v;
         if (kn->s == S_IN && eff_mode() != 2) LIVE[S_INR] = LIVE[S_IN];   /* not Split: knob 1 drives both sides */
         if (kn->s == S_MASTER && LIVE[S_OUT] != 2) LIVE[S_MR] = LIVE[S_MASTER];

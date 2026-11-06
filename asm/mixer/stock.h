@@ -28,6 +28,7 @@
 #define LOOPER_SLOT (*(volatile unsigned *)0xC00F3000 == 0x5A4C5301u ? ((volatile int *)0xC00F3000)[10] : -1)
 #define ZMT_FTSW (*(volatile int *)0x1181FF18)       /* transport word 6: footswitch down; word 7 (+4) the hold claim */
 #define SET_SCREEN FN(0xC00A75E0, void, (int screen, int row))
+#define TICKS FN(0xC00DEE20, int, (void))   /* ms since boot (stock knob step uses it) */
 #define EVENT_POST FN(0xC00CBF40, void, (int mailbox, int bits))  /* display task Event flags: 0x40 = redraw */
 #define KEY_POST FN(0xC00D1324, void, (int ev))  /* a key event into the UI mailbox B14[202] (as the timer task) */
 #define TIMER6 FN(0xC00C7D60, void, (int on))       /* cursor left hold -> event 230 */
