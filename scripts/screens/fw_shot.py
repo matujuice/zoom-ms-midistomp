@@ -22,8 +22,8 @@ UPDATER = Path(os.environ.get("ZOOM_UPDATER", Path.home() / "Downloads/ZOOM MS-7
 FB, B14, STOP, SP = 0x11816800, 0xC00EF748, 0xDEAD0000, 0x1180CF78
 RELEASE = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
 # v2 = the 2.0 release set, midistomp_builder.PATCHES
-STAMP = ["version=V2.0", "commit=08f3ed8", "date=2026-10-24"]  # fixed diag.c build stamps, so the shots do not change per run
-IMAGES = {"release": RELEASE, "v2": ["version-2.0"] + RELEASE[1:] + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]}
+STAMP = ["version=V2.0.1", "commit=08f3ed8", "date=2026-10-24"]  # fixed diag.c build stamps, so the shots do not change per run
+IMAGES = {"release": RELEASE, "v2": ["version-2.0.1"] + RELEASE[1:] + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]}
 
 
 def available():
@@ -253,7 +253,7 @@ SCREENS = {
     "hold_for": ("release", hold_for),  # v2 changes HOLD FOR in the list (pedal_in.c), no choice screen
     "tempo_turn_tap": ("release", tempo(False)),
     "tempo_clock": ("release", tempo(True)),
-    "boot": ("release", boot_screen("v2.0")),
+    "boot": ("release", boot_screen("v2.0.1")),
     **{f"mixer_{n}": ("v2", mixer_page(pg)) for n, pg in [("in", 0), ("route", 1), ("mix_1", 3), ("mix_2", 4), ("mix_3", 5), ("out", 6)]},
     **{f"system_{n}": ("v2", system(i)) for i, n in enumerate(["version", "load", "effects", "mods"])},
 }
