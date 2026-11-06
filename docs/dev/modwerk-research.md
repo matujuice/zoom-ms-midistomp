@@ -295,7 +295,7 @@ trailer sector (`0x0EF000`); the erase just before the write is the trailer eras
    that. Running Zoom's own updater later rewrites the file system (and the bootloader).
 6. **Bootloader never written** (`flash.py:19-22`): this keeps Up+Down update mode as the
    recovery path (`docs/safety.md:3-6`). Matches their note.
-7. **Wire protocol is not in this repo.** We only know the step table (type, address, length,
+7. **Wire protocol: captured 2026-11-06**, see [flash-protocol.md](flash-protocol.md) (erase `0A`, write `02` in 2048-byte chunks with a CRC-32, finish `04`, one ack per message). Earlier note: We only know the step table (type, address, length,
    resource) that the updater sends to the bootloader over USB MIDI; the bytes themselves
    ("the bytes the pedal is sent are unchanged", `docs/flashing.md:24-26`) were never
    captured here. Their `0A / 02 / 04` therefore cannot be checked by us. Also unknown:

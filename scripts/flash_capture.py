@@ -24,7 +24,7 @@ from pathlib import Path
 
 USBPCAP = r"C:\Program Files\USBPcap\USBPcapCMD.exe"
 ZOOM_VID = 0x1686
-HEAD = 16  # bytes of a long SysEx kept in the log (command and address, never the data)
+HEAD = 12  # F0 52 00 61 cmd, address (5 bytes), length (2 bytes); data starts after
 SHORT = 32  # SysEx up to this length is logged whole
 
 
@@ -47,15 +47,34 @@ def record(outdir: Path) -> int:
         print("no USBPcap hubs: reboot after installing USBPcap")
         input()
         return 1
-    procs = [subprocess.Popen([USBPCAP, "-d", h, "-A", "--inject-descriptors",
-                               "-o", str(outdir / f"hub{h[-1]}.pcap")]) for h in names]
+    # USBPcapCMD buffers its own file output and loses it when killed, so it writes to a pipe
+    # and we copy each chunk to disk at once.
+    import msvcrt
+    import threading
+
+    def pump(proc, path):
+        with open(path, "wb") as f:
+            while chunk := proc.stdout.read1(65536):
+                f.write(chunk)
+                f.flush()
+
+    procs, pumps = [], []
+    for h in names:
+        p = subprocess.Popen([USBPCAP, "-d", h, "-A", "--inject-descriptors", "-o", "-"],
+                             stdout=subprocess.PIPE)
+        t = threading.Thread(target=pump, args=(p, outdir / f"hub{h[-1]}.pcap"))
+        t.start()
+        procs.append(p)
+        pumps.append(t)
     (outdir / "recording").write_text(" ".join(names))
     print("recording", names, "- press Enter or create", outdir / "stop")
-    import msvcrt
     while not (outdir / "stop").exists() and not msvcrt.kbhit():
         time.sleep(0.2)
+    time.sleep(2)  # let the last packets reach the pipe
     for p in procs:
         p.terminate()
+    for t in pumps:
+        t.join(5)
     (outdir / "recording").unlink(missing_ok=True)
     return 0
 
@@ -141,7 +160,7 @@ def _selftest() -> None:
     assert list(sysex_stream(ev, bytearray())) == [bytes([0xF0, 1, 2, 3, 4, 0xF7])]
     long = bytes([0xF0]) + bytes(range(1, 41)) + bytes([0xF7])
     s = short(long)
-    assert s.startswith(long[:HEAD].hex(" ") + " ...") and "[25 bytes" in s
+    assert s.startswith(long[:HEAD].hex(" ") + " ...") and "[29 bytes" in s
 
 
 if __name__ == "__main__":
