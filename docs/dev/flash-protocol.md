@@ -43,8 +43,16 @@ identity reply.
     04 finish                     ack at once
 
 The host waits for each ack before the next message (one message in flight). The whole flash
-takes about 9 s. No reboot command follows `04`; the user restarts the pedal. The capture has
-no failure case (what a bad CRC or a dropped chunk returns): not tested.
+takes about 9 s. No reboot command follows `04`; the user restarts the pedal.
+
+## Bad CRC (tested 2026-11-06)
+
+`scripts/zoom_flash.py flash <updater> --bad-crc 0` sent OS chunk 0 with its CRC off by one bit
+(data unchanged). The pedal answered `F0 52 00 61 00 08 F7` after 11 ms: the second status byte
+is `08` instead of `00`. Sending the same chunk again with the right CRC got the normal ack, and
+the rest of the flash went through; the pedal booted the new OS. So a flasher should treat any
+status other than `00 00` as a failed write and resend that chunk. Not tested: a dropped chunk,
+or a bad CRC without a resend.
 
 Raw captures (`*.pcap`) hold Zoom's firmware: keep them local. The `flash-log.txt` the script
 writes keeps only the 12-byte headers, lengths and hashes.
