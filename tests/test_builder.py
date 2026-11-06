@@ -1,3 +1,4 @@
+import pytest
 import importlib.util
 from pathlib import Path
 
@@ -41,3 +42,10 @@ def test_ask_path_reads_a_dragged_mac_path(monkeypatch):
     assert builder.ask_path() == ["/Users/me/Downloads/ZOOM MS-70CDR v2.10 Updater.app"]
     monkeypatch.setattr("builtins.input", lambda: "")
     assert builder.ask_path() == []
+
+
+def test_identity_tag_follows_the_version():
+    assert builder.identity_tag("MIDISTOMP V2.0.1") == "M201"
+    assert builder.identity_tag("MIDISTOMP V2.1.0") == "M210"
+    with pytest.raises(ValueError):
+        builder.identity_tag("MIDISTOMP V2.1")

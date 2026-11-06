@@ -11,4 +11,4 @@ write:
   - model: ms70cdr-2.10
     addr: 0xC00ECCE8
     expect: "322e3130"
-    data: "4d323031"
+    data: "4d323031"   # "M201"; midistomp_builder.py sets it from its NAME on every build
