@@ -696,7 +696,7 @@ MENU > **SYSTEM** has 4 pages. Knob 1 scrolls, knob 3 press goes to the next pag
 
 | Page | Shows |
 |---|---|
-| 1 **VERSION** | MIDISTOMP version, commit (RELEASE on a build from MIDISTOMP-builder), date and label of the build |
+| 1 **VERSION** | MIDISTOMP version, commit (RELEASE on a build from MIDISTOMP-builder), date and label (RELEASE, or DEV on your own build) |
 | 2 **LOAD** | CPU (all of it), CPU PEAK since the page opened, AUDIO (the effect chain) and AUDIO MAX, the free headroom, late audio blocks, and the patch's declared DSP out of 300 |
 | 3 **EFFECTS** | per effect: name, CPU share and declared DSP |
 | 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MIDI and SYSTEM itself; then MASTER and KALEIDO, with their load from the last time they were open (`-` if not opened since power-on) |

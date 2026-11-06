@@ -22,7 +22,7 @@ UPDATER = Path(os.environ.get("ZOOM_UPDATER", Path.home() / "Downloads/ZOOM MS-7
 FB, B14, STOP, SP = 0x11816800, 0xC00EF748, 0xDEAD0000, 0x1180CF78
 RELEASE = ["version-1.2", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]
 # v2 = the 2.0 release set, midistomp_builder.PATCHES
-STAMP = ["version=V2.0.1", "commit=08f3ed8", "date=2026-10-24"]  # fixed diag.c build stamps, so the shots do not change per run
+STAMP = ["version=V2.0.1", "commit=RELEASE", "date=2026-11-06", "label=RELEASE"]  # a released build's stamps, fixed so the shots do not change per run
 IMAGES = {"release": RELEASE, "v2": ["version-2.0.1"] + RELEASE[1:] + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category"]}
 
 
