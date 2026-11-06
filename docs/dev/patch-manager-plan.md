@@ -41,9 +41,10 @@ the hello can come with it for free.
 - **Write:** check n < 50, the CRC and Perform byte 15 = `0xA5`; copy into the RAM image of
   record 50, then the same save `r50_save` uses on STORE. Values are clamped on load already.
   Refuse while the looper records (a record-store save stalls the UI task).
-- **Send:** needs the 70CDR SysEx send routine, still **not mapped** (`modwerk-research.md`
-  section 1). Find it from the identity reply (its template is known now: identity-tag) or
-  the editor-mode tempo notify. This is the research step; the rest is plumbing.
+- **Send:** `0xC00AD664`, `send(A4 = buffer, B4 = length)`, the routine the identity reply
+  and the editor replies use (26 callers; `ms70cdr-addresses.md`, "SysEx send"). It takes the
+  whole message, `F0`..`F7`, and guards itself with a semaphore, so our Task_MIDI hook can
+  call it like the identity reply does. Not from an interrupt or the audio path.
 - **Models:** MS-70CDR first. MS-50G / MS-60B get the same commands once their send routine
   is mapped.
 - Stock firmware: Modwerk sends hello; no answer means stock, and the page shows patches
@@ -72,7 +73,7 @@ reads a captured entry.
 
 | # | What | Who | Needs pedal |
 |---|------|-----|-------------|
-| 1 | Map the 70CDR SysEx send routine | us (deep) | no (disassembly), then a test |
+| 1 | Map the 70CDR SysEx send routine: **done**, `0xC00AD664` | us | no |
 | 2 | Hello + read entry (01, 02) in a test build; `zoomms` gets `hello` and `r50 read` | us | yes |
 | 3 | Write entry (03) with CRC; STORE / power-cycle test | us | yes |
 | 4 | Fix and send the record 50 / byte 17 spec + this command table to Modwerk | Luca OK first | no |
@@ -83,6 +84,7 @@ Steps 1-3 ship in a MIDISTOMP release; v2.0 work and bug fixes stay first.
 
 ## Open
 
+- What does the stock SysEx parser do with `F0 7D`? Must be ignored; test in step 2.
 - Does Modwerk want to build the page, or a PR from us?
 - 7D (non-commercial id) acceptable to them and to Windows MIDI stacks?
 - Record 51 (MIDI settings) in the same command, for a full backup?

@@ -376,3 +376,13 @@ Our code is not an OS address, but it must not overlap anything the 70CDR OS use
 - The alignment alone put several sites on a neighbouring call (e.g. the menu-keys stub, the key-loop calls); those were corrected by hand using the function pairing above.
 - Caves: 16 aligned zero bytes after a `bnop .S2 b3,5` return, no branch/call target or image word pointing into the zero run, and the fetch packet header slot of every packet touched is not 0xE... (plain packet). The same scan accepts all 21 50G caves. `tuner_label_trampoline.S` hand-encodes its branch relative to the fetch packet: the new cave 0xC00DAA30 is at the same packet offset (+0x10), only the packet base (0xC00DAA20) changes.
 - Throwaway scripts live in the session scratchpad, not in the repo.
+
+## SysEx send (patch manager plan, step 1; 2026-11-06, TI dis6x of the stock 2.10 OS)
+
+MS-70CDR only; MS-50G / MS-60B not mapped yet.
+
+| Name | What it is | MS-70CDR | How found | Conf. |
+|---|---|---|---|---|
+| SYSEX_SEND | `send(A4 = buffer, B4 = length)`: sends one whole message, `F0`..`F7` included. Pends the semaphore `B14[201]`, calls `0xC00BF488(0, buf, len)`, posts it | `0xC00AD664` | the identity reply (`0xC00AD694`: copies the 15-byte template `0xC00ECB68`, model byte `B14[212]` at +6, version from `0xC00AD36C` at +10) ends in `callp 0xC00AD664` with A4 = the stack copy, B4 = 15; 26 callers, the editor replies among them | high |
+| SYSEX_ACK | `ack(A4 = status)`: sends the 7-byte ack (`F0 52 00 <model> .. .. F7`, as in `flash-protocol.md`) from template `0xC00ECD80` | `0xC00AD970` | calls SYSEX_SEND with B4 = 7 | medium |
+| VERSION_TEXT | returns A4 = `0xC00ECCE8` ("2.10", identity-tag patches it) | `0xC00AD36C` | 4 callers | high |
