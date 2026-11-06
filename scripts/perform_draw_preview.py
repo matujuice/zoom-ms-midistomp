@@ -254,6 +254,7 @@ static char log_[512];
 static int leaves, saves;
 static void plog(const char *s) { strcat(log_, s); }
 void perf_gesture(int c, int g, int ph) { char b[24]; sprintf(b, "G%d.%d.%d;", c, g, ph); plog(b); }
+int knob_step(int ev, int s, int r) { return s; }
 void perf_momentary(int c, int ph) { char b[24]; sprintf(b, "M%d.%d;", c, ph); plog(b); }
 void perf_turn(int c, int n) { char b[24]; sprintf(b, "T%d.%d;", c, n); plog(b); }
 void perf_leave(void) { leaves++; }

@@ -146,6 +146,8 @@ static int disp(const Par *p, int v)            /* a default's CC -> the target'
     return d > p->max ? p->max : d;
 }
 
+int knob_step(int ev, int steps, int range);     /* pages.c: a fast turn steps more, as stock */
+
 int pd_step(int t, int v, int a)                 /* a move's VALUE (the target's own units, -1 unused) turned a steps */
 {
     Par p;
@@ -153,7 +155,7 @@ int pd_step(int t, int v, int a)                 /* a move's VALUE (the target's
     if (p.look == TRIG) return a > 0 ? 127 : -1;   /* a press: set or unused */
     if (v < 0) return a > 0 ? 0 : -1;
     if (v == 0 && a < 0) return -1;
-    v += a;                                      /* one value a click (a knob turned fast steps more) */
+    v += knob_step(160, a, p.max);               /* one value a click, more on a fast turn */
     return v < 0 ? 0 : v > p.max ? p.max : v;
 }
 
