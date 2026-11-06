@@ -10,6 +10,7 @@
 #include "perform.h"
 #include "chain.h"
 #include "stock.h"
+#include "knob_step.h"
 
 /* ---- Tunables ----------------------------------------------------------- */
 #define DU_BPM 2.4187211e-5f    /* grid units (1/8 beat) per 8-sample block per BPM */
@@ -406,6 +407,7 @@ void perf_turn(int ctl, int steps)
         x = tgt(14 + 10 * x.a);
     }
     if (x.k != K_MIX && x.k != K_FX) return;
+    steps = knob_step(160 + ctl, steps, x.max);  /* ctl 0-2 = knob 1-3 (perform_keys.c turn) */
     DINT;
     for (i = 0; i < NSLOT; i++)                 /* the last turn's Follow and a lag go; a queued press stays (v2.0.1) */
         if ((sl[i].st == F_WAIT && sl[i].ctl == ctl && sl[i].tf) || (sl[i].st == F_LAG && sl[i].t == t)) sl[i].st = F_FREE;

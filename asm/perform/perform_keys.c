@@ -5,7 +5,6 @@
  * perf_key() runs in the UI task, perf_poll() every 16 ms in the switch task. The rows
  * and their text are perform_draw.c's (pd_*). No libc, no RTS. */
 #include "perform.h"
-#include "../mixer/knob_accel.h"
 #ifdef PERF_HOST
 #include "perf_host.h"
 #else
@@ -42,7 +41,7 @@ extern unsigned short *pd_move(void);
 
 static int seen = -1, polls;
 static int st[NCTL];            /* 0 up, 1 down, 2 holding, 3 ignored until released, 4 MOMENTARY held */
-static int td[NCTL], moved[NCTL], tt[3], ka[3][4];   /* ka: knob_accel() state per knob */
+static int td[NCTL], moved[NCTL], tt[3];
 
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
@@ -82,7 +81,6 @@ static void turn(int k, int steps)
         if (st[k] == 2) perf_gesture(k, G_HOLD, 1);
         st[k] = 3;
     }
-    if (KNOB_ACCEL() && !(steps = knob_accel(ka[k], steps, pu_t))) return;
     perf_turn(k, steps);
 }
 

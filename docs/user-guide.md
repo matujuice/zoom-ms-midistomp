@@ -392,10 +392,9 @@ In Perform mode the hold never opens TAP or the tuner.
 - **MIDI Start or Stop, or a patch change,** cancel waiting moves and restart the grid. A tempo change just moves
   the grid with it.
 
-**Knob acceleration** is set in SETTINGS > **KNOB ACCEL** (OFF / ON, once for the whole pedal, not per
-patch). ON: a slow turn moves 1 step per click, a fast turn moves more (up to 8 per click), so a knob crosses
-its range quickly and still lands exactly. It works on the Perform knobs and the mixer node knob pages; stock
-effect parameters already speed up on fast turns by themselves. Lists and menus always move one row per click.
+**Knobs speed up when turned fast**, exactly like the stock effect parameters: a slow turn moves 1 step per
+click, a fast spin moves several, so a knob crosses its range quickly and still lands exactly. This works on
+the Perform knobs and the mixer node knob pages. Lists and menus always move one row per click.
 
 ### SETUP
 

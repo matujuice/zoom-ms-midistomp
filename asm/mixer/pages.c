@@ -11,7 +11,7 @@
  * next page of the range the chain opened (MENU > MIXER: every page); knob 2: EXIT. */
 #include "chain.h"
 #include "stock.h"
-#include "knob_accel.h"
+#include "knob_step.h"
 
 #define UI_REFRESH FN(0xC00ACD84, void, (void))  /* the edited mark, then the auto save timer */
 #define DEFAULTS ((const unsigned char *)(MIXER_BASE + 320))  /* [24] */
@@ -110,23 +110,20 @@ void pages_build(Pages *p)
     }
 }
 
-static int ka[3][4];            /* knob_accel() state per knob */
-
-#define KA_MAX 32
-int knob_accel(int *st, int steps, int now)
+/* knob_step: the stock step 0xC00ABE58's math (state 0, an effect parameter page). Same knob as the previous
+ * event: interval = ms since the last such turn / detents; range > 500: x (21 - interval) * range / 200, 1000,
+ * 3000 under 8, 13, 20 ms; else x (21 - interval) * range / 150 under 20 ms; 0 -> the plain steps. */
+int knob_step(int ev, int steps, int range)
 {
-    int q;
-    if ((st[3] ^ steps) < 0) st[0] = st[1] = 0;      /* turned back: start slow, drop the other way's fraction */
-    st[3] = steps;
-    if (now - st[2] > 1000) st[1] = 0, st[2] = now;   /* idle (or first turn): skip the decay loop */
-    for (; now - st[2] >= 16; st[2] += 16) st[1] -= (st[1] >> 3) + 1;
-    st[1] = (st[1] < 0 ? 0 : st[1]) + 32 * (steps < 0 ? -steps : steps);
-    if (st[1] > 1024) st[1] = 1024;
-    q = st[1] > 48 ? 4 + ((st[1] - 48) >> 3) : 4;
-    st[0] += steps * (q > KA_MAX ? KA_MAX : q);
-    steps = st[0] / 4;
-    st[0] -= steps * 4;
-    return steps;
+    int iv, s = steps;
+    if (ev != KS_LAST || !steps) return steps;     /* stock: no time kept either */
+    iv = KS_DIV(KS_TICKS() - KS_TIME, steps < 0 ? -steps : steps);
+    if (range > 500)
+        s = iv < 20 ? KS_DIV((21 - iv) * steps * range, iv < 8 ? 200 : iv < 13 ? 1000 : 3000) : steps;
+    else if (iv < 20)
+        s = KS_DIV((21 - iv) * steps * range, 150);
+    KS_TIME = KS_TICKS();
+    return s ? s : steps;
 }
 
 /* Screen 15 key entry (chain_vec.asm): event, knob steps; 1 = redraw. */
@@ -137,9 +134,7 @@ int pages_key(int ev, int steps)
     if (ev >= 160 && ev <= 162) {
         kn = knob_at(pg, ev - 160);
         if (!kn) return 0;
-        v = kn->opt || kn->max <= 20 ? 1 : 5;
-        if (v == 5 && KNOB_ACCEL()) v = 1, steps = knob_accel(ka[ev - 160], steps, TICKS());   /* fine while slow */
-        v = value(kn) + steps * v;
+        v = value(kn) + knob_step(ev, steps, kn->max);   /* 1 per detent while slow, as stock params */
         LIVE[kn->s] = v < 0 ? 0 : v > kn->max ? kn->max : v;
         if (kn->s == S_IN && eff_mode() != 2) LIVE[S_INR] = LIVE[S_IN];   /* not Split: knob 1 drives both sides */
         if (kn->s == S_MASTER && LIVE[S_OUT] != 2) LIVE[S_MR] = LIVE[S_MASTER];
