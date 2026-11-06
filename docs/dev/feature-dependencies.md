@@ -20,7 +20,7 @@ sections. Every patch has its own fixed addresses, so none overlap; only the ord
 | fx-category | - | |
 | identity-tag | - | one write; the tag follows the release version |
 | looper | midi-cc, midi-clock, tempo-hold | takes over midi-clock's poll trampoline, calls the CC handler and tempo-hold's hold/toggle hooks, uses transport word 6 |
-| mixer-m2 | midi-cc, midi-clock, midi-settings; looper optional | poll trampoline at 0xC00C82D0 accepts midi-clock's or looper's bytes; relinks midi-cc's step; adds to the midi-settings menu |
+| mixer-m2 (Mixer + Perform mode) | midi-cc, midi-clock, midi-settings; looper optional | poll trampoline at 0xC00C82D0 accepts midi-clock's or looper's bytes; relinks midi-cc's step; adds to the midi-settings menu |
 | diag | midi-clock, midi-settings | reads clock vars; its page sits in the settings menu |
 
 Apply order: the order of `PATCHES` in `scripts/midistomp_builder.py` (BASE first, then
@@ -32,7 +32,7 @@ looper, mixer-m2, diag, ...). looper must come before mixer-m2.
   them; the transport block is how effects see MIDI clock and transport, so it belongs here.
 - **Free-standing extras:** boot-logo, version string, identity-tag, tempo-hold, scroll,
   dsp-limit, fx-category. Any subset works on top of stock or the base.
-- **Needs the base:** diag; looper (also tempo-hold); mixer-m2 (looper optional).
+- **Needs the base:** diag; looper (also tempo-hold); mixer-m2, which is Mixer and Perform mode in one patch (looper optional).
 
 Not checked here: whether every free-standing patch also builds without the base (each one's
 `expect` is stock bytes, so it should). The release test in Modwerk only covers the full set.
