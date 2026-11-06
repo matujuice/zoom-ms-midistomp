@@ -631,7 +631,11 @@ is its footswitch ([LOOPER](#the-footswitch)).
 CC 80 with a value of 64-127 loads the previous patch, CC 81 the next one, wrapping between patch 50 and patch 1.
 Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released steps once.
 
-All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down doesn't follow the PC settings.
+### Tap tempo
+
+CC 82 with a value of 64-127 taps the tempo once, as a tap on the tempo screen does, without opening the tempo screen. Values 0-63 do nothing, so a button that sends 127 when pressed and 0 when released taps once. While a MIDI clock is setting the tempo, taps do nothing, as on the pedal.
+
+All CCs follow CC RECEIVE and MIDI CHANNEL. Patch up/down and tap tempo don't follow the PC settings.
 
 <p align="right"><sub><a href="#contents">↑ Contents</a></sub></p>
 

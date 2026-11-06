@@ -57,6 +57,7 @@ Everything is saved in the patch: routing, levels, the looper settings and the P
 | **Control Change** | effects 1-6 on/off and every knob, see the [CC chart](docs/user-guide.md#8-midi-and-the-cc-chart) |
 | **MIDI clock + Start/Stop** | tempo-synced effects follow your clock; custom effects stay on the beat |
 | **Patch up/down by CC** | CC 80 / 81 load the previous / next patch |
+| **Tap tempo by CC** | CC 82 taps the tempo, without the tempo screen |
 | **MIDI menu** | receive on/off per message type, MIDI channel, PC numbering |
 
 ## QOL improvements
