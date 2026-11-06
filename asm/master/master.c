@@ -39,7 +39,7 @@ extern __cregister volatile unsigned int TSCL;
 #undef softw
 #undef softtext
 
-/* ---- state: the two gaps in the buffers (SIN ends at 0xC0111804, HIST at 0xC0115700) ---------------- */
+/* ---- state: the two gaps in the buffers (SIN ends at 0xC0111884, HIST at 0xC0115780) ---------------- */
 typedef struct {
     volatile unsigned w;            /* frames written (master_tap) */
     volatile float gmin;            /* lowest limiter gain since the last poll (master_tap) */
@@ -78,11 +78,11 @@ typedef struct {
 } St;
 
 #ifndef MS_ST
-#define MS_ST ((St *)0xC0115700)
-#define MS_BARS ((float *)0xC0111804)   /* [126] bars, [126] peak dots */
+#define MS_ST ((St *)0xC0115780)
+#define MS_BARS ((float *)0xC0111884)   /* [126] bars, [126] peak dots */
 #endif
 #define ST MS_ST
-typedef char st_fits[sizeof(St) <= 0x700 ? 1 : -1];   /* St ends before MS_INK (0xC0115E00) */
+typedef char st_fits[sizeof(St) <= 0x680 ? 1 : -1];   /* St ends before MS_INK (0xC0115E00) */
 #define BAR MS_BARS
 #define PKD (MS_BARS + 126)
 
@@ -1082,10 +1082,10 @@ void master_key(int ev, int steps)
     if (MS_MENU_ENTRY == 6) {       /* KALEIDO: knob 1 zoom, knob 2 spin, knob 3 mirrors, EXIT */
         int *k = ev == 160 ? &s->kzs : ev == 161 ? &s->krs : ev == 162 ? &s->kmi : 0, hi = ev == 162 ? 6 : 10;
         if (MS_IDLE_SHOWN) {        /* opened by IDLE KALEIDO: a knob turn or a key's release goes back to play */
-            if (ev >= 160 ? ev <= 162 : (ev & 1) && ev >= 33 && ev <= 77) {
-                MS_IDLE_SHOWN = 0; MS_ON = 0; MS_MODE = 0; EVENT_POST(MAILBOX, 0x40);
-            }
-            return;                 /* presses and hold timers: nothing (the footswitch press is chain_keys.c idle_ev) */
+            if (!k && !(ev & 1 && (unsigned)(ev - 33) <= 44))  /* not a knob turn or a key release */
+                return;             /* presses and hold timers: nothing (the footswitch press is chain_keys.c idle_ev) */
+            MS_IDLE_SHOWN = 0; MS_ON = 0; MS_MODE = 0;
+            goto post;              /* share the EVENT_POST below: MASTER has no room for another call site */
         }
         if (ev == 65) { MS_ON = 0; SET_SCREEN(0, 6); }
         else if (k && steps) { i = *k + (steps > 0 ? 1 : -1); if (i >= (ev == 162 ? 0 : -10) && i <= hi) *k = i; }
@@ -1102,6 +1102,7 @@ void master_key(int ev, int steps)
         i = s->opt[p] + (steps > 0 ? 1 : -1);
         if (i >= 0 && i < PNV[p]) s->opt[p] = i;
     }
+post:
     EVENT_POST(MAILBOX, 0x40);
 }
 
