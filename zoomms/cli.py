@@ -82,7 +82,8 @@ def build_stamp(patch_paths: list[str], given: list[str] = ()) -> dict:
                                 cwd=Path(__file__).parent, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         commit = "RELEASE"  # the frozen builder runs without git
-    stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": "DEV"}
+    label = "RELEASE" if commit == "RELEASE" else "DEV"
+    stamp = {"version": version, "commit": commit, "date": datetime.date.today().isoformat(), "label": label}
     stamp.update(kv.split("=", 1) for kv in given)
     return stamp
 
@@ -105,7 +106,7 @@ def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], bu
     return new_os, (bytes(d133) if d133 != stock_133 else None), img
 
 
-WIN_TITLE = "MIDISTOMP Mod V2.0 Updater"  # Windows window title
+WIN_TITLE = "MIDISTOMP V2.0.1 Updater"  # Windows window title
 
 
 def cmd_build(args) -> int:

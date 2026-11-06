@@ -1,6 +1,6 @@
 # MIDISTOMP V2.0.1: the VERSION menu entry reads "V2.0.1", and the boot screen
 # prints "v2.0.1" under the MIDISTOMP MOD logo instead of the OS version.
-name: version-2.0
+name: version-2.0.1
 description: VERSION entry reads "V2.0.1"; boot screen version line reads "v2.0.1"
 replace:
   - find: "VERSION\0"

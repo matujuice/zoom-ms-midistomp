@@ -1,4 +1,4 @@
-<p align="center"><img src="img/banner.jpg" alt="MIDISTOMP MOD v2.0 on the screen of a Zoom MultiStomp" width="720"></p>
+<p align="center"><img src="img/banner.jpg" alt="MIDISTOMP MOD v2.0.1 on the screen of a Zoom MultiStomp" width="720"></p>
 
 <h1 align="center">MIDISTOMP 2.0 user guide</h1>
 
@@ -74,7 +74,7 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
 3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
    and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
-   window for a moment and writes a new file, **MIDISTOMP V2.0 Updater.exe**, in the same folder. It refuses any
+   window for a moment and writes a new file, **MIDISTOMP V2.0.1 Updater.exe**, in the same folder. It refuses any
    other file, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
@@ -82,10 +82,10 @@ Your patches are kept, but back them up first anyway, just in case (with your us
 
    <img src="img/ms70cdr-usb.jpg" alt="The mini-USB port and the power jack on the side of the pedal" width="320">
 
-6. Run `MIDISTOMP V2.0 Updater.exe` and let it finish. Don't unplug during the update.
+6. Run `MIDISTOMP V2.0.1 Updater.exe` and let it finish. Don't unplug during the update.
 7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0.1**, and MENU > SYSTEM shows **V2.0.1**.
 
-   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0 boot screen" width="300">
+   <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0.1 boot screen" width="300">
 
 8. **On an MS-70CDR,** set SETTINGS > **INPUT** to **STEREO** to get the stereo routing modes (see
    [SETTINGS](#settings)). On the MS-50G and MS-60B leave it on MONO.
@@ -109,11 +109,11 @@ flashed to an MS-50G from an Apple Silicon Mac.
 3. Double-click **MIDISTOMP-builder-Mac-…**. It is not notarized, so the first time macOS refuses it: open System
    Settings > Privacy & Security, click **Open Anyway** next to it, and double-click it again.
 4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
-   Enter. It writes **MIDISTOMP V2.0 Updater.app** next to Zoom's app and signs it for your Mac. It refuses anything
+   Enter. It writes **MIDISTOMP V2.0.1 Updater.app** next to Zoom's app and signs it for your Mac. It refuses anything
    that is not Zoom's original.
-5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0 Updater.app**. It is
+5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0.1 Updater.app**. It is
    an Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to install it). Its window reads
-   **MIDISTOMP V2.0 Updater**; click Execute.
+   **MIDISTOMP V2.0.1 Updater**; click Execute.
 
 To run the builder from source instead of steps 2 to 4 (needs Python and Terminal): get this repository
 (`git clone`, or Code > Download ZIP on GitHub) and Python 3.10 or newer (from python.org or Homebrew; the `python3`
@@ -124,7 +124,7 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
 ```
 
-It writes and signs **MIDISTOMP V2.0 Updater.app** the same way. If signing fails, it prints the two Terminal lines
+It writes and signs **MIDISTOMP V2.0.1 Updater.app** the same way. If signing fails, it prints the two Terminal lines
 (`xattr -cr` and `codesign --force --deep --sign -`) to run on the app yourself.
 
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
@@ -142,7 +142,7 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
 ```
 
-It writes **MIDISTOMP V2.0 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
+It writes **MIDISTOMP V2.0.1 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
 machine with USB passed through, is not tested.
 
 ### Recovery and going back to stock
@@ -696,7 +696,7 @@ MENU > **SYSTEM** has 4 pages. Knob 1 scrolls, knob 3 press goes to the next pag
 
 | Page | Shows |
 |---|---|
-| 1 **VERSION** | MIDISTOMP version, commit (RELEASE on a build from MIDISTOMP-builder), date and label of the build |
+| 1 **VERSION** | MIDISTOMP version, commit (RELEASE on a build from MIDISTOMP-builder), date and label (RELEASE, or DEV on your own build) |
 | 2 **LOAD** | CPU (all of it), CPU PEAK since the page opened, AUDIO (the effect chain) and AUDIO MAX, the free headroom, late audio blocks, and the patch's declared DSP out of 300 |
 | 3 **EFFECTS** | per effect: name, CPU share and declared DSP |
 | 4 **MODS** | the CPU share of each part, from most to least: EFFECTS, OS, EFFECT CHAIN, PERFORM MODE, LOOPER BUFFER, MIDI and SYSTEM itself; then MASTER and KALEIDO, with their load from the last time they were open (`-` if not opened since power-on) |
