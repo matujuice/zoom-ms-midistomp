@@ -678,7 +678,7 @@ them plays Split as Parallel and Mono Serial as Serial.
 
 <p><img src="img/tempo-turn-tap.png" alt="Tempo screen: TURN OR TAP" width="300"> <img src="img/tempo-midi-clock.png" alt="Tempo screen while MIDI clock arrives" width="300"></p>
 
-Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps, or
+Press the knob labelled **TEMPO**: the screen shows the BPM and **TURN OR TAP**. Turn the knob for 1 BPM steps (bigger steps when you turn fast), or
 tap the footswitch. It closes 2 s after the last turn or tap. While MIDI clock arrives it reads **MIDI CLOCK** and
 can't be changed by hand.
 
