@@ -83,7 +83,7 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    <img src="img/ms70cdr-usb.jpg" alt="The mini-USB port and the power jack on the side of the pedal" width="320">
 
 6. Run `MIDISTOMP V2.0 Updater.exe` and let it finish. Don't unplug during the update.
-7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0**, and MENU > SYSTEM shows **V2.0**.
+7. Unplug and power on normally. The boot screen reads **MIDISTOMP MOD v2.0.1**, and MENU > SYSTEM shows **V2.0.1**.
 
    <img src="img/boot-screen.png" alt="MIDISTOMP MOD v2.0 boot screen" width="300">
 
