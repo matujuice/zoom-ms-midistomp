@@ -22,7 +22,9 @@ entry 50), which end right before `SOFT`.
 - `asm/common/fonts.h` defines `F7`, `OS6`, `SOFT` as the OS addresses on the pedal (`_TMS320C6X`)
   and takes `tests/host_fonts.h` on the PC (previews, README shots, tests). `scols()` and our own
   `SW_M`, `SW_W`, `SW_N`, `SW_Q` (wider M W N, and the `?` the softkey font lacks) live there.
-- `asm/mixer/chain_draw.c`: the mockup's G5 / G3 (and K5 / K3) are gone. Covers and the title use
+- `asm/mixer/chain_draw.c`: the mockup's G5 / G3 (and K5 / K3) are gone. They were copies of the
+  OS fonts (G5 = OS6, bold G5 = F7 but for `y`, G3 = the softkey font; only `A` differed), so
+  the page looks the same. Covers and the title use
   FONT7, keys, hints and tags the softkey font, the same fonts as the rest of our pages (Luca,
   2026-11-07: use the font already on the pedal).
 - It reads the font data, not the OS text call (0xC00A9C18): that writes to the LCD frame, and
