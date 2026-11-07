@@ -1,4 +1,4 @@
-"""Pedal photos for the guide, labelled in the LCD look: tags in the firmware's FONT7 (asm/common/draw.h), drawn in
+"""Pedal photos for the guide, labelled in the LCD look: tags in the pedal's FONT7 (tests/host_fonts.h), drawn in
 chunky pixels with the screen shots' ink, and stepped pixel leader lines to what they name.
 
 Usage: py scripts/screens/photo_callouts.py [outdir]   (default docs/img; sources in scripts/screens/photos)"""
@@ -13,7 +13,7 @@ ROOT = HERE.parent.parent
 INK, PAPER = (44, 44, 130), (220, 222, 226)       # make_screens.py's ink and LCD glass
 S = 3                                             # photo px per LCD pixel
 
-F7 = [int(v) for v in re.search(r"F7\[\d+\] = \{(.*?)\};", (ROOT / "asm/common/draw.h").read_text(), re.S)[1].split(",") if v.strip()]
+F7 = [int(v) for v in re.search(r"F7\[\d+\] = \{(.*?)\};", (ROOT / "tests/host_fonts.h").read_text(), re.S)[1].split(",") if v.strip()]
 ARROWS = {"^": [0x20, 0x30, 0x38, 0x3C, 0x38, 0x30, 0x20], "v": [0x04, 0x0C, 0x1C, 0x3C, 0x1C, 0x0C, 0x04],
           "<": [0x08, 0x1C, 0x3E, 0x7F, 0, 0, 0], ">": [0x7F, 0x3E, 0x1C, 0x08, 0, 0, 0]}
 

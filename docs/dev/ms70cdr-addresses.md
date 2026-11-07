@@ -325,6 +325,17 @@ Key loop (Task key handler) callp sequence, one to one in both OSes: this is how
 | LED path (comment) | LED set helper 0xC00CE054(0, 1-bit) | `0xC00CE054` | `0xC00CD3B4` | 2 aligned call sites vote; similarity 0.77. Only in a comment, looper.S writes GPIO via GPIO_BANK01 | medium |
 | block.S regions | big buffer regions 3,2,1 (DDR) | `0xC0636980`+0x199680, `0xC01ADAD4`+0x5252C, `0xC0102000`+0x96000 | unchanged, not verified | not OS addresses; see "Our code areas"; boundaries come from the RAM test (T5) | medium |
 
+## Fonts (asm/common/fonts.h; draw.h, chain_draw.c, perform_draw.c)
+
+Read from the OS at run time, like FONT7 above. Host builds use the same bytes from
+`tests/host_fonts.h`; `tests/test_mixer_patch.py` checks they match the stock image.
+
+| Name | What it is | MS-50G | MS-70CDR | How found | Conf. |
+|---|---|---|---|---|---|
+| F7 | FONT7 from ASCII 32, 7 columns a character, 665 B | not mapped | `0xC00E88B8` | FONT7 + 32 x 7; whole table equal, one hit | high |
+| OS6 | 6 x 8 OS font from ASCII 32, 570 B | not mapped | `0xC00E8DA8` | whole table equal, one hit | high |
+| SOFT | 5-px softkey font, 4 columns a glyph (46/47 = left/right arrow), 192 B | not mapped | `0xC00EA9B0` | whole table equal, one hit; mixer-m2's write at 0xC00EA9A8 ends right before it | high |
+
 ## ram-test.yaml (asm/ram_test)
 
 | Name | What it is | MS-50G | MS-70CDR | How found | Conf. |
