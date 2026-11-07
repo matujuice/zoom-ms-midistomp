@@ -392,3 +392,13 @@ def test_save_buf_is_the_stock_live_save_buffer():
     stock = hi << 16 | lo                                            # 0xC00B84D0: mvk / mvkh of the buffer it packs into
     src = (ROOT / "asm/mixer/mixer.S").read_text()
     assert int(re.search(r"\.equ\s+SAVE_BUF,\s*(0x[0-9A-Fa-f]+)", src).group(1), 16) == stock
+
+
+def test_host_fonts_match_the_os_fonts_fonts_h_reads():
+    img = _stock_image()                                             # the host copies stand in for these on the PC
+    src = (ROOT / "tests/host_fonts.h").read_text()
+    for name, addr in re.findall(r"#define (F7|OS6|SOFT) \(\(const unsigned char \*\)(0x[0-9A-F]+)\)",
+                                 (ROOT / "asm/common/fonts.h").read_text()):
+        body = re.search(name + r"\[\d+\]\s*=\s*\{(.*?)\};", src, re.S).group(1)
+        want = bytes(int(x, 0) for x in re.findall(r"0x[0-9A-Fa-f]+|\d+", body))
+        assert img.read(int(addr, 16), len(want)) == want, name
