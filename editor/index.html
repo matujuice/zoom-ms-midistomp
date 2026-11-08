@@ -40,6 +40,10 @@
   .chain .box[draggable] { cursor: grab; }
   .chain [data-it] { cursor: pointer; }
   .chain .cur { outline: 2px solid var(--accent); outline-offset: 2px; }
+  fieldset.pctl { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; padding: 4px 10px 8px; }
+  fieldset.pctl legend { font-weight: 600; padding: 0 4px; }
+  .ges { font-size: 12px; color: var(--dim); margin-top: 4px; }
+  .mv { padding-left: 12px; }
   .ctl { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
 </style>
 </head>
@@ -480,6 +484,112 @@ function fxControls(rec, i) {
   });
   return h;
 }
+// PERFORM, as the pedal's SETUP (asm/perform/perform_draw.c, perform_keys.c). Edits p.perf, the 208 bytes "Write" sends.
+var WHEN = ['NOW', '1 beat', '2 beats', '4 beats', '8 beats', '1 bar', '2 bars', '4 bars', '8 bars', '16 bars', '32 bars'];
+var LAGS = ['Off', 'Micro', '50 ms', '100 ms', '500 ms', '1 s', '1 beat', '2 beats', '4 beats', '8 beats', '1 bar', '2 bars', '4 bars', '8 bars', '16 bars', '32 bars'];
+var CTLS = ['Knob 1', 'Knob 2', 'Knob 3', 'Left button', 'Down button', 'Right button', 'Footswitch'];
+var LOOPEV = ['Rec start', 'Rec end', 'Play', 'Stop', 'Delete', 'Loop start'];
+var CYCLES = [0, 1, 2, 4, 8, 16, 32];
+// The mixer CCs a target can move (perform_draw.c NP): [group, name, cc, max]
+var NODE_CC = [['IN', 'Input level', 88, 150], ['ROUTE', 'Crossfade', 85, 100], ['ROUTE', 'Mode', 93, 3], ['ROUTE', 'Bus A level', 89, 150],
+  ['ROUTE', 'Bus B level', 90, 150], ['MIX', 'Crossfade', 86, 100], ['MIX', 'Output', 98, 2], ['MIX', 'Curve', 94, 2], ['MIX', 'Mix A level', 91, 150],
+  ['MIX', 'Mix B level', 92, 150], ['MIX', 'Phase B', 95, 1], ['MIX', 'Mute A', 99, 1], ['MIX', 'Mute B', 100, 1], ['MIX', 'Solo', 101, 2], ['OUT', 'Master level', 87, 150]];
+function perfObj(p) {
+  var e = p.perf || (perfs.length && Patch.perform(p.rec, sel, entries, perfs));
+  return e ? Patch.perfDecode(e) : Patch.perfEmpty();
+}
+function isFtsw(t) { return (t & 0xf8) === Patch.T_FTSW; }
+// A target's name and max, and what is wrong with it (an empty slot, a parameter past the effect's last), as the pedal's pinfo
+function targetInfo(rec, t) {
+  if (t === Patch.T_NONE) return { name: 'Off', max: 0 };
+  var n = Patch.count(rec), s = isFtsw(t) ? t & 7 : t >= 14 && t <= 73 ? (t - 14) / 10 | 0 : -1;
+  if (s >= 0) {
+    var fx = s < n && fxName(rec, s), k = isFtsw(t) ? -1 : (t - 14) % 10, defs = fx && EFFECT_PARAMS[Patch.effectKey(rec, s)];
+    var head = 'FX' + (s + 1) + ' ' + (fx || '(empty)') + ' · ', what = k < 0 ? 'Footsw' : k ? 'P' + k : 'On/off';
+    if (!fx) return { name: head + what, max: 127, bad: 'slot ' + (s + 1) + ' has no effect' };
+    if (k <= 0) return { name: head + what, max: 1 };
+    if (defs && k > defs.length) return { name: head + what, max: 127, bad: fx + ' has no parameter ' + k };
+    return { name: head + (defs ? defs[k - 1][0] : what), max: defs ? defs[k - 1][1] : 127 };
+  }
+  var c = NODE_CC.find(function (x) { return x[2] === t; });
+  return c ? { name: c[0] + ' · ' + c[1], max: c[3] } : { name: 'CC ' + t, max: 127 };
+}
+function targetSelect(rec, t, key) {
+  var h = '<option value="255">Off</option>', found = t === Patch.T_NONE;
+  function opt(v, label) { if (v === t) found = true; return '<option value="' + v + '"' + (v === t ? ' selected' : '') + '>' + esc(label) + '</option>'; }
+  for (var s = 0; s < Patch.count(rec); s++) {
+    if (!fxName(rec, s)) continue;
+    var defs = EFFECT_PARAMS[Patch.effectKey(rec, s)], np = defs ? Math.min(defs.length, 9) : 9;
+    h += '<optgroup label="FX' + (s + 1) + ' ' + esc(fxName(rec, s)) + '">' + opt(Patch.T_FTSW + s, targetInfo(rec, Patch.T_FTSW + s).name);
+    for (var k = 1; k <= np; k++) h += opt(14 + 10 * s + k, targetInfo(rec, 14 + 10 * s + k).name);
+    h += '</optgroup>';
+  }
+  ['IN', 'ROUTE', 'MIX', 'OUT'].forEach(function (g) {
+    h += '<optgroup label="' + g + '">' + NODE_CC.filter(function (c) { return c[0] === g; }).map(function (c) { return opt(c[2], g + ' · ' + c[1]); }).join('') + '</optgroup>';
+  });
+  if (!found) h = '<option value="' + t + '" selected>' + esc(targetInfo(rec, t).name) + '</option>' + h;
+  return '<select data-pf="t" data-c="' + key + '">' + h + '</select>';
+}
+function moveHtml(rec, t, w, key, label) {
+  var nx = w >>> 16 & 31, used = nx !== 31, v = w & 0xffff, max = targetInfo(rec, t).max, lag = w >>> 21 & 15, dis = used ? '' : ' disabled';
+  function pick(f, list, x) { return '<select data-pf="' + f + '" data-c="' + key + '"' + dis + '>' + list.map(function (l, i) { return '<option value="' + i + '"' + (i === x ? ' selected' : '') + '>' + l + '</option>'; }).join('') + '</select>'; }
+  var val = max === 1 ? '<select data-pf="v" data-c="' + key + '"' + dis + '><option value="0"' + (v ? '' : ' selected') + '>Off</option><option value="127"' + (v ? ' selected' : '') + '>On</option></select>'
+    : '<input type="number" min="0" max="' + max + '" data-pf="v" data-c="' + key + '" value="' + Math.min(v, max) + '"' + dis + '>';
+  var box = '<div class="mv"><label><input type="checkbox" data-pf="u" data-c="' + key + '"' + (used ? ' checked' : '') + '> ' + label + '</label>';
+  if (!used) return box + '<span class="note">not used</span></div>';
+  return box + '<label>Value ' + val + '</label><label>When ' + pick('n', WHEN, used ? nx : 0) + '</label><label>Lag ' + pick('g', LAGS, lag) + '</label></div>';
+}
+function perfHtml(p) {
+  if (!mst) return '<b>PERFORM</b><div class="note">PERFORM is kept on the pedal, not in the patch. This pedal\'s firmware does not report it to the editor.</div>';
+  if (!entries.length) return '<b>PERFORM</b><div class="note">Read all patches to see this patch\'s PERFORM setup.</div>';
+  var o = perfObj(p), rec = p.rec, warn = [], h = '<b>PERFORM</b> <label>Cycle <select data-pf="cycle">'
+    + CYCLES.map(function (c) { return '<option value="' + c + '"' + (c === o.cycle ? ' selected' : '') + '>' + (c ? c + (c > 1 ? ' bars' : ' bar') : 'None') + '</option>'; }).join('') + '</select></label>';
+  function check(t, what) { var i = targetInfo(rec, t); if (i.bad) warn.push(what + ': ' + i.bad + '.'); }
+  o.target.forEach(function (t, c) {
+    check(t, CTLS[c]);
+    h += '<fieldset class="pctl"><legend>' + CTLS[c] + '</legend><label>Target ' + targetSelect(rec, t, c + ',0') + '</label>';
+    if (t !== Patch.T_NONE) {
+      if (c < 3) h += '<div class="ges">Turn</div>' + moveHtml(rec, t, o.move[c][0], c + ',0', 'Follow');
+      h += '<div class="ges">Press</div>' + moveHtml(rec, t, o.move[c][1], c + ',1', 'Action') + moveHtml(rec, t, o.move[c][2], c + ',2', 'Follow')
+        + '<div class="ges">Hold</div>' + moveHtml(rec, t, o.move[c][3], c + ',3', 'Action') + moveHtml(rec, t, o.move[c][4], c + ',4', 'Release') + moveHtml(rec, t, o.move[c][5], c + ',5', 'Follow');
+    }
+    h += '</fieldset>';
+  });
+  var loop = false;
+  for (var s = 0; s < Patch.count(rec); s++) if (fxName(rec, s) === 'GRDLOOP') loop = true;
+  if (loop || o.loopOn) {                          // the looper events only fire in a patch with GRDLOOP
+    h += '<fieldset class="pctl"><legend>Looper events</legend><label><input type="checkbox" data-pf="loopOn"' + (o.loopOn ? ' checked' : '') + '> On</label>';
+    o.loopTarget.forEach(function (t, l) {
+      check(t, 'Looper ' + LOOPEV[l]);
+      h += '<div class="ges">' + LOOPEV[l] + '</div><label>Target ' + targetSelect(rec, t, 'L' + l) + '</label>' + (t !== Patch.T_NONE ? moveHtml(rec, t, o.loopMove[l], 'L' + l, 'Action') : '');
+    });
+    h += '</fieldset>';
+  }
+  if (p.orig && Patch.hash(rec) !== Patch.hash(p.orig)) warn.push('Targets keep their slot numbers, as on the pedal: check them after moving effects.');
+  return h + '<div class="note">' + (p.perf ? 'PERFORM edited: "Write changed to pedal" sends it. ' : '')
+    + warn.map(function (w) { return '<span class="bad">' + esc(w) + '</span>'; }).join(' ') + '</div>';
+}
+function perfChange(p, el) {
+  var o = perfObj(p), f = el.dataset.pf, c = el.dataset.c || '', v = +el.value;
+  if (f === 'cycle') o.cycle = v;
+  else if (f === 'loopOn') o.loopOn = el.checked ? 1 : 0;
+  else {
+    var lp = c[0] === 'L', ci = lp ? +c.slice(1) : +c.split(',')[0], at = lp ? ci : +c.split(',')[1];
+    var row = lp ? o.loopMove : o.move[ci], w = row[at], t = lp ? o.loopTarget[ci] : o.target[ci];
+    if (f === 't') {
+      if (lp) o.loopTarget[ci] = v; else o.target[ci] = v;
+      if (isFtsw(v)) {                                 // perform_keys.c: a new Footsw target presses on a click (and a hold)
+        var a = lp ? ci : 1;
+        if ((row[a] >>> 16 & 31) === 31) row[a] = Patch.mv(127, 0, 0);
+        if (!lp && (row[3] >>> 16 & 31) === 31) row[3] = Patch.mv(127, 0, 0);
+      }
+    } else if (f === 'u') row[at] = el.checked ? Patch.mv(0, 0, 0) : Patch.MV_UNUSED;
+    else if (f === 'v') row[at] = Patch.mv(Math.max(0, Math.min(targetInfo(p.rec, t).max, v | 0)), w >>> 16 & 31, w >>> 21 & 15);
+    else if (f === 'n') row[at] = Patch.mv(w & 0xffff, v, w >>> 21 & 15);
+    else if (f === 'g') row[at] = Patch.mv(w & 0xffff, w >>> 16 & 31, v);
+  }
+  p.perf = Patch.perfEncode(o);
+}
 function detail() {
   var box = detailBox, p = patches[sel];
   if (!p) { box.style.display = 'none'; return; }
@@ -491,7 +601,7 @@ function detail() {
   // MIXER settings 0-10: kept on the pedal (record 50), edited here and written with SysEx 03
   var mx = entries.length && Patch.mixer(p.rec, sel, entries), mset0 = p.mix || (mx && mx.set), mode = mset0 ? mset0[0] : -1;
   if (focus === 'mix' && (mode === 0 || mode === 3)) focus = 'route';     // as the pedal: Serial has no [MIX]
-  h += chainHtml(p.rec, r, mode) + '<div class="ctl">';
+  h += chainHtml(p.rec, r, mode) + '<div class="chain"><span class="box node' + (focus === 'perf' ? ' cur' : '') + '" data-it="perf">PERFORM</span></div><div class="ctl">';
   function mset(list) {
     if (!mx) return '<div class="note">' + (mst ? 'Read all patches to see this patch\'s MIXER settings.'
       : 'MIXER settings (Mode, levels, crossfades) are kept on the pedal, not in the patch. This pedal\'s firmware does not report them to the editor.') + '</div>';
@@ -511,6 +621,7 @@ function detail() {
       + '<label>Solo <select data-k="solo">' + opts(Patch.SOLO, r.solo) + '</select></label>' + mset([5, 7, 8, 9, 10]);
   else if (focus === 'out')
     h += '<b>OUT</b> <label>Output <select data-k="out">' + opts(Patch.OUT, r.out) + '</select></label>' + mset([6]);
+  else if (focus === 'perf') h += perfHtml(p);
   else if (typeof focus === 'number' && fxName(p.rec, focus))
     h += fxControls(p.rec, focus);
   else h += '<span class="note">Nothing selected.</span>';
@@ -530,6 +641,7 @@ $('detail').addEventListener('change', function (e) {
     render();
     return;
   }
+  if (e.target.dataset.pf && p) { perfChange(p, e.target); render(); return; }
   var mi = e.target.dataset.mx;
   if (mi && p && entries.length) {
     p.mix = (p.mix || Patch.mixer(p.rec, sel, entries).set).slice();

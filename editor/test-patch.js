@@ -131,4 +131,18 @@ var pa = [1], pb = [2];
 assert.strictEqual(P.perform(rec, 3, [other, e, other, e], [null, pa, null, pb]), pb);   // its own entry
 assert.strictEqual(P.perform(rec, 3, [other, e, other, e], [null, pa, null, null]), pa); // a copy's
 assert.strictEqual(P.perform(rec, 3, [other, other, other, e], [pa, pa, pa, null]), null);
+// PERFORM fields: a random entry with PT_OK round-trips; the empty entry is the pedal's
+for (var t = 0; t < 20; t++) {
+  var re = Array.from({ length: 208 }, function () { return Math.random() * 256 | 0; });
+  re[15] = P.PERF_OK;
+  assert.deepStrictEqual(P.perfEncode(P.perfDecode(re)), re);
+}
+var em = P.perfEncode(P.perfEmpty());
+assert.strictEqual(em.length, 208);
+assert.deepStrictEqual(em.slice(0, 16), [0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0xa5]);
+assert.deepStrictEqual(em.slice(16, 20), [0, 0, 0x1f, 0]);
+assert.strictEqual(P.mv(127, 0, 0), 127);
+var fresh = new Array(122).fill(0); fresh[108] = 0x40; fresh[109] = 0x05; fresh[110] = 0x14;
+assert.strictEqual(P.count(fresh), 1);   // a new patch on the MS-70CDR
+assert.strictEqual(P.mv(5, 31, 0), P.MV_UNUSED | 5);
 console.log('patch.js OK');

@@ -144,7 +144,31 @@ var Patch = (function () {
     return null;
   }
 
+  // One entry's fields (asm/perform/perform.h PerfPatch). Moves: u32 LE, VALUE bits 0-15, NEXT 16-20 (31 = unused), LAG 21-24.
+  // Targets: 14 + 10 * slot + k (k 0 the effect's on/off, 1-9 its parameter k), 85-101 a mixer CC, 0x80 + slot Footsw, 0xFF none.
+  var MV_UNUSED = 0x001f0000, T_NONE = 0xff, T_FTSW = 0x80;
+  function u32(e, o) { return (e[o] | e[o + 1] << 8 | e[o + 2] << 16 | e[o + 3] << 24) >>> 0; }
+  function perfDecode(e) {
+    var o = { cycle: e[0], target: e.slice(1, 8), loopTarget: e.slice(8, 14), loopOn: e[14], move: [], loopMove: [] };
+    for (var c = 0; c < 7; c++) { o.move.push([]); for (var m = 0; m < 6; m++) o.move[c].push(u32(e, 16 + 24 * c + 4 * m)); }
+    for (var l = 0; l < 6; l++) o.loopMove.push(u32(e, 184 + 4 * l));
+    return o;
+  }
+  function perfEncode(o) {
+    var e = [o.cycle].concat(o.target, o.loopTarget, [o.loopOn, PERF_OK]);
+    o.move.concat([o.loopMove]).forEach(function (row) { row.forEach(function (w) { e.push(w & 255, w >>> 8 & 255, w >>> 16 & 255, w >>> 24); }); });
+    return e;
+  }
+  function perfEmpty() {                       // perform_store.c: no entry for the patch
+    var row = function (n, v) { return Array.from({ length: n }, function () { return v; }); };
+    return { cycle: 0, target: row(7, T_NONE), loopTarget: row(6, T_NONE), loopOn: 0,
+             move: row(7, 0).map(function () { return row(6, MV_UNUSED); }), loopMove: row(6, MV_UNUSED) };
+  }
+  function count(rec) { return (rec[108] | rec[109] << 8 | rec[110] << 16) >> 10 & 7; }   // COUNT: effects in the chain
+  function mv(v, next, lag) { return (v | next << 16 | lag << 21) >>> 0; }
+
   return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite,
+           perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, mv: mv, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
            PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };

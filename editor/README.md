@@ -22,6 +22,10 @@ then open http://localhost:8737 and press Connect. Close Zoom Effect Manager and
   pedal keeps MIXER and PERFORM. Input and Master also set Input R and Master R, as on the pedal.
   Backups carry the MIXER settings and PERFORM too (PERFORM needs firmware with `04`). On stock or
   older firmware both go back to defaults.
+- PERFORM: click PERFORM under the chain to set it up as on the pedal's SETUP: Cycle, each control's
+  target (an effect's Footsw or parameter, or a mixer level) and its Turn / Press / Hold moves (Value,
+  When, Lag), and the looper events in a patch with GRDLOOP. Targets keep their slot numbers when
+  effects move, as on the pedal; the editor warns when one points at an empty slot or a missing parameter.
 - Effect names: `effect-names.js`, from g200kg/zoom-ms-utility (MIT). Pack effects show as `id …`.
 
 Check the decoder: `node editor/test-patch.js`.
