@@ -179,6 +179,8 @@ $('connect').onclick = function () { guard(async function () {
   v = await v;
   mst = v && v.slice(7, 10).join('.');
   entries = []; perfs = [];
+  status('Reading the effects on the pedal...');
+  try { await readInstalled(); } catch (e) { installed = null; buildCats(); }
   status('Connected: ' + model + ' ' + fw + (mst ? ', MIDISTOMP ' + mst : '') + ' (' + outp.name + ')', 'ok');
 }); };
 
@@ -217,6 +219,99 @@ async function readPerform(list) {
   }
 }
 var ALL = Array.from({ length: 50 }, function (_, n) { return n; });
+
+// The pedal's own files, with the stock file commands (as zoom-zt2): FLST_SEQ.ZDT lists the effects on it,
+// each .ZDL carries its id (header) and its picture (the picEffectType_* symbol). Inside PC mode (52 on, 53 off).
+var installed = null, zdlFile = {}, pics = {};   // installed: keys of the pedal's effects (null: not read); zdlFile[key]: its file
+function unpack7(d) {   // 8 bytes carry 7: the first holds their top bits
+  var o = [];
+  for (var i = 0; i < d.length; i += 8) for (var j = 1; j < 8 && i + j < d.length; j++) o.push(d[i + j] | (d[i] & 0x40 >> j - 1 ? 0x80 : 0));
+  return o;
+}
+async function fileCmd(body) {
+  var r = expect(function (m) { return m[1] === 0x52 && m[3] === dev && m[4] === 0x60; }, 1500);
+  await send(zoom([0x60].concat(body)));
+  return r;
+}
+async function readFile(name, first) {   // first: just the first block (512 bytes)
+  var out = [];
+  await fileCmd([0x20, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0].concat(Array.from(name, function (c) { return c.charCodeAt(0); }), [0]));
+  try {
+    for (;;) {
+      await fileCmd([0x05, 0x00]);
+      await fileCmd([0x22, 0x14, 0x2f, 0x60, 0x00, 0x0c, 0x00, 0x04, 0x00, 0x00, 0x00]);
+      var m = await fileCmd([0x05, 0x00]), n = m && m[5] === 4 ? m[10] * 128 + m[9] : 0;
+      if (!n) break;
+      out = out.concat(unpack7(m.slice(11, 12 + n + Math.floor(n / 7))).slice(0, n));
+      if (first) break;
+    }
+  } finally { await fileCmd([0x21, 0x40, 0, 0, 0, 0]); await fileCmd([0x09]); }
+  return out;
+}
+async function pcMode(fn) {
+  await send(zoom([0x52]));
+  try { return await fn(); } finally { await send(zoom([0x53])); await send(zoom([0x50])); }   // then editor mode again
+}
+function idKey(id) {   // a ZDL's id (category << 24 | number) in g200kg's key form, as make_pack_params.py
+  var b0 = id * 2 & 255, b1 = id * 2 >>> 8 & 7, b3 = Math.floor(id * 2 / 16777216) & 0x1f;
+  return String((b0 & 0x80) << 23 | (b0 & 0x7e) << 16 | b1 << 8 | b3);
+}
+function store(k, v) {   // localStorage JSON; reads give {} when blocked or empty
+  try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || '{}'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return {}; }
+}
+async function readInstalled() {
+  installed = await pcMode(async function () {
+    var fl = await readFile('FLST_SEQ.ZDT'), names = String.fromCharCode.apply(null, fl).match(/[A-Z0-9_]+\.ZDL/g) || [], seen = store('zdlKeys'), ks = [];
+    if (!names.length) return null;
+    for (var nm of names) {
+      var k = ZDL_KEYS[nm] || seen[nm];
+      if (!k) {   // a file the editor does not know: its id from its header, once
+        status('Reading ' + nm + ' from the pedal...');
+        var h = await readFile(nm, true);
+        if (h.length < 68 || String.fromCharCode.apply(null, h.slice(20, 24)) !== 'INFO') continue;
+        k = seen[nm] = idKey(h[0x43] * 16777216 + (h[0x42] << 16 | h[0x41] << 8 | h[0x40]));
+      }
+      k = String(k);
+      if (!EFFECT_NAMES[k]) EFFECT_NAMES[k] = nm.slice(0, -4);
+      zdlFile[k] = nm; ks.push(k);
+    }
+    store('zdlKeys', seen);
+    return ks;
+  });
+  buildCats();
+}
+// the picture: the picEffectType_* symbol of the ZDL's ELF (32-bit LE), run-length coded (a byte twice, then the count of more)
+function zdlPic(f) {
+  var b = Uint8Array.from(f), v = new DataView(b.buffer), E = 20 + v.getUint32(12, true), sh = [], i, s;
+  var u32 = function (o) { return v.getUint32(E + o, true); }, u16 = function (o) { return v.getUint16(E + o, true); };
+  for (i = 0; i < u16(48); i++) sh.push([0, 1, 2, 3, 4, 5, 6].map(function (j) { return u32(u32(32) + i * u16(46) + 4 * j); }));
+  for (s of sh) if (s[1] === 2) for (i = 0; i < s[5] / 16; i++) {
+    var q = s[4] + 16 * i, a = E + sh[s[6]][4] + u32(q), nm = '';
+    while (b[a] && nm.length < 40) nm += String.fromCharCode(b[a++]);
+    if (nm.indexOf('picEffectType') !== 0) continue;
+    var sec = sh[u16(q + 14)], val = u32(q + 4), off = E + sec[4] + (sec[3] && val >= sec[3] ? val - sec[3] : val), r = [];
+    var c = Array.from(b.subarray(off, off + u32(q + 8)));
+    for (var k = 0; k < c.length; k++) { r.push(c[k]); if (c[k + 1] === c[k]) { r.push(c[k]); for (var t = 0; t < c[k + 2]; t++) r.push(c[k]); k += 2; } }
+    return r.length === 1024 ? r : c.length === 1024 ? c : null;
+  }
+  return null;
+}
+// the picker's middle effect: its picture, from the cache or (one at a time, between other work) from the pedal
+function wantPic(k) {
+  var nm = zdlFile[k];
+  if (!nm || k in pics) return;
+  var c = store('zdlPics')[nm];
+  if (c) { pics[k] = unhex(c); return; }
+  if (busy || !outp) return;
+  busy = true; buttons(); pics[k] = null;
+  pcMode(function () { return readFile(nm); }).then(function (f) {
+    pics[k] = zdlPic(f);
+    if (pics[k]) { var all = store('zdlPics'); all[nm] = hex(pics[k]); store('zdlPics', all); }
+  }).catch(function () {}).then(function () {
+    busy = false; buttons();
+    if (/^add\d$/.test(focus) && patches[sel]) drawAdd(patches[sel]);
+  });
+}
 
 async function currentProgram() {
   var r = expect(function (m) { return (m[0] & 0xf0) === 0xc0; }, 800);
@@ -661,10 +756,18 @@ function swapAB(s, z) {
 var ZONES = ['BEFORE ROUTE', 'BUS A', 'BUS B', 'AFTER MIX'];
 var GROUP_NAMES = { COMP: 'DYNAMICS', FILTER: 'FILTER', DRIVE: 'DRIVE', AMP: 'AMP', MOD: 'MODULATION', SFX: 'SFX', DELAY: 'DELAY', REVERB: 'REVERB' };
 function byName(keys) { return keys.slice().sort(function (a, b) { return EFFECT_NAMES[a].localeCompare(EFFECT_NAMES[b]); }); }
-var ADD_CATS = Object.keys(EFFECT_GROUPS).map(function (g) { return { name: GROUP_NAMES[g] || g, keys: byName(EFFECT_GROUPS[g]) }; })
-  .concat([{ name: 'EFFECTS PACK', keys: byName(Object.keys(PACK_EFFECTS)) }]);
-ADD_CATS.forEach(function (c) { c.n = c.keys.length; });
-var FIND_KEYS = byName([].concat.apply([], ADD_CATS.map(function (c) { return c.keys; })));
+var ADD_CATS, FIND_KEYS;
+function buildCats() {   // the effects on the pedal once read, else every known one; the pedal's unknown ones under OTHER
+  var on = installed && new Set(installed), has = function (k) { return !on || on.has(String(k)); };
+  ADD_CATS = Object.keys(EFFECT_GROUPS).map(function (g) { return { name: GROUP_NAMES[g] || g, keys: byName(EFFECT_GROUPS[g].filter(has)) }; })
+    .concat([{ name: 'EFFECTS PACK', keys: byName(Object.keys(PACK_EFFECTS).filter(has)) }]);
+  var listed = new Set([].concat.apply([], ADD_CATS.map(function (c) { return c.keys.map(String); })));
+  if (on) ADD_CATS.push({ name: 'OTHER', keys: byName(installed.filter(function (k) { return !listed.has(k); })) });
+  ADD_CATS = ADD_CATS.filter(function (c) { return c.keys.length; });
+  ADD_CATS.forEach(function (c) { c.n = c.keys.length; });
+  FIND_KEYS = byName([].concat.apply([], ADD_CATS.map(function (c) { return c.keys; })));
+}
+buildCats();
 var addAt = -1;   // the slot a new effect goes in, -1: the output end of its zone
 // cat: -1 the categories, -2 Find, else the category; cur: the keyboard's box (-1: none), on the picker the effect in the middle
 var add = { cat: -1, cur: -1, q: '' }, addHits = [];
@@ -687,7 +790,8 @@ function drawAdd(p) {
   else {
     var ks = addKeys();
     add.cur = Math.max(0, Math.min(ks.length - 1, add.cur));
-    addHits = LCD.picker(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.cur);
+    wantPic(ks[add.cur]);
+    addHits = LCD.picker(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.cur, pics[ks[add.cur]]);
   }
   LCD.present(cv);
 }
@@ -721,7 +825,7 @@ function addKey(e) {
 function pickHtml() {
   return '<div class="lcdwrap"><canvas id="addLcd" class="lcd knobs" tabindex="0" aria-label="Add an effect: arrow keys choose a category, Enter opens it; then left and right turn the effects past the middle (or drag, or the mouse wheel), Enter adds the middle one, Escape goes back."></canvas></div>'
     + '<label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect by name" value="' + esc(add.q) + '"></label>'
-    + '<div class="note">Stock effects your pedal does not have are listed too. If the pedal shows "DSP FULL", remove or swap an effect.</div>';
+    + '<div class="note">' + (installed ? 'The effects on your pedal, with their pictures read from it.' : 'Every known effect: connect the pedal to list only the ones it has.') + ' If the pedal shows "DSP FULL", remove or swap an effect.</div>';
 }
 function addPicked(k) {
   var p = patches[sel], z = +String(focus).slice(3);
