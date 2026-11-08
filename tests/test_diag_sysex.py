@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 HOST = {"MIDI_BYTE", "MIDI_SEND", "TRANSPORT_MAGIC", "SERVICES_MAGIC", "R50_ENT", "LIVE", "SAVED", "MAXES",
-        "CUR_PATCH", "SAVE_SETTINGS", "SETTINGS_WORDS"}
+        "CUR_PATCH", "SAVE_SETTINGS", "SETTINGS_WORDS", "PT_MAGIC_W", "PT"}
 
 HARNESS = r"""
 #include <stdio.h>
@@ -41,6 +41,14 @@ static void dump(void)      /* entries 5 and 7, LIVE, SAVED: what a write change
     for (int i = 0; i < 11; i++) printf("%02X", saved[i]);
     printf("\n");
 }
+static unsigned char pt[208 * 50 + 2];   /* + 2: chunk 14 of entry 49 reads past the table */
+#define PT(n) (pt + 208 * (n))
+#ifdef PT_OFF
+static unsigned pt_magic;
+#else
+static unsigned pt_magic = 0x50524633u;
+#endif
+#define PT_MAGIC_W pt_magic
 #define STAMP(i) "V2.0.1"
 @BLOCK@
 int main(void)
@@ -61,8 +69,7 @@ def unpack7(d):
     return out
 
 
-@pytest.fixture(scope="module")
-def exe(tmp_path_factory):
+def build(tmp_path_factory, *flags):
     if not shutil.which("gcc"):
         pytest.skip("no gcc")
     src = (ROOT / "asm/diag/diag.c").read_text()
@@ -70,8 +77,18 @@ def exe(tmp_path_factory):
     block = "\n".join(l for l in block.splitlines() if not re.match(r"#define (%s)\b" % "|".join(HOST), l))
     d = tmp_path_factory.mktemp("sx")
     (d / "t.c").write_text(HARNESS.replace("@BLOCK@", block))
-    subprocess.run(["gcc", "-std=c99", "-o", str(d / "t.exe"), str(d / "t.c")], check=True)
+    subprocess.run(["gcc", "-std=c99", *flags, "-o", str(d / "t.exe"), str(d / "t.c")], check=True)
     return d / "t.exe"
+
+
+@pytest.fixture(scope="module")
+def exe(tmp_path_factory):
+    return build(tmp_path_factory)
+
+
+@pytest.fixture(scope="module")
+def exe_off(tmp_path_factory):       # no PERFORM table in record 50 yet
+    return build(tmp_path_factory, "-DPT_OFF")
 
 
 def run(exe, *msgs):
@@ -160,3 +177,41 @@ def test_write_rejected(exe):
     out, e5, *_ = state(exe, write_msg(5, 1, bad), write_msg(50, 1, SET),
                         " ".join(write_msg(5, 1, SET).split()[:-2] + ["F7"]))   # short
     assert out == [bytes.fromhex("F07D4D5354440905" "01F7")] and e5 == bytes(16)
+
+
+def hexs(b):
+    return " ".join("%02X" % x for x in b)
+
+
+def perf_write(n, k, data, nonce=4):
+    return hexs([0xF0, 0x7D, 0x4D, 0x53, 0x54, 5, nonce, n, k] + pack7(data) + [0xF7])
+
+
+def perf_read(n, k, nonce=4):
+    return hexs([0xF0, 0x7D, 0x4D, 0x53, 0x54, 4, nonce, n, k, 0xF7])
+
+
+ENTRY = [(i * 53 + 7) & 255 for i in range(208)]
+
+
+def test_perform_round_trip(exe):
+    msgs = [perf_write(49, k, (ENTRY + [0, 0])[14 * k:14 * k + 14]) for k in range(15)]
+    assert all(len(m.split()) == 26 for m in msgs)
+    out = run(exe, *msgs, *[perf_read(49, k) for k in range(15)])
+    acks, save, reads = out[:14], out[14:16], out[16:]
+    assert acks == [bytes.fromhex("F07D4D53544604") + bytes([49, k, 0, 0xF7]) for k in range(14)]
+    assert save == ["SAVE", bytes.fromhex("F07D4D53544604") + bytes([49, 14, 0, 0xF7])]   # chunk 14 saves
+    got = []
+    for k, r in enumerate(reads):
+        assert r[:10] == bytes.fromhex("F07D4D53544504") + bytes([49, k, 1]) and len(r) == 27
+        assert all(b < 0x80 for b in r[1:-1])
+        got += unpack7(list(r[10:-1]))
+    assert got == ENTRY + [0, 0]                           # bytes past 208 read as 0
+
+
+def test_perform_no_table(exe_off):
+    out = run(exe_off, perf_write(3, 14, list(range(14))), perf_read(3, 0), perf_read(3, 15), perf_read(50, 0))
+    assert out[0] == bytes.fromhex("F07D4D53544604") + bytes([3, 14, 1, 0xF7])   # refused, no SAVE
+    assert out[1][7:10] == bytes([3, 0, 0]) and unpack7(list(out[1][10:-1])) == [0] * 14
+    assert len(out) == 2                                   # chunk 15 and patch 50: no reply
+

@@ -114,6 +114,10 @@ void diag_mwake(void)
  *      over its max: nothing written). The patch played (n = CUR_PATCH) takes them at once.
  *      Record 50 is saved to flash from Task_MIDI, as the stock patch store (32) saves a
  *      patch from there (0xC00AE2B0).
+ *   04 n k: chunk k (0-14) of patch n's PERFORM entry -> 45 n k ok + 14 bytes, packed
+ *      (ok 0: no PERFORM table yet, the bytes mean nothing; bytes past 208 are 0)
+ *   05 n k + 14 bytes packed: write chunk k -> 46 n k status (0 written, 1 no PERFORM table).
+ *      Chunk 14 saves record 50. The PERFORM engine reads the entry when the patch loads.
  * ponytail: state is 0x7F (unknown) until the editor mode and looper flags are mapped. */
 #define MIDI_BYTE (*(volatile unsigned char *)(B14 + 226))       /* the byte just taken */
 #define MIDI_SEND FN(0xC00AD664, void, (const unsigned char *, int))
@@ -126,6 +130,8 @@ void diag_mwake(void)
 #define CUR_PATCH (*(volatile int *)(B14 + 324))
 #define SAVE_SETTINGS FN(0xC00BA3E4, void, (int *))              /* writes record 50 (pages.c r50_save) */
 #define SETTINGS_WORDS ((int *)0xC009D8F8)
+#define PT_MAGIC_W (*(volatile unsigned *)(0xC0116000u + 824))  /* asm/perform/perform_store.c */
+#define PT(n) ((volatile unsigned char *)0xC0116000u + 828 + 208 * (n))
 /* in every build with this code: CC, MIDI settings, tempo-hold, mixer, PERFORM, MASTER, KALEIDO, diag, DSP 300 */
 #define FEATURES (1u | 1u << 2 | 1u << 3 | 1u << 5 | 1u << 6 | 1u << 7 | 1u << 8 | 1u << 9 | 1u << 10)
 
@@ -140,6 +146,27 @@ static void sx_reply(int cmd, const unsigned char *d, int n)
     for (i = 0; i < n; i++) m[7 + i] = d[i];
     m[7 + n] = 0xF7;
     MIDI_SEND(m, 8 + n);
+}
+
+/* groups of 7, led by their high bits (the first byte's = 0x40) */
+static int pack(const volatile unsigned char *e, int n, unsigned char *d)
+{
+    int i, j = 0, h = 0, k = 7;
+    for (i = 0; i < n; i++, k++) {
+        if (k == 7) { k = 0; h = j++; d[h] = 0; }
+        if (e[i] & 0x80) d[h] |= 0x40 >> k;
+        d[j++] = e[i] & 0x7F;
+    }
+    return j;
+}
+
+static void unpack(const unsigned char *s, int n, unsigned char *d)
+{
+    int i, j = 0, h = 0, k = 7;
+    for (i = 0; i < n; i++, k++) {
+        if (k == 7) { k = 0; h = j++; }
+        d[i] = s[j++] | (s[h] << (k + 1) & 0x80);
+    }
 }
 
 static void sx_done(int n)
@@ -158,20 +185,11 @@ static void sx_done(int n)
         d[0] = f & 127; d[1] = f >> 7 & 127; d[2] = f >> 14 & 127; d[3] = 0x7F;
         sx_reply(0x42, d, 4);
     } else if (sx[4] == 2 && n == 7 && sx[6] < 50) {
-        const volatile unsigned char *e = R50_ENT(sx[6]);
         d[0] = sx[6];
-        for (i = 0, j = 1, h = 0; i < 16; i++, j++) {   /* groups of 7, led by their high bits */
-            if (i == 7 || i == 14 || i == 0) { h = j++; d[h] = 0; }
-            if (e[i] & 0x80) d[h] |= 0x40 >> (j - h - 1);
-            d[j] = e[i] & 0x7F;
-        }
-        sx_reply(0x43, d, j);
+        sx_reply(0x43, d, 1 + pack(R50_ENT(sx[6]), 16, d + 1));
     } else if (sx[4] == 3 && n == 25 && sx[6] < 50) {
         volatile unsigned char *e = R50_ENT(sx[6]);
-        for (i = 0, j = 7; i < 15; i++, j++) {          /* 18 packed bytes -> hash, settings */
-            if (i == 0 || i == 7 || i == 14) h = j++;
-            d[i] = sx[j] | (sx[h] << (j - h) & 0x80);
-        }
+        unpack(sx + 7, 15, d);                          /* hash, settings */
         for (i = 0, f = 0; i < 11; i++) f |= d[4 + i] > MAXES[i];
         if (!f) {
             for (i = 0; i < 15; i++) e[i] = d[i];
@@ -183,6 +201,24 @@ static void sx_done(int n)
         }
         d[0] = sx[6]; d[1] = f;
         sx_reply(0x44, d, 2);
+    } else if ((sx[4] == 4 && n == 8 || sx[4] == 5 && n == 24) && sx[6] < 50 && sx[7] < 15) {
+        volatile unsigned char *e = PT(sx[6]) + 14 * sx[7];
+        unsigned char t[14];
+        h = 208 - 14 * sx[7];                           /* bytes of the entry left in this chunk */
+        f = PT_MAGIC_W != 0x50524633u;                  /* "PRF3" */
+        if (sx[4] == 4) {
+            for (i = 0; i < 14; i++) t[i] = i < h ? e[i] : 0;
+            d[0] = sx[6]; d[1] = sx[7]; d[2] = !f;
+            sx_reply(0x45, d, 3 + pack(t, 14, d + 3));
+        } else {
+            unpack(sx + 8, 14, t);
+            if (!f) {
+                for (i = 0; i < 14 && i < h; i++) e[i] = t[i];
+                if (sx[7] == 14) SAVE_SETTINGS(SETTINGS_WORDS);
+            }
+            d[0] = sx[6]; d[1] = sx[7]; d[2] = f;
+            sx_reply(0x46, d, 3);
+        }
     }
 }
 
