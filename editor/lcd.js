@@ -197,17 +197,18 @@ var LCD = (function () {
   function clear(x, y, w, h, cur) { if (cur) fill(x - 2, y - 2, w + 4, h + 4, 0); else fill(x, y, w, h, 0); }
   function mark(x, y, w, h, sel) { if (sel) inv(x - 2, y - 2, w + 4, h + 4); else sq(x - 2, y - 2, w + 4, h + 4); }
   function prect(l, y, dot, x, yy, w, h) { for (var i = 0; i < w; i++) for (var j = 0; j < h; j++) if (!dot || ((x + i + yy + j) & 1) === 0) fill(l + x + i, y + yy + j, 1, 1, 1); }
-  function pill(l, y, dot, t) {
-    prect(l, y, dot, 1, 0, CW - 2, 1); prect(l, y, dot, 0, 1, CW, t - 1); prect(l, y, dot, 0, CH - t, CW, t - 1); prect(l, y, dot, 1, CH - 1, CW - 2, 1);
-    prect(l, y, dot, 0, t, 1, CH - 2 * t); prect(l, y, dot, CW - 1, t, 1, CH - 2 * t);
-    prect(l, y, dot, 1, t, 1, 1); prect(l, y, dot, CW - 2, t, 1, 1); prect(l, y, dot, 1, CH - 1 - t, 1, 1); prect(l, y, dot, CW - 2, CH - 1 - t, 1, 1);
+  function pill(l, y, dot, t, w, h) {   // w x h, default CW x CH
+    w = w || CW; h = h || CH;
+    prect(l, y, dot, 1, 0, w - 2, 1); prect(l, y, dot, 0, 1, w, t - 1); prect(l, y, dot, 0, h - t, w, t - 1); prect(l, y, dot, 1, h - 1, w - 2, 1);
+    prect(l, y, dot, 0, t, 1, h - 2 * t); prect(l, y, dot, w - 1, t, 1, h - 2 * t);
+    prect(l, y, dot, 1, t, 1, 1); prect(l, y, dot, w - 2, t, 1, 1); prect(l, y, dot, 1, h - 1 - t, 1, 1); prect(l, y, dot, w - 2, h - 1 - t, 1, 1);
   }
-  function label(c, slot, l, y) {
-    var nm = c.name[slot] || '', a = nm.substr(0, 5), z = nm.substr(5, 5);
+  function name2(nm, l, y, z) {   // an effect's name in a pill: 5 + 5 characters on two rows
+    var a = nm.substr(0, 5); z = z || nm.substr(5, 5);
     t7(a, l + 1 + Math.trunc((CW - 2 - w5(a, 1)) / 2), y + 2);
-    if (c.full && c.full[slot]) z = 'FULL';
     t7(z, l + 1 + Math.trunc((CW - 2 - w5(z, 1)) / 2), y + 10);
   }
+  function label(c, slot, l, y) { name2(c.name[slot] || '', l, y, c.full && c.full[slot] ? 'FULL' : 0); }
   function cover(d, slot, l, cy) {
     var y = cy - 9, cur = d.cur === slot, c = d.c;
     if (slot === -2) { d.hits.push({ it: 'land', x: l, y: y, w: CW, h: CH }); return clear(l, y, CW, CH, 0); }   // where it lands: an empty frame, drawn last (chain)
@@ -427,7 +428,81 @@ var LCD = (function () {
       floating(c);
       d.hits.forEach(function (h) { if (h.it === 'land') { inv(h.x + 1, h.y, CW - 2, 1); inv(h.x + 1, h.y + CH - 1, CW - 2, 1); inv(h.x, h.y + 1, 1, CH - 2); inv(h.x + CW - 1, h.y + 1, 1, CH - 2); } });
     }
+    if (c.ask != null) return ask('DELETE ' + c.ask + '?', 'NO', 'YES');
     return d.hits;
+  }
+  // a softkey: the softkey font in a 9-row box, filled when on; returns its hit
+  function skey(it, s, x, y, on) {
+    var w = softW(s) + 9;
+    fill(x, y, w, 9, 0); small(s, x + 5, y + 2);
+    if (on) inv(x, y, w, 9); else sq(x, y, w, 9);
+    return { it: it, x: x - 1, y: y - 1, w: w + 2, h: 11 };
+  }
+  // a question over the screen, with two keys; a click outside it is { it: 'no' } too
+  function ask(q, no, yes) {
+    var bw = Math.max(7 * q.length + 16, 120), bh = 30, bx = (W - bw) >> 1, by = 14, kw = softW(no) + 9, kv = softW(yes) + 9;
+    fill(bx - 2, by - 2, bw + 4, bh + 4, 0); sq(bx, by, bw, bh); sq(bx + 1, by + 1, bw - 2, bh - 2);
+    font7c(q, W >> 1, by + 5);
+    var cx = W >> 1;
+    return [{ it: 'no', x: 0, y: 0, w: W, h: H }, skey('no', no, cx - 6 - kw, by + 17, 0), skey('yes', yes, cx + 6, by + 17, 1)];
+  }
+
+  // ---- the add screen: categories, then their effects scrolling by, then the chosen one big ----------
+  // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x 67, as the chain
+  function categories(tt, cats, cur) {
+    var hits = [], G = 3, n = cats.length + 1, cols = 5, bw = Math.floor((SW - 2 * G - (cols - 1) * 3) / cols), bh = 25;
+    begin(SW, 67);
+    fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
+    for (var i = 0; i < n; i++) {
+      var x = G + (i % cols) * (bw + 3) + ((W - 2 * G - cols * bw - (cols - 1) * 3) >> 1), y = 12 + Math.floor(i / cols) * (bh + 3), cx = x + (bw >> 1);
+      if (i < cats.length) {
+        pill(x, y, 0, 2, bw, bh);
+        t7(cats[i].name, cx - Math.trunc(w5(cats[i].name, 1) / 2), y + 6);
+        var ns = cats[i].n + ' EFFECTS'; small(ns, cx - (softW(ns) >> 1), y + 16);
+        hits.push({ it: 'cat', i: i, x: x, y: y, w: bw, h: bh });
+      } else {   // EXIT: a square box, an arrow into a little door
+        sq(x, y, bw, bh);
+        t7('EXIT', cx - 20, y + 9);
+        var ax = cx + 10; fill(ax, y + 12, 9, 1, 1); fill(ax + 6, y + 10, 1, 5, 1); fill(ax + 7, y + 11, 1, 3, 1); sq(ax + 10, y + 8, 6, 9);
+        hits.push({ it: 'exit', x: x, y: y, w: bw, h: bh });
+      }
+      if (i === cur) inv(x + 2, y + 2, bw - 4, bh - 4);
+    }
+    return hits;
+  }
+  // names in one row of pills scrolling right to left by off pixels (static and centered when they all fit);
+  // cur: the keyboard's pill (-1: none), kept in view. Returns { hits, off }
+  function carousel(tt, names, off, cur) {
+    var hits = [], P = CW + 8, tot = names.length * P, y = 24, fit = tot - 8 <= SW - 12, x0 = fit ? (SW - tot + 8) >> 1 : 0;
+    begin(SW, 67);
+    fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
+    if (!fit && cur >= 0) {   // the cursor in view, 10 pixels in from the edges
+      var cx = ((cur * P - off) % tot + tot) % tot;
+      if (cx > W - CW - 10) off += cx - (W - CW - 10); else if (cx < 10) off -= 10 - cx;
+    }
+    if (!fit) off = (off % tot + tot) % tot;
+    names.forEach(function (nm, i) {
+      var b = fit ? x0 + i * P : ((i * P - off) % tot + tot) % tot;
+      (fit ? [b] : [b, b - tot]).forEach(function (l) {
+        if (l <= -CW || l >= W) return;
+        pill(l, y, 0, 1); name2(nm, l, y);
+        if (i === cur) mark(l, y, CW, CH, 1);
+        hits.push({ it: 'fx', i: i, x: l, y: y, w: CW, h: CH });
+      });
+    });
+    hits.push(skey('back', 'BACK', 3, 56, 0));
+    var tip = names.length + ' EFFECTS'; small(tip, W - 3 - softW(tip), 58);
+    return { hits: hits, off: off };
+  }
+  // the chosen effect, twice as big, with ADD and BACK under it
+  function chosen(tt, nm) {
+    begin(CW, CH); pill(0, 0, 0, 2); name2(nm, 0, 0);
+    var g = grab(), l = (SW - 2 * CW) >> 1, y = 12;
+    begin(SW, 67);
+    fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
+    for (var j = 0; j < g.h; j++) for (var i = 0; i < g.w; i++) if (g.fb[j * g.w + i]) fill(l + 2 * i, y + 2 * j, 2, 2, 1);
+    var cx = W >> 1, ka = softW('BACK') + 9;
+    return [{ it: 'cover', x: l, y: y, w: 2 * CW, h: 2 * CH }, skey('back', 'BACK', cx - 6 - ka, 55, 0), skey('ok', 'ADD', cx + 6, 55, 1)];
   }
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
@@ -449,9 +524,9 @@ var LCD = (function () {
       hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: 52 });
     });
     if (on != null) {
-      var s = on ? 'ON' : 'OFF', bw = 7 * 3 + 9, bx = W - bw;   // flush right as the frame, as tall as the tab, 1 row above the frame
-      font7c(s, bx + (bw >> 1), 2);   // the tab's font, on the tab's text rows
-      if (on) invert(bx, 0, W - 1, 9); else rect(bx, 0, W - 1, 9, 3);
+      var s = on ? 'ON' : 'OFF', bw = 7 * 3 + 9, bx = W - bw;   // flush right as the frame, rows 1-9: 1 row above the frame
+      font7(s, bx + ((bw - (7 * s.length - 1)) >> 1), 2);   // the tab's font, centered on its ink (7 rows in the 9)
+      if (on) invert(bx, 1, W - 1, 9); else rect(bx, 1, W - 1, 9, 3);
       hits.push({ it: 'onoff', x: bx, y: 0, w: bw, h: 11 });
     }
     return hits;
@@ -584,7 +659,7 @@ var LCD = (function () {
     font7: font7, font7r: font7r, font7c: font7c, os6: os6, small: small, softText: softText, softW: softW,
     statusBar: statusBar, widthP: widthP, toggle: toggle, fader: fader, knob: knob, tab: tab, frame: frame,
     softkey40: softkey40, softkey42: softkey42, title: title, cursor: cursor, turnArrows: turnArrows, scrollbar: scrollbar,
-    chain: chain, knobPage: knobPage, IT_ROUTE: IT_ROUTE, IT_MIX: IT_MIX, IT_IN: IT_IN, IT_OUT: IT_OUT,
+    chain: chain, categories: categories, carousel: carousel, chosen: chosen, knobPage: knobPage, IT_ROUTE: IT_ROUTE, IT_MIX: IT_MIX, IT_IN: IT_IN, IT_OUT: IT_OUT,
     width: function () { return W; }
   };
 })();
