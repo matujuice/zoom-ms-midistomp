@@ -164,7 +164,7 @@ var LCD = (function () {
   function hit(hits, p) { for (var i = hits.length - 1; i >= 0; i--) { var h = hits[i]; if (p.x >= h.x && p.x < h.x + h.w && p.y >= h.y && p.y < h.y + h.h) return h; } return null; }
 
   // ---- the Effect Chain (asm/mixer/chain_draw.c) ----------------------------------------
-  var CW = 38, CH = 19, YC = 32, YA = 21, YB = 43, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4, K_ADD = 5;
+  var CW = 38, CH = 19, YC = 43, YA = 32, YB = 54, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4, K_ADD = 5;
   var IT_ROUTE = 0x10, IT_MIX = 0x11, IT_IN = 0x12, IT_OUT = 0x13, PRE = 0, BUS_A = 1, BUS_B = 2, POST = 3;
   var K5 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 []-.!/';
   var G5 = [[14,17,17,31,17,17,17],[30,17,17,30,17,17,30],[14,17,16,16,16,17,14],[28,18,17,17,17,18,28],[31,16,16,30,16,16,31],[31,16,16,30,16,16,16],
@@ -227,7 +227,7 @@ var LCD = (function () {
   }
   // the dragged effect, inverted as when chosen, under the pointer; c.drag: { slot, x, y } in LCD pixels
   function floating(c) {
-    var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(64 - CH - 2, g.y - (CH >> 1)));
+    var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(H - CH - 2, g.y - (CH >> 1)));
     fill(l - 2, y - 2, CW + 4, CH + 4, 0); pill(l, y, 0, 1); label(c, g.slot, l, y); inv(l - 2, y - 2, CW + 4, CH + 4);
   }
   // a "+" or "-" box (at x, y), 13 x 9 pixels: square on the 6 x 9 cells; hit is its click region
@@ -342,8 +342,8 @@ var LCD = (function () {
     wires(h, v);
     var y0 = ys[0] - 4, hh = ys[ys.length - 1] - ys[0] + 10;
     if (d.cur === (out ? IT_OUT : IT_IN)) mark(l, y0, CW, hh, d.c.sel);
-    if (out && d.c.limit) { var k = ys.length > 1 ? YC - 3 : 12; fill(l + 9, k, w3('LIMIT') + 2, 7, 1); t3('LIMIT', l + 10, k + 1, 0); }
-    d.hits.push({ it: out ? 'out' : 'in', x: l, y: 12, w: CW, h: 42 });
+    if (out && d.c.limit) { var k = ys.length > 1 ? YC - 3 : YA - 9; fill(l + 9, k, w3('LIMIT') + 2, 7, 1); t3('LIMIT', l + 10, k + 1, 0); }
+    d.hits.push({ it: out ? 'out' : 'in', x: l, y: YA - 9, w: CW, h: YB - YA + CH });
   }
   function jackLanes(c, cols, i) {
     var out = cols[i].kind === K_OUT, nb = out ? i - 1 : i + 1;
@@ -385,7 +385,7 @@ var LCD = (function () {
     var plus = pc >= 0 && c.ins && !c.add;
     if (plus) { if (pc + 1 < cols.length) gap[pc] += PAD; if (pc > 0) gap[pc - 1] += PAD; }   // room for the "+" on each side
     var w = 6 + cols.reduce(function (a, col) { return a + cw(col); }, 0) + gap.reduce(function (a, b) { return a + b; }, 0), X = [];
-    begin(Math.max(w, SW), 67);
+    begin(Math.max(w, SW), 89);
     X[0] = W - 3 - CW - ((W - w) >> 1);
     for (i = 1; i < cols.length; i++) X[i] = X[i - 1] - cw(cols[i]) - gap[i - 1];
     for (j = 0; j + 1 < cols.length; j++) {   // the lines in the gap between column j and j + 1
@@ -420,7 +420,7 @@ var LCD = (function () {
     function one(j, y, z, end) { btn(d, boxX(j), y - 4, 1, { it: 'ins', z: z, end: end }); }
     var k = pc >= 0 ? cols[pc].kind : -1;
     if (pc >= 0 && d.delX >= 0) {   // "+" before (right, nearer IN) and after the chosen effect, "-" under it
-      var l0 = d.delX, cy = d.delY, by = cy === YA ? 57 : cy + 14;
+      var l0 = d.delX, cy = d.delY, by = cy === YA ? YB + 14 : cy + 14;
       if (plus) { btn(d, boxX(pc - 1), cy - 4, 1, { it: 'ins', after: 0 }); btn(d, boxX(pc), cy - 4, 1, { it: 'ins', after: 1 }); }
       if (c.del) btn(d, l0 + ((CW - AW) >> 1), by, 0, { it: 'del' });
     } else if (plus && k !== K_EFF && k !== K_BUS) {   // beside IN, ROUTE, MIX or OUT: the start or end of the zones next to it
@@ -451,7 +451,7 @@ var LCD = (function () {
   }
   // a question over the screen: an inverted label, then q; two keys; a click outside it is { it: 'no' } too
   function ask(lb, q, no, yes) {
-    var tw = 7 * lb.length + 4, rw = tw + 6 + 7 * q.length, bw = Math.max(rw + 20, 110), bh = 33, bx = (W - bw - 1) >> 1, by = (67 - bh - 1) >> 1;
+    var tw = 7 * lb.length + 4, rw = tw + 6 + 7 * q.length, bw = Math.max(rw + 20, 110), bh = 33, bx = (W - bw - 1) >> 1, by = (H - bh - 1) >> 1;
     var kw = softW(no) + 9, cx = W >> 1, lx = (W - rw) >> 1, ty = by + 6;
     fill(bx - 2, by - 2, bw + 5, bh + 5, 0);
     rframe(bx + 1, by + 1, bw, bh); fill(bx + 1, by + 1, bw - 2, bh - 2, 0); fill(bx + 3, by, bw - 6, 1, 0); rframe(bx, by, bw, bh);
@@ -460,13 +460,14 @@ var LCD = (function () {
   }
 
   // ---- the add screen: categories, then the picker (the chosen effect big, the others beside it) ----
-  // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x 67, as the chain
+  // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x 80, the rows centered
   function categories(tt, cats, cur) {
     var hits = [], G = 3, n = cats.length + 1, cols = 5, bw = Math.floor((SW - 2 * G - (cols - 1) * 3) / cols), bh = 25;
-    begin(SW, 67);
+    begin(SW, 80);
+    var y0 = 9 + ((H - 9 - Math.ceil(n / cols) * (bh + 3) + 3) >> 1);
     fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
     for (var i = 0; i < n; i++) {
-      var x = G + (i % cols) * (bw + 3) + ((W - 2 * G - cols * bw - (cols - 1) * 3) >> 1), y = 12 + Math.floor(i / cols) * (bh + 3), cx = x + (bw >> 1);
+      var x = G + (i % cols) * (bw + 3) + ((W - 2 * G - cols * bw - (cols - 1) * 3) >> 1), y = y0 + Math.floor(i / cols) * (bh + 3), cx = x + (bw >> 1);
       if (i < cats.length) {
         pill(x, y, 0, 2, bw, bh);
         t7(cats[i].name, cx - Math.trunc(w5(cats[i].name, 1) / 2), y + 6);
@@ -512,21 +513,28 @@ var LCD = (function () {
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
-  // on (1/0, null: none): an ON/OFF softkey top right, filled when on, as the play screen's keys
-  function knobPage(tabs, cur, ps, w, on) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
-    var hits = [], x = 0, n = ps.length, cell, x0;
-    begin(w || Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
+  // on (1/0, null: none): an ON/OFF softkey top right, filled when on, as the play screen's keys.
+  // pic: the effect's 128 x 64 picture, on the left; the page beside it. 80 high
+  function knobPage(tabs, cur, ps, w, on, pic) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
+    var hits = [], x = 0, n = ps.length, cell, x0, y = 10;
+    if (pic) {
+      hits = knobPage(tabs, cur, ps, (w || SW) - 131, on); var g = grab();
+      begin(w || SW, 80); paste(g, 131, 0);
+      for (x = 0; x < 8; x++) blit(0, 8 + 8 * x, 128, 8, Array.prototype.slice.call(pic, 128 * x, 128 * x + 128), true);
+      return shift(hits, 131, 0);
+    }
+    begin(w || Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)), 80);
     cell = Math.min(60, Math.floor((W - 8) / Math.max(1, n))); x0 = (W - n * cell) >> 1;
-    frame(0, 11, W, 53); line(0, 63, W - 1, 63);
+    frame(0, 11, W, H - 11); line(0, H - 1, W - 1, H - 1);
     tabs.forEach(function (s, i) { var tw = tab(x, 0, i < cur ? 2 : i === cur ? 0 : 1, s); hits.push({ it: 'tab', i: i, x: x, y: 0, w: tw, h: 11 }); x += tw - 1; });
     ps.forEach(function (p, i) {
       var cx = x0 + cell * i + ((cell - 31) >> 1);
-      font7(p.name, cx, 16);
-      if (p.look === 'toggle') toggle(p.v >= 1, cx, 24);
-      else if (p.look === 'fader') fader(cx, 24, p.v, 0, p.max);
-      else knob(p.max ? p.v / p.max : 0, cx, 24);
-      font7r(p.text, cx + 30, 48);
-      hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: 52 });
+      font7(p.name, cx, 16 + y);
+      if (p.look === 'toggle') toggle(p.v >= 1, cx, 24 + y);
+      else if (p.look === 'fader') fader(cx, 24 + y, p.v, 0, p.max);
+      else knob(p.max ? p.v / p.max : 0, cx, 24 + y);
+      font7r(p.text, cx + 30, 48 + y);
+      hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: H - 12 });
     });
     if (on != null) {
       var s = on ? 'ON' : 'OFF', bw = 7 * 3 + 9, bx = W - bw;   // flush right as the frame, rows 1-9: 1 row above the frame
@@ -580,26 +588,26 @@ var LCD = (function () {
     });
     return hits;
   }
-  // the stock list: title, 4 OS-font rows, cursor, scroll bar. rows [[label, value]], top the first row shown.
+  // the stock list: title, OS-font rows (4 on the pedal's 64), cursor, scroll bar. rows [[label, value]], top the first row shown.
   // Returns { hits, top }: { it: 'row', i } and { it: 'up' | 'down' } on the scroll bar.
-  function list(name, rows, cur, top, w) {   // w wide (128 on the pedal)
-    var n = rows.length, bar = n > 4, hits = [], i, e;
-    w = w || 128; begin(w); e = bar ? w - 7 : w - 1;
-    top = Math.max(0, Math.min(top, n - 4));   // the caller keeps cur in view when it moves it; the scroll bar may scroll it out
+  function list(name, rows, cur, top, w, h) {   // w x h (128 x 64 on the pedal)
+    var R = h > 64 ? Math.floor((h - 12) / 9) : 4, D = 9 * R - 36, n = rows.length, bar = n > R, hits = [], i, e;   // D: the scroll bar's extra rows
+    w = w || 128; begin(w, h || 64); e = bar ? w - 7 : w - 1;
+    top = Math.max(0, Math.min(top, n - R));   // the caller keeps cur in view when it moves it; the scroll bar may scroll it out
     font7c(name, w >> 1, 1); invert(0, 0, w - 1, 8);
-    for (i = 0; i < 4 && top + i < n; i++) {
+    for (i = 0; i < R && top + i < n; i++) {
       var l = rows[top + i][0], v = rows[top + i][1];
       os6(l, 1, 12 + 9 * i);
       os6(v, e - 6 * v.length, 12 + 9 * i);
       hits.push({ it: 'row', i: top + i, x: 0, y: 11 + 9 * i, w: e + 1, h: 9 });
     }
-    if (cur >= top && cur < top + 4) invert(0, 11 + 9 * (cur - top), e, 19 + 9 * (cur - top));
+    if (cur >= top && cur < top + R) invert(0, 11 + 9 * (cur - top), e, 19 + 9 * (cur - top));
     if (bar) {
-      rect(w - 6, 11, w - 1, 54, 2); rect(w - 5, 16, w - 1, 41, 1);
-      var s0 = Math.trunc(top * 24 / n), e0 = top + 4 > n ? 23 : Math.trunc(96 / n) + s0;
+      rect(w - 6, 11, w - 1, 54 + D, 2); rect(w - 5, 16, w - 1, 41 + D, 1);
+      var s0 = Math.trunc(top * (24 + D) / n), e0 = top + R > n ? 23 + D : Math.trunc((24 + D) * R / n) + s0;
       rect(w - 4, 17 + s0, w - 2, 17 + e0, 0);
-      blit(w - 5, 43, 5, 8, [1, 3, 7, 3, 1], true); blit(w - 5, 12, 5, 8, [4, 6, 7, 6, 4], true);
-      hits.push({ it: 'up', x: w - 6, y: 11, w: 6, h: 22 }, { it: 'down', x: w - 6, y: 33, w: 6, h: 22 });
+      blit(w - 5, 43 + D, 5, 8, [1, 3, 7, 3, 1], true); blit(w - 5, 12, 5, 8, [4, 6, 7, 6, 4], true);
+      hits.push({ it: 'up', x: w - 6, y: 11, w: 6, h: 22 + (D >> 1) }, { it: 'down', x: w - 6, y: 33 + (D >> 1), w: 6, h: 22 + D - (D >> 1) });
     }
     return { hits: hits, top: top };
   }
@@ -609,12 +617,12 @@ var LCD = (function () {
   // Returns { hits (side 0 or 1), top: [a's, b's], div: the line's x (SW: none) }
   function lists(a, b) {
     var G = 3, ra, rb = null, hb, ga, gb, L, R, x2;
-    if (!b) { ra = list(a[0], a[1], a[2], a[3], SW - 2 * G); ga = grab(); begin(SW); paste(ga, G, 0); return { hits: shift(ra.hits, G, 0, { side: 0 }), top: [ra.top], div: SW }; }
+    if (!b) { ra = list(a[0], a[1], a[2], a[3], SW - 2 * G, 80); ga = grab(); begin(SW, 80); paste(ga, G, 0); return { hits: shift(ra.hits, G, 0, { side: 0 }), top: [ra.top], div: SW }; }
     L = (SW - 1 - 4 * G) >> 1; R = SW - 1 - 4 * G - L; x2 = SW - G - R;
-    ra = list(a[0], a[1], a[2], a[3], L); ga = grab();
-    if (Array.isArray(b)) { rb = list(b[0], b[1], b[2], b[3], R); hb = rb.hits; } else hb = knobPage(b.tabs, b.cur, b.ps, R);
+    ra = list(a[0], a[1], a[2], a[3], L, 80); ga = grab();
+    if (Array.isArray(b)) { rb = list(b[0], b[1], b[2], b[3], R, 80); hb = rb.hits; } else hb = knobPage(b.tabs, b.cur, b.ps, R);
     gb = grab();
-    begin(SW); paste(ga, G, 0); paste(gb, x2, 0); line(2 * G + L, 0, 2 * G + L, 63);
+    begin(SW, 80); paste(ga, G, 0); paste(gb, x2, 0); line(2 * G + L, 0, 2 * G + L, H - 1);
     return { hits: shift(ra.hits, G, 0, { side: 0 }).concat(shift(hb, x2, 0, { side: 1 })), top: [ra.top, rb ? rb.top : 0], div: 2 * G + L };
   }
   // the footswitch key, w x 24, drawn as a softkey: dark, white in a frame when chosen.

@@ -57,8 +57,8 @@
   .chain .box[draggable] { cursor: grab; }
   .chain .add { min-width: 0; padding: 0 9px; border-style: dashed; color: var(--dim); }
   .lcdwrap { margin: 10px 0 4px; width: 0; min-width: 100%; }   /* inside a table cell: do not widen the table */
-  canvas.lcd { display: block; width: 100%; height: auto; cursor: pointer; touch-action: pan-y; }   /* every screen LCD.SW wide */
-  canvas.lcd.knobs { cursor: ns-resize; touch-action: none; }
+  canvas.lcd { display: block; width: 100%; height: auto; touch-action: pan-y; }   /* every screen LCD.SW wide; the pointer's shape: lcdCursor */
+  canvas.lcd.knobs { touch-action: none; }
   .tabs { display: flex; gap: 4px; margin: 8px 0 0; border-bottom: 1px solid var(--line); }
   .tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; }
   .tabs button.cur { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -69,7 +69,7 @@
   fieldset.pctl legend { font: 600 14px var(--display); padding: 0 4px; }
   .ges { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-top: 4px; }
   .mv { padding-left: 12px; }
-  .ctl { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
+  .ctl { margin: 10px 0; }
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   /* Phones: each patch is a card (number and name, then the six slots, then mixer and note) */
   @media (max-width: 720px) {
@@ -314,6 +314,7 @@ async function loadPics() {
     pics[k] = await picJob; picJob = null;
     if (pics[k]) { all[nm] = hex(pics[k]); store('zdlPics2', all); }
     if (/^add\d$/.test(focus) && patches[sel]) drawAdd(patches[sel]);
+    else if (typeof focus === 'number' && patches[sel]) drawKnobs(patches[sel]);
   }
   if (/^Reading effect pictures/.test($('status').textContent)) status(connMsg, 'ok');
 }
@@ -684,8 +685,15 @@ $('detail').addEventListener('pointercancel', function (e) { if (e.target.id ===
 $('detail').addEventListener('wheel', function (e) {
   if (e.target.id !== 'addLcd' || !addRow()) return;
   e.preventDefault();
-  addTurn(add.cur + ((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) < 0 ? -1 : 1));
+  addTurn(add.cur + ((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) < 0 ? 1 : -1));
 }, { passive: false });
+// the pointer's shape from what is under it: knobs drag up and down, the picker's pills sideways, effects in the chain move, the rest clicks
+$('detail').addEventListener('pointermove', function lcdCursor(e) {
+  var t = e.target, hs = { chainLcd: chainHits, addLcd: addHits, knobLcd: knobHits, playLcd: playHits, listLcd: listHits }[t.id];
+  if (!hs) return;
+  var h = LCD.hit(hs, LCD.at(t, e)), it = h && h.it;
+  t.style.cursor = !h ? 'default' : it === 'param' ? 'ns-resize' : it === 'fx' ? 'ew-resize' : t.id === 'chainLcd' && typeof it === 'number' ? 'grab' : 'pointer';
+});
 $('detail').addEventListener('pointermove', function (e) {
   if (!down || e.target.id !== 'chainLcd' || !down.h || typeof down.h.it !== 'number') return;
   if (!chainDrag && Math.abs(e.clientX - down.cx) + Math.abs(e.clientY - down.cy) < 5) return;
@@ -924,7 +932,7 @@ function drawKnobs(p) {
   var tab = typeof focus === 'number' ? fxName(p.rec, focus) || 'THRU' : { 'in': 'INPUT', route: 'ROUTE', mix: 'MIX', out: 'OUTPUT' }[focus];
   var ps = knobParams(p);
   cv.parentNode.hidden = !ps.length;              // ROUTE and OUT have no knobs until the MIXER settings are read
-  knobHits = LCD.knobPage([tab], 0, ps, 0, typeof focus === 'number' ? Patch.on(p.rec, focus) : null);
+  knobHits = typeof focus === 'number' ? LCD.knobPage([tab], 0, ps, 0, Patch.on(p.rec, focus), pics[Patch.effectKey(p.rec, focus)]) : LCD.knobPage([tab], 0, ps, 0, null);
   LCD.present(cv);
 }
 function knobSet(p, n, v) { var k = knobParams(p)[n]; k.set(Math.max(0, Math.min(k.max, v))); drawKnobs(p); }
