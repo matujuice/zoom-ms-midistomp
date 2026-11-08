@@ -680,7 +680,7 @@ function fxControls(rec, i) {
   });
   return h + notes.map(function (t) { return '<div class="note bad">' + esc(t) + '</div>'; }).join('');
 }
-var KNOB_CV = '<div class="lcdwrap"><canvas id="knobLcd" class="lcd knobs" tabindex="0" aria-label="Knobs as on the pedal: click EFFECT ON/OFF top right to switch the effect; drag a knob up or down, or use the mouse wheel. The fields below take exact values."></canvas></div>';
+var KNOB_CV = '<div class="lcdwrap"><canvas id="knobLcd" class="lcd knobs" tabindex="0" aria-label="Knobs as on the pedal: click ON/OFF top right to switch the effect; drag a knob up or down, or use the mouse wheel. The fields below take exact values."></canvas></div>';
 // The chosen item's knob page as on the pedal, every knob on one wide page: { name, look, v, max, text, set(v) }
 function knobParams(p) {
   var rec = p.rec, i = focus;
