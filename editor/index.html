@@ -143,6 +143,7 @@ function onMidi(e) {
 async function guard(fn) {
   if (busy) return;
   busy = true; buttons();
+  if (picJob) await picJob;   // the background picture read in progress ends first
   try { await fn(); } catch (err) { status(String(err.message || err), 'bad'); }
   busy = false; buttons();
 }
@@ -181,7 +182,8 @@ $('connect').onclick = function () { guard(async function () {
   entries = []; perfs = [];
   status('Reading the effects on the pedal...');
   try { await readInstalled(); } catch (e) { installed = null; buildCats(); }
-  status('Connected: ' + model + ' ' + fw + (mst ? ', MIDISTOMP ' + mst : '') + ' (' + outp.name + ')', 'ok');
+  status(connMsg = 'Connected: ' + model + ' ' + fw + (mst ? ', MIDISTOMP ' + mst : '') + ' (' + outp.name + ')', 'ok');
+  loadPics();
 }); };
 
 // MIDISTOMP SysEx: F0 7D "MST" cmd nonce ... F7 (docs/dev/modwerk-research.md section 1)
@@ -288,7 +290,7 @@ function zdlPic(f) {
   for (s of sh) if (s[1] === 2 || s[1] === 11) for (i = 0; i < s[5] / 16; i++) {
     var q = s[4] + 16 * i, a = E + sh[s[6]][4] + u32(q), nm = '';
     while (b[a] && nm.length < 40) nm += String.fromCharCode(b[a++]);
-    if (nm.indexOf('picEffectType') !== 0) continue;
+    if (nm.indexOf('picEffectType_') !== 0) continue;   // not picEffectTypeKnob_*, another picture
     var sec = sh[u16(q + 14)], val = u32(q + 4), off = E + sec[4] + (sec[3] && val >= sec[3] ? val - sec[3] : val), r = [];
     var c = Array.from(b.subarray(off, off + u32(q + 8)));
     for (var k = 0; k < c.length && r.length < 1024; k++) { r.push(c[k]);   // stops at 1024: some files pad the data with zeros
@@ -297,21 +299,23 @@ function zdlPic(f) {
   }
   return null;
 }
-// the picker's middle effect: its picture, from the cache or (one at a time, between other work) from the pedal
-function wantPic(k) {
-  var nm = zdlFile[k];
-  if (!nm || k in pics) return;
-  var c = store('zdlPics')[nm];
-  if (c) { pics[k] = unhex(c); return; }
-  if (busy || !outp) return;
-  busy = true; buttons(); pics[k] = null;
-  pcMode(function () { return readFile(nm); }).then(function (f) {
-    pics[k] = zdlPic(f);
-    if (pics[k]) { var all = store('zdlPics'); all[nm] = hex(pics[k]); store('zdlPics', all); }
-  }).catch(function () {}).then(function () {
-    busy = false; buttons();
+// every effect's picture, kept by file name: the new ones read from the pedal after connecting, in the background,
+// one file at a time; other pedal work waits for the file in progress (guard), the reading waits while it runs
+var picJob = null, connMsg = '', picsRun = 0;
+async function loadPics() {
+  var run = ++picsRun, all = store('zdlPics2'), todo = [];
+  (installed || []).forEach(function (k) { var nm = zdlFile[k]; if (all[nm]) pics[k] = unhex(all[nm]); else todo.push(k); });
+  for (var i = 0; i < todo.length; i++) {
+    while (busy && run === picsRun) await new Promise(function (r) { setTimeout(r, 300); });
+    if (run !== picsRun || !outp) return;   // a new connect started its own
+    var k = todo[i], nm = zdlFile[k], live = $('status').textContent === connMsg || /^Reading effect pictures/.test($('status').textContent);
+    if (live) status('Reading effect pictures from the pedal: ' + (i + 1) + ' of ' + todo.length + '...');
+    picJob = pcMode(function () { return readFile(nm); }).then(function (f) { try { return zdlPic(f); } catch (e) { return null; } }, function () { return null; });
+    pics[k] = await picJob; picJob = null;
+    if (pics[k]) { all[nm] = hex(pics[k]); store('zdlPics2', all); }
     if (/^add\d$/.test(focus) && patches[sel]) drawAdd(patches[sel]);
-  });
+  }
+  if (/^Reading effect pictures/.test($('status').textContent)) status(connMsg, 'ok');
 }
 
 async function currentProgram() {
@@ -791,7 +795,6 @@ function drawAdd(p) {
   else {
     var ks = addKeys();
     add.cur = Math.max(0, Math.min(ks.length - 1, add.cur));
-    wantPic(ks[add.cur]);
     addHits = LCD.picker(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.cur, pics[ks[add.cur]]);
   }
   LCD.present(cv);
