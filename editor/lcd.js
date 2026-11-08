@@ -432,9 +432,9 @@ var LCD = (function () {
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
-  function knobPage(tabs, cur, ps) {   // SW wide; the knobs centered, each in a column up to 60 wide
+  function knobPage(tabs, cur, ps, w) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
     var hits = [], x = 0, n = ps.length, cell, x0;
-    begin(Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
+    begin(w || Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
     cell = Math.min(60, Math.floor((W - 8) / Math.max(1, n))); x0 = (W - n * cell) >> 1;
     frame(0, 11, W, 53); line(0, 63, W - 1, 63);
     tabs.forEach(function (s, i) { var tw = tab(x, 0, i < cur ? 2 : i === cur ? 0 : 1, s); hits.push({ it: 'tab', i: i, x: x, y: 0, w: tw, h: 11 }); x += tw - 1; });
@@ -516,13 +516,19 @@ var LCD = (function () {
     }
     return { hits: hits, top: top };
   }
-  // one or two lists on one SW-wide screen, a line between them; a, b: [name, rows, cur, top], b may be null.
-  // Returns { hits (side 0 or 1), top: [a's, b's] }
+  // a list on one SW-wide screen, with another list or a knob page beside it and a line between them;
+  // G blank columns at the screen's edges and on both sides of the line.
+  // a: [name, rows, cur, top]; b: null, [name, rows, cur, top] or { tabs, cur, ps } (a knob page).
+  // Returns { hits (side 0 or 1), top: [a's, b's], div: the line's x (SW: none) }
   function lists(a, b) {
-    if (!b) { var r = list(a[0], a[1], a[2], a[3], SW); return { hits: shift(r.hits, 0, 0, { side: 0 }), top: [r.top] }; }
-    var L = (SW - 3) >> 1, ra = list(a[0], a[1], a[2], a[3], L), ga = grab(), rb = list(b[0], b[1], b[2], b[3], SW - L - 3), gb = grab();
-    begin(SW); paste(ga, 0, 0); paste(gb, L + 3, 0); line(L + 1, 0, L + 1, 63);
-    return { hits: shift(ra.hits, 0, 0, { side: 0 }).concat(shift(rb.hits, L + 3, 0, { side: 1 })), top: [ra.top, rb.top] };
+    var G = 3, ra, rb = null, hb, ga, gb, L, R, x2;
+    if (!b) { ra = list(a[0], a[1], a[2], a[3], SW - 2 * G); ga = grab(); begin(SW); paste(ga, G, 0); return { hits: shift(ra.hits, G, 0, { side: 0 }), top: [ra.top], div: SW }; }
+    L = (SW - 1 - 4 * G) >> 1; R = SW - 1 - 4 * G - L; x2 = SW - G - R;
+    ra = list(a[0], a[1], a[2], a[3], L); ga = grab();
+    if (Array.isArray(b)) { rb = list(b[0], b[1], b[2], b[3], R); hb = rb.hits; } else hb = knobPage(b.tabs, b.cur, b.ps, R);
+    gb = grab();
+    begin(SW); paste(ga, G, 0); paste(gb, x2, 0); line(2 * G + L, 0, 2 * G + L, 63);
+    return { hits: shift(ra.hits, G, 0, { side: 0 }).concat(shift(hb, x2, 0, { side: 1 })), top: [ra.top, rb ? rb.top : 0], div: 2 * G + L };
   }
   // the footswitch key, w x 24, drawn as a softkey: dark, white in a frame when chosen.
   // The stomp is seen at an angle: a base ring, the cap's top face and its side; the cap hides the ring behind it.
