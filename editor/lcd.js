@@ -164,7 +164,8 @@ var LCD = (function () {
   function hit(hits, p) { for (var i = hits.length - 1; i >= 0; i--) { var h = hits[i]; if (p.x >= h.x && p.x < h.x + h.w && p.y >= h.y && p.y < h.y + h.h) return h; } return null; }
 
   // ---- the Effect Chain (asm/mixer/chain_draw.c) ----------------------------------------
-  var CW = 38, CH = 19, YC = 43, YA = 32, YB = 54, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4, K_ADD = 5;
+  var BH = 98;   // every bottom screen's height: two rows of knobs
+  var CW = 38, CH = 19, YC = 48, YA = 37, YB = 59, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4, K_ADD = 5;
   var IT_ROUTE = 0x10, IT_MIX = 0x11, IT_IN = 0x12, IT_OUT = 0x13, PRE = 0, BUS_A = 1, BUS_B = 2, POST = 3;
   var K5 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 []-.!/';
   var G5 = [[14,17,17,31,17,17,17],[30,17,17,30,17,17,30],[14,17,16,16,16,17,14],[28,18,17,17,17,18,28],[31,16,16,30,16,16,31],[31,16,16,30,16,16,16],
@@ -460,10 +461,10 @@ var LCD = (function () {
   }
 
   // ---- the add screen: categories, then the picker (the chosen effect big, the others beside it) ----
-  // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x 80, the rows centered
+  // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x BH, the rows centered
   function categories(tt, cats, cur) {
     var hits = [], G = 3, n = cats.length + 1, cols = 5, bw = Math.floor((SW - 2 * G - (cols - 1) * 3) / cols), bh = 25;
-    begin(SW, 80);
+    begin(SW, BH);
     var y0 = 9 + ((H - 9 - Math.ceil(n / cols) * (bh + 3) + 3) >> 1);
     fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
     for (var i = 0; i < n; i++) {
@@ -485,18 +486,18 @@ var LCD = (function () {
     return hits;
   }
   // the chosen effect in the middle (its 128 x 64 picture, else its pill twice as big), the others in pills
-  // left and right of it in list order; BACK and ADD under the pills, a scrollbar along the bottom. SW x 80
+  // left and right of it in list order; BACK and ADD under the pills, a scrollbar along the bottom. SW x BH
   function picker(tt, names, cur, pic) {
-    var hits = [], P = CW + 8, n = names.length, cw = pic ? 128 : 2 * CW, cx0, y = 33, k;
-    begin(SW, 80);
+    var hits = [], P = CW + 8, n = names.length, cw = pic ? 128 : 2 * CW, cx0, D = (BH - 80) >> 1, y = 33 + D, k;
+    begin(SW, BH);
     cx0 = (W - cw) >> 1;
     fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
-    if (pic) for (k = 0; k < 8; k++) blit(cx0, 10 + 8 * k, 128, 8, Array.prototype.slice.call(pic, 128 * k, 128 * k + 128), true);
+    if (pic) for (k = 0; k < 8; k++) blit(cx0, 10 + D + 8 * k, 128, 8, Array.prototype.slice.call(pic, 128 * k, 128 * k + 128), true);
     else if (n) {
       begin(CW, CH); pill(0, 0, 0, 2); name2(names[cur], 0, 0);
       var g = grab();
-      begin(SW, 80); fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
-      for (var r = 0; r < g.h; r++) for (var c = 0; c < g.w; c++) if (g.fb[r * g.w + c]) fill(cx0 + 2 * c, 23 + 2 * r, 2, 2, 1);
+      begin(SW, BH); fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
+      for (var r = 0; r < g.h; r++) for (var c = 0; c < g.w; c++) if (g.fb[r * g.w + c]) fill(cx0 + 2 * c, 23 + D + 2 * r, 2, 2, 1);
     }
     for (k = 1; cx0 - 8 - CW - (k - 1) * P > -CW || cx0 + cw + 8 + (k - 1) * P < W; k++) {
       [[cur - k, cx0 - 8 - CW - (k - 1) * P], [cur + k, cx0 + cw + 8 + (k - 1) * P]].forEach(function (e) {
@@ -505,36 +506,40 @@ var LCD = (function () {
         hits.push({ it: 'fx', i: e[0], x: e[1], y: y, w: CW, h: CH });
       });
     }
-    if (n > 1) hscrollbar(cur, n, 1, 24, 75, W - 48, 5);
-    hits.push(skey('back', 'BACK', 3, 63, 0));
-    if (n) hits.push(skey('ok', 'ADD', W - 3 - (softW('ADD') + 9), 63, 1));
+    if (n > 1) hscrollbar(cur, n, 1, 24, H - 5, W - 48, 5);
+    hits.push(skey('back', 'BACK', 3, 63 + D, 0));
+    if (n) hits.push(skey('ok', 'ADD', W - 3 - (softW('ADD') + 9), 63 + D, 1));
     return hits;
   }
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
   // on (1/0, null: none): an ON/OFF softkey top right, filled when on, as the play screen's keys.
-  // pic: the effect's 128 x 64 picture, on the left; the page beside it. 80 high
-  function knobPage(tabs, cur, ps, w, on, pic) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
-    var hits = [], x = 0, n = ps.length, cell, x0, y = 10;
+  // pic: the effect's 128 x 64 picture, on the left; the page beside it. BH high, the knobs on two rows
+  function knobPage(tabs, cur, ps, w, on, pic) {   // w (default SW) wide; each row centered, each knob in a column up to 60 wide
+    var hits = [], x = 0, n = ps.length, rows = n > 1 ? 2 : 1, per = Math.ceil(n / rows), cell, x0, y0;
     if (pic) {
       hits = knobPage(tabs, cur, ps, (w || SW) - 131, on); var g = grab();
-      begin(w || SW, 80); paste(g, 131, 0);
-      for (x = 0; x < 8; x++) blit(0, 8 + 8 * x, 128, 8, Array.prototype.slice.call(pic, 128 * x, 128 * x + 128), true);
+      begin(w || SW, BH); paste(g, 131, 0);
+      for (x = 0; x < 8; x++) blit(0, ((BH - 64) >> 1) + 8 * x, 128, 8, Array.prototype.slice.call(pic, 128 * x, 128 * x + 128), true);
       return shift(hits, 131, 0);
     }
-    begin(w || Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)), 80);
-    cell = Math.min(60, Math.floor((W - 8) / Math.max(1, n))); x0 = (W - n * cell) >> 1;
+    begin(w || Math.max(SW, 40 * per + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)), BH);
+    cell = Math.min(60, Math.floor((W - 8) / Math.max(1, per)));
+    y0 = 12 + ((H - 13 - 42 * rows + 2) >> 1);   // a row: name, knob, value in 40 rows, 2 between
     frame(0, 11, W, H - 11); line(0, H - 1, W - 1, H - 1);
     tabs.forEach(function (s, i) { var tw = tab(x, 0, i < cur ? 2 : i === cur ? 0 : 1, s); hits.push({ it: 'tab', i: i, x: x, y: 0, w: tw, h: 11 }); x += tw - 1; });
     ps.forEach(function (p, i) {
-      var cx = x0 + cell * i + ((cell - 31) >> 1);
-      font7(p.name, cx, 16 + y);
-      if (p.look === 'toggle') toggle(p.v >= 1, cx, 24 + y);
-      else if (p.look === 'fader') fader(cx, 24 + y, p.v, 0, p.max);
-      else knob(p.max ? p.v / p.max : 0, cx, 24 + y);
-      font7r(p.text, cx + 30, 48 + y);
-      hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: H - 12 });
+      var r = Math.floor(i / per), m = r ? n - per : per, c = i - r * per, y = y0 + 42 * r;
+      x0 = (W - m * cell) >> 1;
+      var cx = x0 + cell * c + ((cell - 31) >> 1);
+      font7(p.name, cx, y);
+      if (p.look === 'toggle') toggle(p.v >= 1, cx, 8 + y);
+      else if (p.look === 'fader') fader(cx, 8 + y, p.v, 0, p.max);
+      else knob(p.max ? p.v / p.max : 0, cx, 8 + y);
+      font7r(p.text, cx + 30, 32 + y);
+      var hy = r ? 12 + ((H - 12) >> 1) : 12;
+      hits.push({ it: 'param', i: i, x: x0 + cell * c, y: hy, w: cell, h: rows > 1 ? (H - 12) >> 1 : H - 12 });
     });
     if (on != null) {
       var s = on ? 'ON' : 'OFF', bw = 7 * 3 + 9, bx = W - bw;   // flush right as the frame, rows 1-9: 1 row above the frame
@@ -617,12 +622,12 @@ var LCD = (function () {
   // Returns { hits (side 0 or 1), top: [a's, b's], div: the line's x (SW: none) }
   function lists(a, b) {
     var G = 3, ra, rb = null, hb, ga, gb, L, R, x2;
-    if (!b) { ra = list(a[0], a[1], a[2], a[3], SW - 2 * G, 80); ga = grab(); begin(SW, 80); paste(ga, G, 0); return { hits: shift(ra.hits, G, 0, { side: 0 }), top: [ra.top], div: SW }; }
+    if (!b) { ra = list(a[0], a[1], a[2], a[3], SW - 2 * G, BH); ga = grab(); begin(SW, BH); paste(ga, G, 0); return { hits: shift(ra.hits, G, 0, { side: 0 }), top: [ra.top], div: SW }; }
     L = (SW - 1 - 4 * G) >> 1; R = SW - 1 - 4 * G - L; x2 = SW - G - R;
-    ra = list(a[0], a[1], a[2], a[3], L, 80); ga = grab();
-    if (Array.isArray(b)) { rb = list(b[0], b[1], b[2], b[3], R, 80); hb = rb.hits; } else hb = knobPage(b.tabs, b.cur, b.ps, R);
+    ra = list(a[0], a[1], a[2], a[3], L, BH); ga = grab();
+    if (Array.isArray(b)) { rb = list(b[0], b[1], b[2], b[3], R, BH); hb = rb.hits; } else hb = knobPage(b.tabs, b.cur, b.ps, R);
     gb = grab();
-    begin(SW, 80); paste(ga, G, 0); paste(gb, x2, 0); line(2 * G + L, 0, 2 * G + L, H - 1);
+    begin(SW, BH); paste(ga, G, 0); paste(gb, x2, 0); line(2 * G + L, 0, 2 * G + L, H - 1);
     return { hits: shift(ra.hits, G, 0, { side: 0 }).concat(shift(hb, x2, 0, { side: 1 })), top: [ra.top, rb ? rb.top : 0], div: 2 * G + L };
   }
   // the footswitch key, w x 24, drawn as a softkey: dark, white in a frame when chosen.
