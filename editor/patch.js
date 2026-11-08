@@ -96,7 +96,32 @@ var Patch = (function () {
   }
   function setOn(rec, i, on) { setBit(rec, 144 * i, on); }
 
-  return { param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
+  // MIXER settings 0-10 live in record 50 (one entry per patch: hash, settings), read with the MIDISTOMP
+  // SysEx 02 (docs/dev/modwerk-research.md section 1). Names, maxes, defaults: asm/mixer/pages.c, mixer.S.
+  var MIXER = [['Mode', 3, 0, ['Serial', 'Parallel', 'Split', 'Mono Serial']], ['Route XFade', 100, 50], ['Input', 150, 100],
+    ['Route A', 150, 100], ['Route B', 150, 100], ['Mix XFade', 100, 50], ['Master', 150, 100],
+    ['Curve', 2, 1, ['Smooth', 'DJ', 'Cut']], ['Mix A', 150, 100], ['Mix B', 150, 100], ['Phase B', 1, 0, ['Normal', 'Invert']]];
+  function fnv(h, c) { return Math.imul(h ^ c, 16777619) >>> 0; }
+  function hash(rec) {                       // pages.c r50_hash: the six effect ids and the name
+    var h = 2166136261;
+    for (var i = 0; i < 6; i++) { var k = 18 * i; [rec[k] & 0xfe, rec[k + 1], rec[k + 2], rec[k + 3] & 0x1f].forEach(function (c) { h = fnv(h, c); }); }
+    for (var j = 111; j < 122; j++) h = fnv(h, rec[j]);
+    return h;
+  }
+  // F0 7D "MST" 43 nonce n <19 packed> F7 -> { hash, set: [11] }
+  function mixerEntry(msg) {
+    var e = unpack7(msg.slice(8, -1));
+    return { hash: (e[0] | e[1] << 8 | e[2] << 16 | e[3] << 24) >>> 0, set: e.slice(4, 15) };
+  }
+  // As pages.c mix_get: entry n if its hash is this patch's, else the first entry with that hash (a copy), else defaults.
+  // ponytail: skips mix_get's middle case (settings in bytes 14-15, saved by the M3b5 / M3b6 test builds only).
+  function mixer(rec, n, entries) {
+    var h = hash(rec), from = entries[n] && entries[n].hash === h ? n : entries.findIndex(function (e) { return e && e.hash === h; });
+    var set = MIXER.map(function (m, i) { var v = from >= 0 ? entries[from].set[i] : m[2]; return v > m[1] ? m[2] : v; });
+    return { set: set, from: from };          // from: the entry used, -1 = defaults
+  }
+
+  return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };
 })();

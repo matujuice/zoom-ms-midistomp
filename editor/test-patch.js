@@ -96,4 +96,18 @@ for (t = 0; t < 50; t++) {
   assert.deepStrictEqual(rec.slice(0, 18 * s), was.slice(0, 18 * s));
   assert.deepStrictEqual(rec.slice(18 * s + 17), was.slice(18 * s + 17));
 }
+// MIXER: the hash as pages.c r50_hash (value from a separate Python FNV-1a), the 02 reply, and mix_get's choice
+rec = []; for (i = 0; i < 122; i++) rec.push(i * 7 & 255);
+assert.strictEqual(P.hash(rec), 0xba8022cd);
+var ent = [0xcd, 0x22, 0x80, 0xba, 1, 50, 140, 100, 100, 50, 100, 2, 100, 150, 1, 0];
+var reply = [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x43, 7, 7].concat(P.pack7(ent), [0xf7]);
+assert.strictEqual(reply.length, 28);
+var e = P.mixerEntry(reply);
+assert.deepStrictEqual([e.hash, e.set], [0xba8022cd, ent.slice(4, 15)]);
+var other = { hash: 1, set: ent.slice(4, 15) }, defs = P.MIXER.map(function (m) { return m[2]; });
+assert.deepStrictEqual(P.mixer(rec, 3, [other, other, other, e]), { set: e.set, from: 3 });        // its own entry
+assert.deepStrictEqual(P.mixer(rec, 0, [other, e]).from, 1);                                       // a copy's
+assert.deepStrictEqual(P.mixer(rec, 0, [other, other]), { set: defs, from: -1 });                 // none: defaults
+var bad = { hash: e.hash, set: [9].concat(e.set.slice(1)) };                                        // Mode 9 > max 3
+assert.strictEqual(P.mixer(rec, 0, [bad]).set[0], 0);
 console.log('patch.js OK');
