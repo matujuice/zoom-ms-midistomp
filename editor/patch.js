@@ -126,7 +126,26 @@ var Patch = (function () {
     return [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x03, nonce, n].concat(pack7([h & 255, h >>> 8 & 255, h >>> 16 & 255, h >>> 24].concat(set)), [0xf7]);
   }
 
-  return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
+  // PERFORM: 208 bytes per patch after the mixer table (asm/perform/perform_store.c), read and written
+  // 14 bytes at a time: 04 nonce n k -> 45 nonce n k ok <pack7 14>; 05 nonce n k <pack7 14> -> 46 nonce n k status.
+  var PERF_LEN = 208, PERF_OK = 0xa5;          // byte 15 is PERF_OK once STORE wrote the entry
+  function performRead(n, k, nonce) { return [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x04, nonce, n, k, 0xf7]; }
+  function performWrite(n, k, e, nonce) {
+    var c = e.slice(14 * k, 14 * k + 14);
+    while (c.length < 14) c.push(0);
+    return [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x05, nonce, n, k].concat(pack7(c), [0xf7]);
+  }
+  function performChunk(msg) { return unpack7(msg.slice(10, -1)); }
+  // As perform_store.c find: entry n if its mixer entry has this patch's hash, else a copy's; null = none (empty PERFORM)
+  function perform(rec, n, entries, perfs) {
+    var h = hash(rec), ok = function (i) { return entries[i] && entries[i].hash === h && perfs[i]; };
+    if (ok(n)) return perfs[n];
+    for (var i = 0; i < 50; i++) if (ok(i)) return perfs[i];
+    return null;
+  }
+
+  return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite,
+           PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };
 })();

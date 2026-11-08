@@ -115,4 +115,20 @@ var wr = P.mixerWrite(7, 0xba8022cd, ent.slice(4, 15), 9);
 assert.strictEqual(wr.length, 27);
 assert.ok(wr.slice(1, -1).every(function (b) { return b < 0x80; }));
 assert.deepStrictEqual(P.unpack7(wr.slice(8, -1)), ent.slice(0, 15));
+// PERFORM: 05 chunks are 26 bytes and carry the entry, the last one padded; the 45 reply decodes; find's choice
+var pe = rnd(208);
+var chunks = [];
+for (k = 0; k < 15; k++) {
+  var w = P.performWrite(4, k, pe, 5);
+  assert.strictEqual(w.length, 26);
+  assert.ok(w.slice(1, -1).every(function (b) { return b < 0x80; }));
+  chunks = chunks.concat(P.unpack7(w.slice(9, -1)));
+  var rd = [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x45, 5, 4, k, 1].concat(w.slice(9, -1), [0xf7]);
+  assert.deepStrictEqual(P.performChunk(rd), P.unpack7(w.slice(9, -1)));
+}
+assert.deepStrictEqual(chunks, pe.concat([0, 0]));
+var pa = [1], pb = [2];
+assert.strictEqual(P.perform(rec, 3, [other, e, other, e], [null, pa, null, pb]), pb);   // its own entry
+assert.strictEqual(P.perform(rec, 3, [other, e, other, e], [null, pa, null, null]), pa); // a copy's
+assert.strictEqual(P.perform(rec, 3, [other, other, other, e], [pa, pa, pa, null]), null);
 console.log('patch.js OK');

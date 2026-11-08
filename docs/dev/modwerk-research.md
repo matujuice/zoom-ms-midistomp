@@ -99,7 +99,22 @@ the patch dump (28) and store (32): loading the patch then finds entry n and the
 and the store saves both; sent after, the store would save PERFORM defaults. A restored backup
 patch is not slot n's, so it gets 03 after the store and PERFORM defaults. The editor mirrors
 Input→Input R and Master→Master R itself, as the knobs and CCs do. ponytail: 03 has no
-PEDAL-mono Mode limit, and backups carry no PERFORM.
+PEDAL-mono Mode limit.
+
+Commands 04 and 05, read and write patch n's PERFORM entry (208 bytes, record 50 + 828 + 208n,
+`asm/perform/perform_store.c`) 14 bytes at a time, chunk k 0..14 (chunk 14 holds bytes 196-207 and
+two bytes of 0):
+
+    F0 7D 4D 53 54 04 <nonce> <n> <k> F7                             10 bytes
+    F0 7D 4D 53 54 45 <nonce> <n> <k> <ok> <16 bytes> F7            27 bytes, ok 1 = the table exists
+    F0 7D 4D 53 54 05 <nonce> <n> <k> <16 bytes> F7                  26 bytes
+    F0 7D 4D 53 54 46 <nonce> <n> <k> <status> F7                    status 0 = written, 1 = no table
+
+n >= 50 or k >= 15 gets no reply. 05 writes RAM only; chunk 14 saves record 50 to flash. The entry
+has no hash: it belongs to the patch whose hash is in mixer entry n, and is valid when byte 15 is
+0xA5 (STORE writes it). The pedal loads PERFORM only on a patch change, and a STORE of the patch
+played saves the PERFORM in RAM over entry n, so the editor writes it while another patch plays.
+Backups carry each patch's PERFORM entry (as perform_store.c find chooses it) and restore it.
 
 **Firmware work for step B** (1 session plus a hardware test):
 1. Find the 70CDR transmit routine used by the identity reply and the SysEx executor

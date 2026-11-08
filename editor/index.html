@@ -56,7 +56,7 @@
     <input type="file" id="file" accept=".json" hidden>
     <span id="status">Not connected.</span>
   </div>
-  <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER and PERFORM settings when you rename a patch or move its effects; on older firmware they go back to defaults. Backups carry MIXER settings, not PERFORM. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
+  <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER and PERFORM settings when you rename a patch or move its effects; on older firmware they go back to defaults. Backups carry both. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
   <div class="wrap"><table>
     <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>MIDISTOMP</th><th></th></tr></thead>
     <tbody id="rows"></tbody>
@@ -105,7 +105,7 @@ function buttons() {
   $('restore').disabled = busy;
 }
 function recDirty(p) { return p && (!p.orig || p.rec.some(function (b, i) { return b !== p.orig[i]; })); }
-function dirty(p) { return recDirty(p) || !!(p && p.mix); }     // p.mix: MIXER settings edited here, not yet written
+function dirty(p) { return recDirty(p) || !!(p && (p.mix || p.perf)); }   // p.mix, p.perf: MIXER settings, PERFORM to write
 
 $('connect').onclick = function () { guard(async function () {
   if (!navigator.requestMIDIAccess) throw new Error('This browser has no Web MIDI. Use Chrome or Edge.');
@@ -128,12 +128,12 @@ $('connect').onclick = function () { guard(async function () {
   await send(MST.concat([0x01, 0x2a, 0xf7]));
   v = await v;
   mst = v && v.slice(7, 10).join('.');
-  entries = [];
+  entries = []; perfs = [];
   status('Connected: ' + model + ' ' + fw + (mst ? ', MIDISTOMP ' + mst : '') + ' (' + outp.name + ')', 'ok');
 }); };
 
 // MIDISTOMP SysEx: F0 7D "MST" cmd nonce ... F7 (docs/dev/modwerk-research.md section 1)
-var MST = [0xf0, 0x7d, 0x4d, 0x53, 0x54], mst = null, entries = [];   // entries[n]: patch n's record 50 entry
+var MST = [0xf0, 0x7d, 0x4d, 0x53, 0x54], mst = null, entries = [], perfs = [];   // entries[n], perfs[n]: record 50's mixer and PERFORM entry n
 function mstReply(m, cmd, nonce) { return m.length > 7 && MST.every(function (b, i) { return m[i] === b; }) && m[5] === cmd && m[6] === nonce; }
 async function readMixer() {
   if (!mst) return;
@@ -145,6 +145,28 @@ async function readMixer() {
     entries[n] = Patch.mixerEntry(m);
   }
 }
+// PERFORM entries (04): chunk 1 first, whose byte 15 says if STORE ever wrote the entry. perfs stays [] on older builds.
+async function perfChunk(n, k) {
+  var r = expect(function (m) { return mstReply(m, 0x45, 0x34) && m.length === 27 && m[7] === n && m[8] === k; }, 500);
+  await send(Patch.performRead(n, k, 0x34));
+  return r;
+}
+async function readPerform(list) {
+  if (!mst) return;
+  for (var n of list) {
+    var m = await perfChunk(n, 1);
+    if (!m || !m[9]) { perfs = []; return; }          // no 04, or no PERFORM table yet
+    var c1 = Patch.performChunk(m), e = [];
+    if (c1[1] !== Patch.PERF_OK) { perfs[n] = null; continue; }
+    for (var k = 0; k < 15; k++) {
+      m = k === 1 ? null : await perfChunk(n, k);
+      if (k !== 1 && !m) throw new Error('No PERFORM chunk ' + k + ' for patch ' + (n + 1) + ' from the pedal.');
+      e = e.concat(k === 1 ? c1 : Patch.performChunk(m));
+    }
+    perfs[n] = e.slice(0, Patch.PERF_LEN);
+  }
+}
+var ALL = Array.from({ length: 50 }, function (_, n) { return n; });
 
 async function currentProgram() {
   var r = expect(function (m) { return (m[0] & 0xf0) === 0xc0; }, 800);
@@ -213,8 +235,10 @@ $('readAll').onclick = function () { guard(async function () {
   if (was >= 0) await selectPatch(was);
   status('Reading MIXER settings…');
   await readMixer();
+  status('Reading PERFORM…');
+  await readPerform(ALL);
   render();
-  status('Read 50 patches' + (mst ? ' and their MIXER settings' : '') + ' from ' + model + '.', 'ok');
+  status('Read 50 patches' + (mst ? ' and their MIXER settings' + (perfs.length ? ' and PERFORM' : '') : '') + ' from ' + model + '.', 'ok');
 }); };
 
 // pre: MIXER settings to write under the new hash first, so the pedal finds them and the PERFORM entry
@@ -240,6 +264,18 @@ async function writeMixer(n, set) {           // SysEx 03; the pedal saves recor
   var m = await r;
   return m && m[8] === 0;
 }
+// Written while the pedal plays another patch: it loads PERFORM only on a patch change (perform_engine.c
+// perf_poll16), and a STORE of patch n would save the old one from RAM over it. Chunk 14 saves to flash.
+async function writePerform(n, e) {
+  if (await currentProgram() === n) await selectPatch(n ? n - 1 : 1);
+  for (var k = 0; k < 15; k++) {
+    var r = expect(function (m) { return mstReply(m, 0x46, 0x34) && m[7] === n && m[8] === k; }, k === 14 ? 3000 : 500);
+    await send(Patch.performWrite(n, k, e, 0x34));
+    var m = await r;
+    if (!m || m[9]) return false;
+  }
+  return true;
+}
 $('writeChanged').onclick = function () { guard(async function () {
   var list = patches.map(function (p, n) { return dirty(p) ? n : -1; }).filter(function (n) { return n >= 0; });
   if (!confirm('Write ' + list.length + ' patch(es) to the pedal: ' + list.map(function (n) { return n + 1; }).join(', ') + '?\nThis overwrites them on the pedal.')) return;
@@ -249,13 +285,21 @@ $('writeChanged').onclick = function () { guard(async function () {
     var n = list[k], p = patches[n], old = p.orig && entries.length && Patch.mixer(p.orig, n, entries);
     var moved = old && !p.restored && old.from >= 0 && Patch.hash(p.orig) !== Patch.hash(p.rec);
     var keep = p.mix || (moved ? old.set : null), pre = recDirty(p) && moved && old.from === n ? keep : null;
-    if (recDirty(p) && !await writePatch(n, pre)) bad++;
-    else if (keep && !pre && !await writeMixer(n, keep)) { bad++; p.note = 'MIXER not saved'; }
-    else if (keep) { p.mix = null; if (!recDirty(p) && p.note !== 'written') p.note = 'written'; }
+    var rw = recDirty(p), ok = true;
+    if (rw && !await writePatch(n, pre)) ok = false;
+    else if (keep && !pre && !await writeMixer(n, keep)) { ok = false; p.note = 'MIXER not saved'; }
+    else if (keep) { p.mix = null; if (!rw && p.note !== 'written') p.note = 'written'; }
+    // PERFORM entry n belongs to the patch whose hash is in mixer entry n: a write or STORE above put it there
+    if (ok && p.perf) {
+      if (!rw && !keep && entries[n].hash !== Patch.hash(p.rec) && !await writeMixer(n, Patch.mixer(p.rec, n, entries).set)) { ok = false; p.note = 'PERFORM not saved'; }
+      else if (!await writePerform(n, p.perf)) { ok = false; p.note = 'PERFORM not saved'; }
+      else { p.perf = null; if (!rw) p.note = 'written'; }
+    }
+    if (!ok) bad++;
     render();
   }
   if (was >= 0) await selectPatch(was);
-  if (entries.length) { await readMixer(); render(); }          // a rename or move gave a patch new MIXER settings
+  if (entries.length) { await readMixer(); if (perfs.length) await readPerform(list); render(); }   // a rename, move or STORE changed them
   status(bad ? bad + ' patch(es) read back different: see the table.' : 'Wrote ' + list.length + ' patch(es), read back OK.', bad ? 'bad' : 'ok');
 }); };
 
@@ -263,6 +307,10 @@ $('backup').onclick = function () {
   var data = { format: 'midistomp-patches', version: 1, model: model, deviceId: dev, saved: new Date().toISOString(),
     patches: patches.map(function (p) { return p ? p.rec.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null; }) };
   if (entries.length) data.mixer = patches.map(function (p, n) { return p ? p.mix || Patch.mixer(p.rec, n, entries).set : null; });
+  if (perfs.length) data.perform = patches.map(function (p, n) {     // 208 bytes as hex, null = an empty PERFORM
+    var e = p && (p.perf || Patch.perform(p.rec, n, entries, perfs));
+    return e ? e.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null;
+  });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
   a.download = (model || 'zoom') + '-patches-' + data.saved.slice(0, 10) + '.json';
@@ -282,10 +330,15 @@ $('file').onchange = async function () {
       var rec = h.match(/../g).map(function (x) { return parseInt(x, 16); });
       if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte.');
       var old = patches[n];
-      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null, restored: true };   // not slot n's MIXER or PERFORM
+      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null, perf: null, restored: true };   // not slot n's MIXER or PERFORM
       var mx = d.mixer && d.mixer[n];                 // backups from MIDISTOMP firmware carry MIXER settings too
       if (mst && Array.isArray(mx) && mx.length === 11 && mx.every(function (v, i) { return v >= 0 && v <= Patch.MIXER[i][1]; })
           && !(entries.length && Patch.mixer(rec, n, entries).set.every(function (v, i) { return v === mx[i]; }))) patches[n].mix = mx;
+      var pf = d.perform && d.perform[n], cur = perfs.length && Patch.perform(rec, n, entries, perfs);   // and PERFORM
+      if (perfs.length && /^[0-9a-f]{416}$/.test(pf || '')) {
+        pf = pf.match(/../g).map(function (x) { return parseInt(x, 16); });
+        if (pf[15] === Patch.PERF_OK && !(cur && cur.every(function (b, i) { return b === pf[i]; }))) patches[n].perf = pf;
+      }
       if (dirty(patches[n])) patches[n].note = 'from backup';
     });
     render();
@@ -446,7 +499,7 @@ function detail() {
       var m = Patch.MIXER[i], v = mset0[i];
       return '<label>' + m[0] + ' ' + (m[3] ? '<select data-mx="' + i + '">' + opts(m[3], v) + '</select>'
         : '<input type="number" min="0" max="' + m[1] + '" data-mx="' + i + '" value="' + v + '">') + '</label>';
-    }).join('') + '<div class="note">' + (p.mix ? 'MIXER settings edited: "Write changed to pedal" sends them.'
+    }).join('') + '<div class="note">' + (p.perf ? 'PERFORM from the backup: "Write changed to pedal" sends it. ' : '') + (p.mix ? 'MIXER settings edited: "Write changed to pedal" sends them.'
       : mx.from < 0 ? 'MIXER: defaults, none saved for this patch.' : mx.from !== sel ? 'MIXER: saved with patch ' + (mx.from + 1) + ', a copy.' : '')
       + (list.indexOf(1) >= 0 || list.indexOf(5) >= 0 ? ' XFade 0-100: 50 is the middle, below is A, above is B (the pedal shows 37 as A26).' : '') + '</div>';
   }
@@ -461,10 +514,10 @@ function detail() {
   else if (typeof focus === 'number' && fxName(p.rec, focus))
     h += fxControls(p.rec, focus);
   else h += '<span class="note">Nothing selected.</span>';
-  h += '</div>' + (p.orig || p.mix ? '<button id="undo">Undo changes</button>' : '');
+  h += '</div>' + (p.orig || p.mix || p.perf ? '<button id="undo">Undo changes</button>' : '');
   box.innerHTML = h;
   box.style.display = 'block';
-  if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.note = ''; render(); };
+  if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.perf = null; p.note = ''; render(); };
 }
 $('detail').addEventListener('change', function (e) {
   var k = e.target.dataset.k, fx = e.target.dataset.fx, p = patches[sel];
