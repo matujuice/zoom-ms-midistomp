@@ -660,8 +660,7 @@ var clampNote = '';
 function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); }
 function fxControls(rec, i) {
   var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
-  var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
-    + KNOB_CV;
+  var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b>' + KNOB_CV;
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
   if (!defs) {
@@ -681,7 +680,7 @@ function fxControls(rec, i) {
   });
   return h + notes.map(function (t) { return '<div class="note bad">' + esc(t) + '</div>'; }).join('');
 }
-var KNOB_CV = '<div class="lcdwrap"><canvas id="knobLcd" class="lcd knobs" tabindex="0" aria-label="Knobs as on the pedal: drag one up or down, or use the mouse wheel. The fields below take exact values."></canvas></div>';
+var KNOB_CV = '<div class="lcdwrap"><canvas id="knobLcd" class="lcd knobs" tabindex="0" aria-label="Knobs as on the pedal: click EFFECT ON/OFF top right to switch the effect; drag a knob up or down, or use the mouse wheel. The fields below take exact values."></canvas></div>';
 // The chosen item's knob page as on the pedal, every knob on one wide page: { name, look, v, max, text, set(v) }
 function knobParams(p) {
   var rec = p.rec, i = focus;
@@ -731,13 +730,14 @@ function drawKnobs(p) {
   var tab = typeof focus === 'number' ? fxName(p.rec, focus) || 'THRU' : { 'in': 'INPUT', route: 'ROUTE', mix: 'MIX', out: 'OUTPUT' }[focus];
   var ps = knobParams(p);
   cv.parentNode.hidden = !ps.length;              // ROUTE and OUT have no knobs until the MIXER settings are read
-  knobHits = LCD.knobPage([tab], 0, ps);
+  knobHits = LCD.knobPage([tab], 0, ps, 0, typeof focus === 'number' ? Patch.on(p.rec, focus) : null);
   LCD.present(cv);
 }
 function knobSet(p, n, v) { var k = knobParams(p)[n]; k.set(Math.max(0, Math.min(k.max, v))); drawKnobs(p); }
 $('detail').addEventListener('pointerdown', function (e) {
   if (e.target.id !== 'knobLcd') return;
   var h = LCD.hit(knobHits, LCD.at(e.target, e)), p = patches[sel];
+  if (h && h.it === 'onoff') { snap(p); Patch.setOn(p.rec, focus, !Patch.on(p.rec, focus)); render(); refocus('#knobLcd'); return; }
   if (!h || h.it !== 'param') return;
   var k = knobParams(p)[h.i];
   snap(p);
@@ -877,7 +877,7 @@ function perfChange(p, el) {
 }
 // ---- the PERFORM tab: the pedal's play screen; a click on the top bar, a knob column or a button opens its
 // SETUP list (TARGET, TURN, PRESS, HOLD) and, next to it, the chosen gesture's move page, as perform_draw.c draws them.
-var view = 'chain', pctl = 0, prow = 1, pmv = 0, ptop = 0, ttop = -1, playHits = [], listHits = [], moveHits = [], pturn = null, pside = 0, prows = 1, pdiv = 0;
+var view = 'chain', pctl = 0, prow = 1, pmv = 0, ptop = 0, ttop = -1, playHits = [], listHits = [], moveHits = [], pturn = null, pdiv = 0;
 var OFFON = ['Off', 'On'];
 var NPJ = [['InLvl', 88, 150, 'fader'], ['XFade', 85, 100, 'knob', 1], ['Mode', 93, 3, 'knob', 0, ['Serl', 'Paral', 'Split', 'MSerl']],
   ['BusA', 89, 150, 'fader'], ['BusB', 90, 150, 'fader'], ['XFade', 86, 100, 'fader', 1], ['Outpt', 98, 2, 'knob', 0, ['Ster', 'Mono', 'Split']],
@@ -958,7 +958,7 @@ function perfView(p) {
   if (!mst || !entries.length) return perfHtml(p);
   var o = perfObj(p), m = perfMove(o);
   return '<div class="lcdwrap"><canvas id="playLcd" class="lcd" tabindex="0" aria-label="PERFORM play screen and footswitch (' + esc(tgtText(p.rec, o.target[6])) + '). Click the top bar for CYCLE and the looper, a knob column, a button or the footswitch for its setup."></canvas></div>'
-    + '<div class="lcdwrap"><canvas id="listLcd" class="lcd' + (m ? ' knobs' : '') + '" tabindex="0" aria-label="Setup list: click a row or use the up and down arrow keys; click CYCLE or LOOPER again to change it. With TARGET chosen, the target list on the right: click one to set it, or press the right arrow key and then up and down. With a move chosen, the move on the right: drag Value, Next or Lag up or down, or use the mouse wheel. Value below 0 is unused."></canvas></div>'
+    + '<div class="lcdwrap"><canvas id="listLcd" class="lcd' + (m ? ' knobs' : '') + '" tabindex="0" aria-label="Setup list: click a row; click CYCLE or LOOPER again to change it. With TARGET chosen, the target list on the right: click one to set it. With a move chosen, the move on the right: drag Value, Next or Lag up or down, or use the mouse wheel. Value below 0 is unused."></canvas></div>'
     + '<div class="ctl">' + perfHtml(p, pctl) + '</div>';
 }
 function drawPerf(p) {
@@ -995,7 +995,6 @@ function drawPerf(p) {
       { name: m.t === Patch.T_NONE ? 'Value' : q.nm.slice(0, 5), look: q.look === 'trig' ? 'toggle' : q.look, v: un ? 0 : m.w & 0xffff, max: q.max, text: natText(q, un ? -1 : m.w & 0xffff) },
       { name: 'Next', look: 'knob', v: nx, max: 10, text: WHEN_L[nx] }, { name: 'Lag', look: 'knob', v: lag, max: 15, text: LAG_L[lag] }] };
   }
-  prows = rows.length;
   var l = LCD.lists([name, rows, Math.min(prow, rows.length - 1), ptop], b);
   listHits = l.hits; pdiv = l.div; ptop = l.top[0]; if (Array.isArray(b)) ttop = l.top[1];
   moveHits = b && !Array.isArray(b) ? listHits.filter(function (h) { return h.side; }) : [];
@@ -1035,7 +1034,6 @@ $('detail').addEventListener('pointerup', function (e) {
     if (h.i) o.loopOn = o.loopOn ? 0 : 1; else o.cycle = CYCLES[(CYCLES.indexOf(o.cycle) + 1) % CYCLES.length];
     p.perf = Patch.perfEncode(o);
   } else { prow = h.i; pmv = 0; ttop = -1; }
-  pside = 0;
   render();
   refocus('#' + id);
 });
@@ -1068,27 +1066,6 @@ $('detail').addEventListener('wheel', function (e) {
   if (q.x < pdiv) ptop += e.deltaY < 0 ? -1 : 1; else if (pctl !== 'bar' && !prow) ttop += e.deltaY < 0 ? -1 : 1;
   drawPerf(patches[sel]);
 }, { passive: false });
-// Up and down: the setup list's row; with the target list open, right arrow moves them to it (left: back), where they set the target
-$('detail').addEventListener('keydown', function (e) {
-  if (e.target.id !== 'listLcd' || !/^Arrow/.test(e.key) || !patches[sel]) return;
-  var p = patches[sel], o = perfObj(p), d = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0, open = pctl !== 'bar' && !prow, n;
-  e.preventDefault();
-  if (!d) { pside = open && e.key === 'ArrowRight' ? 1 : 0; return; }
-  if (pside && open) {
-    var tl = targetList(p.rec), c = tl.findIndex(function (x) { return x[2] === o.target[pctl]; });
-    n = Math.max(0, Math.min(tl.length - 1, c + d));
-    if (n === c) return;
-    snap(p); setTarget(o, false, pctl, tl[n][2]); p.perf = Patch.perfEncode(o);
-    if (n < ttop) ttop = n; else if (n > ttop + 3) ttop = n - 3;
-  } else {
-    n = Math.max(0, Math.min(prows - 1, prow + d));
-    if (n === prow) return;
-    prow = n; pmv = 0; ttop = -1; pside = 0;
-    if (n < ptop) ptop = n; else if (n > ptop + 3) ptop = n - 3;
-  }
-  render();
-  refocus('#listLcd');
-});
 $('detail').addEventListener('wheel', function (e) {
   if (e.target.id !== 'listLcd') return;
   var h = LCD.hit(moveHits, LCD.at(e.target, e)), p = patches[sel];
@@ -1169,8 +1146,7 @@ $('detail').addEventListener('change', function (e) {
   var k = e.target.dataset.k, fx = e.target.dataset.fx, p = patches[sel];
   if (p && (fx || k || e.target.dataset.pf || e.target.dataset.mx)) snap(p);
   if (fx && p && typeof focus === 'number') {
-    if (fx === 'on') Patch.setOn(p.rec, focus, e.target.checked);
-    else {
+    {
       var defs = EFFECT_PARAMS[Patch.effectKey(p.rec, focus)], d = defs && defs[+fx], o = +e.target.dataset.o || 0;
       var want = Math.round(+e.target.value || 0) - o, m = fxMax(d, +fx), v = Math.max(0, Math.min(m, want));
       if (v !== want) clampNote = (d ? d[0] : 'P' + (+fx + 1)) + ': ' + (want + o) + ' is out of range, set to ' + (v + o) + '.';

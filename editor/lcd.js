@@ -432,7 +432,8 @@ var LCD = (function () {
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
-  function knobPage(tabs, cur, ps, w) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
+  // on (1/0, null: none): an EFFECT ON/OFF softkey top right, filled when on, as the play screen's keys
+  function knobPage(tabs, cur, ps, w, on) {   // w (default SW) wide; the knobs centered, each in a column up to 60 wide
     var hits = [], x = 0, n = ps.length, cell, x0;
     begin(w || Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
     cell = Math.min(60, Math.floor((W - 8) / Math.max(1, n))); x0 = (W - n * cell) >> 1;
@@ -447,6 +448,12 @@ var LCD = (function () {
       font7r(p.text, cx + 30, 48);
       hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: 52 });
     });
+    if (on != null) {
+      var s = on ? 'EFFECT ON' : 'EFFECT OFF', bw = softW('EFFECT OFF') + 9, bx = W - 3 - bw;
+      small(s, bx + ((bw - softW(s)) >> 1), 3);
+      if (on) invert(bx, 2, bx + bw - 1, 8); else rect(bx, 2, bx + bw - 1, 8, 3);
+      hits.push({ it: 'onoff', x: bx, y: 0, w: bw, h: 11 });
+    }
     return hits;
   }
 
