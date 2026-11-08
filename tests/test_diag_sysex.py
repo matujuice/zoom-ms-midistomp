@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-HOST = {"MIDI_BYTE", "MIDI_SEND", "TRANSPORT_MAGIC", "SERVICES_MAGIC", "R50_ENT"}
+HOST = {"MIDI_BYTE", "MIDI_SEND", "TRANSPORT_MAGIC", "SERVICES_MAGIC", "R50_ENT", "LIVE", "SAVED", "MAXES",
+        "CUR_PATCH", "SAVE_SETTINGS", "SETTINGS_WORDS"}
 
 HARNESS = r"""
 #include <stdio.h>
@@ -19,6 +20,27 @@ static unsigned transport = 0x5A4D5401u, services;
 #define SERVICES_MAGIC services
 static unsigned char r50[24 + 16 * 50];
 #define R50_ENT(n) (r50 + 24 + 16 * (n))
+static unsigned char live[24], saved[24], maxes[24] = { 3, 100, 150, 150, 150, 100, 150, 2, 150, 150, 1 };
+static int cur = 7;
+#define LIVE live
+#define SAVED saved
+#define MAXES maxes
+#define CUR_PATCH cur
+#define SETTINGS_WORDS 0
+static void save(int *w) { (void)w; printf("SAVE\n"); }
+#define SAVE_SETTINGS save
+static void post(int q, int e) { printf("POST %d\n", e); }
+#define EVENT_POST post
+#define UI_EVENT 0
+static void dump(void)      /* entries 5 and 7, LIVE, SAVED: what a write changed */
+{
+    printf("DUMP ");
+    for (int i = 0; i < 16; i++) printf("%02X", r50[24 + 16 * 5 + i]);
+    for (int i = 0; i < 16; i++) printf("%02X", r50[24 + 16 * 7 + i]);
+    for (int i = 0; i < 11; i++) printf("%02X", live[i]);
+    for (int i = 0; i < 11; i++) printf("%02X", saved[i]);
+    printf("\n");
+}
 #define STAMP(i) "V2.0.1"
 @BLOCK@
 int main(void)
@@ -26,6 +48,7 @@ int main(void)
     unsigned b;
     for (int i = 0; i < 16; i++) r50[24 + 16 * 3 + i] = (i * 37 + 200) & 255;
     while (scanf("%x", &b) == 1) if (sx_n || b == 0xF0) sx_byte(b);
+    dump();
     return 0;
 }
 """
@@ -54,7 +77,28 @@ def exe(tmp_path_factory):
 def run(exe, *msgs):
     text = " ".join(msgs)
     out = subprocess.run([str(exe)], input=text, capture_output=True, text=True, check=True).stdout
-    return [bytes.fromhex(l) for l in out.splitlines()]
+    return [l if l[:1] in "SPD" else bytes.fromhex(l) for l in out.splitlines()][:-1]
+
+
+def state(exe, *msgs):
+    """(replies and events, entry 5, entry 7, LIVE, SAVED) after the messages"""
+    out = subprocess.run([str(exe)], input=" ".join(msgs), capture_output=True, text=True, check=True).stdout
+    *lines, d = out.splitlines()
+    b = bytes.fromhex(d[5:])
+    return [l if l[:1] in "SP" else bytes.fromhex(l) for l in lines], b[:16], b[16:32], b[32:43], b[43:]
+
+
+def pack7(b):
+    out = []
+    for i in range(0, len(b), 7):
+        g = b[i:i + 7]
+        out += [sum(0x40 >> j for j, x in enumerate(g) if x & 0x80)] + [x & 0x7F for x in g]
+    return out
+
+
+def write_msg(n, h, settings, nonce=9):
+    e = list(h.to_bytes(4, "little")) + settings
+    return " ".join("%02X" % x for x in [0xF0, 0x7D, 0x4D, 0x53, 0x54, 3, nonce, n] + pack7(e) + [0xF7])
 
 
 HELLO = "F0 7D 4D 53 54 01 2A F7"
@@ -91,3 +135,28 @@ def test_realtime_inside_and_restart(exe):
     # clock bytes inside the message are skipped; a new F0 restarts the message
     out = run(exe, "F0 7D 4D F0 7D 4D F8 53 54 01 F8 2A FA F7", "90 40 7F", HELLO)
     assert len(out) == 4 and out[0][6] == 0x2A and out[2][6] == 0x2A
+
+
+SET = [3, 100, 150, 0, 77, 100, 150, 2, 129, 150, 1]
+
+
+def test_write(exe):
+    msg = write_msg(5, 0xBA8022CD, SET)
+    assert len(msg.split()) == 27
+    out, e5, e7, live, saved = state(exe, msg)
+    assert out == ["SAVE", bytes.fromhex("F07D4D5354440905" "00F7")]
+    assert e5[:15] == bytes([0xCD, 0x22, 0x80, 0xBA] + SET) and e5[15] == 0
+    assert live == bytes(11) and saved == bytes(11)       # not the patch played
+
+
+def test_write_live(exe):
+    out, e5, e7, live, saved = state(exe, write_msg(7, 0x80FF0001, SET))
+    assert out == ["POST 64", "SAVE", bytes.fromhex("F07D4D5354440907" "00F7")]
+    assert e7[:15] == bytes([1, 0, 0xFF, 0x80] + SET) and live == saved == bytes(SET)
+
+
+def test_write_rejected(exe):
+    bad = SET[:]; bad[10] = 2                              # Phase B max 1
+    out, e5, *_ = state(exe, write_msg(5, 1, bad), write_msg(50, 1, SET),
+                        " ".join(write_msg(5, 1, SET).split()[:-2] + ["F7"]))   # short
+    assert out == [bytes.fromhex("F07D4D5354440905" "01F7")] and e5 == bytes(16)

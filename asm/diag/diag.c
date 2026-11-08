@@ -105,21 +105,31 @@ void diag_mwake(void)
 }
 
 /* ---- MIDISTOMP SysEx (docs/dev/modwerk-research.md section 1, step B) ------------------
- * F0 7D 'M' 'S' 'T' cmd nonce [arg] F7, watched byte by byte from diag_mend. It only reads:
- * the stock parser drops F0 7D messages by itself. Replies go out through the stock send,
- * from Task_MIDI, as the identity reply does.
+ * F0 7D 'M' 'S' 'T' cmd nonce [args] F7, watched byte by byte from diag_mend. The stock parser
+ * drops F0 7D messages by itself. Replies go out through the stock send, from Task_MIDI, as
+ * the identity reply does.
  *   01 hello            -> 41 version (major minor patch), 42 status (f0 f1 f2 state)
  *   02 n: settings of n -> 43 n + record 50 entry n (hash, settings 0-10, pad), 7-bit packed
+ *   03 n + packed (hash, settings 0-10): write entry n -> 44 n status (0 saved, 1 a value
+ *      over its max: nothing written). The patch played (n = CUR_PATCH) takes them at once.
+ *      Record 50 is saved to flash from Task_MIDI, as the stock patch store (32) saves a
+ *      patch from there (0xC00AE2B0).
  * ponytail: state is 0x7F (unknown) until the editor mode and looper flags are mapped. */
 #define MIDI_BYTE (*(volatile unsigned char *)(B14 + 226))       /* the byte just taken */
 #define MIDI_SEND FN(0xC00AD664, void, (const unsigned char *, int))
 #define TRANSPORT_MAGIC (*(volatile unsigned *)0x1181FF00u)       /* midi-clock.yaml */
 #define SERVICES_MAGIC (*(volatile unsigned *)0xC00F3000u)        /* looper services block */
-#define R50_ENT(n) ((const volatile unsigned char *)0xC0116000u + 24 + 16 * (n))   /* mixer pages.c */
+#define R50_ENT(n) ((volatile unsigned char *)0xC0116000u + 24 + 16 * (n))   /* mixer pages.c */
+#define LIVE ((volatile unsigned char *)0xC00F60E0u)              /* mixer chain.h: [24] the patch played */
+#define SAVED ((volatile unsigned char *)0xC00F60F8u)             /* ... as saved */
+#define MAXES ((const volatile unsigned char *)0xC00F6128u)       /* [24] max of each setting */
+#define CUR_PATCH (*(volatile int *)(B14 + 324))
+#define SAVE_SETTINGS FN(0xC00BA3E4, void, (int *))              /* writes record 50 (pages.c r50_save) */
+#define SETTINGS_WORDS ((int *)0xC009D8F8)
 /* in every build with this code: CC, MIDI settings, tempo-hold, mixer, PERFORM, MASTER, KALEIDO, diag, DSP 300 */
 #define FEATURES (1u | 1u << 2 | 1u << 3 | 1u << 5 | 1u << 6 | 1u << 7 | 1u << 8 | 1u << 9 | 1u << 10)
 
-static unsigned char sx[8];     /* the bytes after F0 */
+static unsigned char sx[25];    /* the bytes after F0 */
 static int sx_n;                /* 1 + bytes in sx while in a message, 0 otherwise */
 
 static void sx_reply(int cmd, const unsigned char *d, int n)
@@ -156,6 +166,23 @@ static void sx_done(int n)
             d[j] = e[i] & 0x7F;
         }
         sx_reply(0x43, d, j);
+    } else if (sx[4] == 3 && n == 25 && sx[6] < 50) {
+        volatile unsigned char *e = R50_ENT(sx[6]);
+        for (i = 0, j = 7; i < 15; i++, j++) {          /* 18 packed bytes -> hash, settings */
+            if (i == 0 || i == 7 || i == 14) h = j++;
+            d[i] = sx[j] | (sx[h] << (j - h) & 0x80);
+        }
+        for (i = 0, f = 0; i < 11; i++) f |= d[4 + i] > MAXES[i];
+        if (!f) {
+            for (i = 0; i < 15; i++) e[i] = d[i];
+            if (sx[6] == CUR_PATCH) {
+                for (i = 0; i < 11; i++) LIVE[i] = SAVED[i] = d[4 + i];
+                EVENT_POST(UI_EVENT, 64);               /* redraw, as the MIDI CC path */
+            }
+            SAVE_SETTINGS(SETTINGS_WORDS);
+        }
+        d[0] = sx[6]; d[1] = f;
+        sx_reply(0x44, d, 2);
     }
 }
 
@@ -164,7 +191,7 @@ static void sx_byte(unsigned b)
     if (b >= 0xF8) return;                      /* realtime bytes may come inside a message */
     if (b == 0xF0) { sx_n = 1; return; }
     if (b == 0xF7) { if (sx_n >= 7) sx_done(sx_n - 1); sx_n = 0; return; }
-    if (b & 0x80 || sx_n > 7) { sx_n = 0; return; }
+    if (b & 0x80 || sx_n > 25) { sx_n = 0; return; }
     sx[sx_n - 1] = b;
     if (sx_n <= 4 && b != (unsigned char)"\x7DMST"[sx_n - 1]) { sx_n = 0; return; }
     sx_n++;
