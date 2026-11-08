@@ -515,9 +515,9 @@ var LCD = (function () {
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
   // on (1/0, null: none): an ON/OFF softkey top right, filled when on, as the play screen's keys.
-  // pic: the effect's 128 x 64 picture, on the left; the page beside it. BH high, the knobs on two rows
+  // pic: the effect's 128 x 64 picture, on the left; the page beside it. BH high, the knobs in one row, two when 48 columns each do not fit
   function knobPage(tabs, cur, ps, w, on, pic) {   // w (default SW) wide; each row centered, each knob in a column up to 60 wide
-    var hits = [], x = 0, n = ps.length, rows = n > 1 ? 2 : 1, per = Math.ceil(n / rows), cell, x0, y0;
+    var hits = [], x = 0, n = ps.length, rows = 48 * n > (w || SW) - 8 ? 2 : 1, per = Math.ceil(n / rows), cell, x0, y0;
     if (pic) {
       hits = knobPage(tabs, cur, ps, (w || SW) - 131, on); var g = grab();
       begin(w || SW, BH); paste(g, 131, 0);
