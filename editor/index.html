@@ -660,7 +660,7 @@ var clampNote = '';
 function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); }
 function fxControls(rec, i) {
   var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
-  var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b>' + KNOB_CV;
+  var h = KNOB_CV;
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
   if (!defs) {
