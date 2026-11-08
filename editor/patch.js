@@ -165,10 +165,46 @@ var Patch = (function () {
              move: row(7, 0).map(function () { return row(6, MV_UNUSED); }), loopMove: row(6, MV_UNUSED) };
   }
   function count(rec) { return (rec[108] | rec[109] << 8 | rec[110] << 16) >> 10 & 7; }   // COUNT: effects in the chain
+  // Bytes 108-110, LSB first: DSP-off mask bits 0-5 (one per slot), cursor 6-9 (6 - COUNT .. 5 on real patches), COUNT 10-12, tempo 13-20
+  function setTail(rec, mask, n) {
+    var t = rec[108] | rec[109] << 8 | rec[110] << 16, cur = Math.max(t >> 6 & 15, 6 - n);
+    t = t & ~0x1fff | mask & 63 | Math.min(cur, 5) << 6 | n << 10;
+    rec[108] = t & 255; rec[109] = t >> 8 & 255; rec[110] = rec[110] & 0xe0 | t >> 16 & 0x1f;
+  }
+  // The chain: slots 0..COUNT-1, minus a lone THRU (an empty patch: COUNT 1, id 0)
+  function used(rec) { var n = count(rec); return n === 1 && !effectId(rec, 0) ? 0 : n; }
+  // Adds the effect with g200kg key `key` at slot `at` (later slots move up), on, its parameters at
+  // defs' defaults, on bus `bus`. Byte 17 is rebuilt, as reorder does. false = the chain is full.
+  function addEffect(rec, at, key, defs, bus) {
+    var n = used(rec), r = routing(rec), old = rec.slice(), mask = rec[108] & 63;
+    if (n >= 6 || at > n) return false;
+    for (var s = n; s > at; s--) for (var j = 0; j < 17; j++) rec[18 * s + j] = old[18 * (s - 1) + j];
+    for (j = 0; j < 17; j++) rec[18 * at + j] = 0;
+    rec[18 * at] = 1 | key >> 16 & 0x7e | key >>> 23 & 0x80;      // on, id: the inverse of effectKey
+    rec[18 * at + 1] = key >> 8 & 7;
+    rec[18 * at + 3] = key & 0x1f;
+    (defs || []).forEach(function (d, p) { if (p < 9) setParam(rec, at, p, d[2]); });
+    r.bus.splice(at, 0, bus); r.bus.length = 6;
+    setRouting(rec, r);
+    setTail(rec, mask & (1 << at) - 1 | (mask >> at) << at + 1, n + 1);
+    return true;
+  }
+  // Removes slot s (later slots move down); the freed last slot becomes empty (on, id 0, bus PRE), as the pedal leaves it.
+  function removeEffect(rec, s) {
+    var n = used(rec), r = routing(rec), old = rec.slice(), mask = rec[108] & 63;
+    if (s >= n) return false;
+    for (var k = s; k < n - 1; k++) for (var j = 0; j < 17; j++) rec[18 * k + j] = old[18 * (k + 1) + j];
+    for (j = 0; j < 17; j++) rec[18 * (n - 1) + j] = 0;
+    rec[18 * (n - 1)] = 1;
+    r.bus.splice(s, 1); r.bus.push(0);
+    setRouting(rec, r);
+    setTail(rec, mask & (1 << s) - 1 | (mask >> s + 1) << s, Math.max(1, n - 1));
+    return true;
+  }
   function mv(v, next, lag) { return (v | next << 16 | lag << 21) >>> 0; }
 
   return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite,
-           perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, mv: mv, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
+           perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, used: used, addEffect: addEffect, removeEffect: removeEffect, mv: mv, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
            PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };

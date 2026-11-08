@@ -1,7 +1,7 @@
 # MIDISTOMP patch editor (local)
 
 A small page for the MS-70CDR and MS-50G: read all 50 patches, see each slot's effect, on/off and
-MIDISTOMP routing (bus, Input R, Master R, Output, mutes, solo), rename, edit routing, save a backup
+MIDISTOMP routing (bus, Input R, Master R, Output, mutes, solo), rename, add and remove effects, edit their settings and routing, save a backup
 and restore it. It talks to the pedal with the stock patch SysEx, so it works on stock firmware too
 (routing then shows "—").
 
@@ -26,6 +26,13 @@ then open http://localhost:8737 and press Connect. Close Zoom Effect Manager and
   target (an effect's Footsw or parameter, or a mixer level) and its Turn / Press / Hold moves (Value,
   When, Lag), and the looper events in a patch with GRDLOOP. Targets keep their slot numbers when
   effects move, as on the pedal; the editor warns when one points at an empty slot or a missing parameter.
-- Effect names: `effect-names.js`, from g200kg/zoom-ms-utility (MIT). Pack effects show as `id …`.
+- Add an effect with the "+" at the output end of a zone (Pre, A, B, Post): pick it from the stock list
+  or the effects pack, by category or by name. It starts with its default settings. Remove one from its
+  settings. A chain holds up to 6. The stock list covers all MS models: an effect this pedal does not have
+  becomes THRU when written, and the table says so. The editor does not count DSP: if the pedal shows
+  DSP FULL, remove or swap an effect. Adding, removing or moving effects changes the MIXER and PERFORM
+  match, so the editor writes them under the new one as for a rename.
+- Effect names and parameters: `effect-names.js` and `effect-params.js`, from g200kg/zoom-ms-utility
+  (MIT); the pack's in `pack-params.js`, built from the pack's manifests by `scripts/make_pack_params.py`.
 
 Check the decoder: `node editor/test-patch.js`.

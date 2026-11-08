@@ -39,6 +39,8 @@
   .chain .zone[data-l]::after { content: attr(data-l); position: absolute; left: -12px; color: var(--accent); font-size: 10px; }
   .chain .box[draggable] { cursor: grab; }
   .chain [data-it] { cursor: pointer; }
+  .chain .add { padding: 0 7px; border-style: dashed; color: var(--dim); }
+  #pick { min-width: 22ch; margin: 4px 0; }
   .chain .cur { outline: 2px solid var(--accent); outline-offset: 2px; }
   fieldset.pctl { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; padding: 4px 10px 8px; }
   fieldset.pctl legend { font-weight: 600; padding: 0 4px; }
@@ -69,8 +71,10 @@
 </main>
 <script src="effect-names.js"></script>
 <script src="effect-params.js"></script>
+<script src="pack-params.js"></script>
 <script src="patch.js"></script>
 <script>
+Object.keys(PACK_EFFECTS).forEach(function (k) { EFFECT_NAMES[k] = PACK_EFFECTS[k].n; EFFECT_PARAMS[k] = PACK_EFFECTS[k].p; });
 var MODELS = { 0x61: 'MS-70CDR', 0x58: 'MS-50G', 0x5f: 'MS-60B' };
 var midi, inp, outp, dev = 0, model = '', busy = false;
 var patches = [];          // { rec: [122], orig: [122] | null, note: '' }
@@ -254,11 +258,13 @@ async function writePatch(n, pre) {
   await send(Patch.toDump(p.rec, dev));
   await sleep(50);
   await send(zoom([0x32, 0x01, 0x00, 0x00, n, 0x00, 0x00, 0x00, 0x00, 0x00]));   // store to patch n
-  await sleep(250);
+  for (var t0 = Date.now(); await currentProgram() < 0 && Date.now() - t0 < 6000;);   // silent ~2.5 s while it saves to flash
   var back = await readPatch(n);                                 // read back to check
   var same = back && back.every(function (b, i) { return b === p.rec[i]; });
+  // The pedal turns an effect it does not have into THRU (an MS-70CDR has no "Comp" of the MS-50G)
+  var gone = back ? [0, 1, 2, 3, 4, 5].filter(function (i) { return Patch.effectId(p.rec, i) && !Patch.effectId(back, i); }).map(function (i) { return fxName(p.rec, i); }) : [];
   if (back) { p.rec = back; p.orig = back.slice(); p.restored = false; }
-  p.note = same ? 'written' : back ? 'pedal changed it' : 'no read-back';
+  p.note = same ? 'written' : gone.length ? 'not on this pedal: ' + gone.join(', ') : back ? 'pedal changed it' : 'no read-back';
   return same;
 }
 
@@ -351,10 +357,8 @@ $('file').onchange = async function () {
   buttons();
 };
 
-// zoom-ms-zdl-effects-pack: effect id (category 8 << 24 | fxid) -> ZDL name. ponytail: hand list, update when the pack adds effects.
-var PACK_NAMES = { 480: 'DualShft', 481: 'LOUDER', 485: 'DubSiren', 486: 'Choral', 487: 'WaveFold', 488: 'EuGate',
-  489: 'SGNL', 490: 'Scrub', 491: 'DirtBox', 492: 'Washout', 493: 'Breather', 494: 'Takeoff', 495: 'GRDELAY',
-  496: 'Sweep', 497: 'GRDLOOP', 498: 'DryPrb', 500: 'RoutePrb', 501: 'Gooey', 502: 'DJFilter' };
+// The pack's test probes (effect id 8 << 24 | fxid), which have no manifest; the pack's effects come from pack-params.js
+var PACK_NAMES = { 498: 'DryPrb', 500: 'RoutePrb' };
 function fxName(rec, i) {
   var key = Patch.effectKey(rec, i), id = Patch.effectId(rec, i);
   if (!key) return '';
@@ -407,12 +411,13 @@ $('rows').addEventListener('click', function (e) {
 // Drag a box onto another box or into a zone to move it; the patch's slots are then rewritten in signal order.
 // mode: MIXER Mode 0-3, or -1 when not known. Serial and Mono Serial have no [MIX]: A then B in a row (chain_draw.c).
 function chainHtml(rec, r, mode) {
+  var full = Patch.used(rec) >= 6;
   function zone(z, label) {
     var h = '<div class="zone" data-z="' + z + '"' + (label ? ' data-l="' + label + '"' : '') + '>';
     for (var i = 0; i < 6; i++)
-      if (r.bus[i] === z && fxName(rec, i))
-        h += '<span class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '">' + esc(fxName(rec, i)) + '</span>';
-    return h + '</div>';
+      if (r.bus[i] === z && i < Patch.used(rec))
+        h += '<span class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '">' + esc(fxName(rec, i) || 'THRU') + '</span>';
+    return h + (full ? '' : '<button class="add' + (focus === 'add' + z ? ' cur' : '') + '" data-it="add' + z + '" title="Add an effect to ' + ZONES[z] + '" aria-label="Add an effect to ' + ZONES[z] + '">+</button>') + '</div>';
   }
   function node(it, t) { return '<span class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '">' + t + '</span>'; }
   var route = node('route', 'ROUTE' + (mode >= 0 ? ' · ' + Patch.MIXER[0][3][mode] : ''));
@@ -429,7 +434,11 @@ $('detail').addEventListener('click', function (e) {
   if (!it) return;
   focus = /^\d$/.test(it.dataset.it) ? +it.dataset.it : it.dataset.it;
   detail();
+  if ($('pickq')) $('pickq').focus();
 });
+$('detail').addEventListener('input', function (e) { if (e.target.id === 'pickq') $('pick').innerHTML = pickOpts(e.target.value); });
+$('detail').addEventListener('dblclick', function (e) { if (e.target.closest('#pick')) addPicked(); });
+$('detail').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.target.id === 'pick' || e.target.id === 'pickq')) addPicked(); });
 $('detail').addEventListener('dragstart', function (e) {
   var b = e.target.closest && e.target.closest('.box[data-s]');
   if (!b) return;
@@ -465,10 +474,43 @@ $('detail').addEventListener('drop', function (e) {
   render();
 });
 $('detail').addEventListener('dragend', function () { dragSlot = -1; });
-// Parameters from g200kg's table; effects it does not know (the pack's) show their raw values, read only.
+// Add an effect: a picker of the stock effects (g200kg's list, by category) and the pack's, filtered by name.
+// It goes at the output end of its zone (the "+" side); drag it to move it. The pedal checks DSP use itself.
+var ZONES = ['Pre', 'A', 'B', 'Post'];
+var GROUP_NAMES = { COMP: 'Dynamics', FILTER: 'Filter', DRIVE: 'Drive', AMP: 'Amp', MOD: 'Modulation', SFX: 'SFX', DELAY: 'Delay', REVERB: 'Reverb' };
+function pickOpts(q) {
+  q = (q || '').toLowerCase();
+  var h = '';
+  function grp(label, keys) {
+    var o = keys.filter(function (k) { return EFFECT_NAMES[k].toLowerCase().indexOf(q) >= 0; })
+      .sort(function (a, b) { return EFFECT_NAMES[a].localeCompare(EFFECT_NAMES[b]); })
+      .map(function (k) { return '<option value="' + k + '">' + esc(EFFECT_NAMES[k]) + '</option>'; }).join('');
+    if (o) h += '<optgroup label="' + label + '">' + o + '</optgroup>';
+  }
+  grp('Effects pack', Object.keys(PACK_EFFECTS));
+  Object.keys(EFFECT_GROUPS).forEach(function (g) { grp(GROUP_NAMES[g], EFFECT_GROUPS[g]); });
+  return h;
+}
+function pickHtml(z) {
+  return '<b>Add an effect to ' + ZONES[z] + '</b> <label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect"></label><br>'
+    + '<select id="pick" size="12" aria-label="Effects">' + pickOpts('') + '</select> <button id="pickadd">Add</button>'
+    + '<div class="note">Stock effects your pedal does not have are listed too. If the pedal shows "DSP FULL", remove or swap an effect.</div>';
+}
+function addPicked() {
+  var p = patches[sel], k = $('pick') && $('pick').value, z = +String(focus).slice(3);
+  if (!p || !k) return;
+  var n = Patch.used(p.rec), bus = Patch.routing(p.rec).bus, at = 0;
+  for (var i = 0; i < n; i++) if (bus[i] <= z) at = i + 1;    // after the last effect of this zone or an earlier one
+  if (!Patch.addEffect(p.rec, at, +k, EFFECT_PARAMS[k], z)) return;
+  focus = at;
+  render();
+}
+function slotsMoved(p) { return p.orig && [0, 1, 2, 3, 4, 5].some(function (i) { return Patch.effectId(p.orig, i) !== Patch.effectId(p.rec, i); }); }
+// Parameters from g200kg's table and the pack's manifests; effects neither knows show their raw values, read only.
 function fxControls(rec, i) {
   var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
-  var h = '<b>' + esc(fxName(rec, i)) + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label><br>';
+  var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
+    + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button><br>';
   if (!defs) {
     for (var p = 0; p < 9; p++) h += '<label>P' + (p + 1) + ' <input type="number" disabled value="' + Patch.param(rec, i, p) + '"></label>';
     return h + '<div class="note">Parameter names for this effect are not known yet, so they are shown read only.</div>';
@@ -565,7 +607,7 @@ function perfHtml(p) {
     });
     h += '</fieldset>';
   }
-  if (p.orig && Patch.hash(rec) !== Patch.hash(p.orig)) warn.push('Targets keep their slot numbers, as on the pedal: check them after moving effects.');
+  if (slotsMoved(p)) warn.push('Targets keep their slot numbers, as on the pedal: check them after moving effects.');
   return h + '<div class="note">' + (p.perf ? 'PERFORM edited: "Write changed to pedal" sends it. ' : '')
     + warn.map(function (w) { return '<span class="bad">' + esc(w) + '</span>'; }).join(' ') + '</div>';
 }
@@ -601,6 +643,9 @@ function detail() {
   // MIXER settings 0-10: kept on the pedal (record 50), edited here and written with SysEx 03
   var mx = entries.length && Patch.mixer(p.rec, sel, entries), mset0 = p.mix || (mx && mx.set), mode = mset0 ? mset0[0] : -1;
   if (focus === 'mix' && (mode === 0 || mode === 3)) focus = 'route';     // as the pedal: Serial has no [MIX]
+  var po = perfs.length && slotsMoved(p) && perfObj(p);
+  if (po && po.target.concat(po.loopTarget).some(function (t) { return isFtsw(t) || t >= 14 && t <= 73; }))
+    h += '<div class="note bad">Effects moved: PERFORM targets keep their slot numbers, as on the pedal. Check PERFORM.</div>';
   h += chainHtml(p.rec, r, mode) + '<div class="chain"><span class="box node' + (focus === 'perf' ? ' cur' : '') + '" data-it="perf">PERFORM</span></div><div class="ctl">';
   function mset(list) {
     if (!mx) return '<div class="note">' + (mst ? 'Read all patches to see this patch\'s MIXER settings.'
@@ -622,12 +667,15 @@ function detail() {
   else if (focus === 'out')
     h += '<b>OUT</b> <label>Output <select data-k="out">' + opts(Patch.OUT, r.out) + '</select></label>' + mset([6]);
   else if (focus === 'perf') h += perfHtml(p);
-  else if (typeof focus === 'number' && fxName(p.rec, focus))
+  else if (typeof focus === 'number' && focus < Patch.used(p.rec))
     h += fxControls(p.rec, focus);
+  else if (/^add\d$/.test(focus)) h += pickHtml(+focus[3]);
   else h += '<span class="note">Nothing selected.</span>';
   h += '</div>' + (p.orig || p.mix || p.perf ? '<button id="undo">Undo changes</button>' : '');
   box.innerHTML = h;
   box.style.display = 'block';
+  if ($('pickadd')) $('pickadd').onclick = addPicked;
+  if ($('remove')) $('remove').onclick = function () { Patch.removeEffect(p.rec, focus); focus = null; render(); };
   if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.perf = null; p.note = ''; render(); };
 }
 $('detail').addEventListener('change', function (e) {

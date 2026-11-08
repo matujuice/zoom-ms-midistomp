@@ -145,4 +145,24 @@ assert.strictEqual(P.mv(127, 0, 0), 127);
 var fresh = new Array(122).fill(0); fresh[108] = 0x40; fresh[109] = 0x05; fresh[110] = 0x14;
 assert.strictEqual(P.count(fresh), 1);   // a new patch on the MS-70CDR
 assert.strictEqual(P.mv(5, 31, 0), P.MV_UNUSED | 5);
+// addEffect / removeEffect on a fresh patch (empty, COUNT 1)
+var fr = new Array(122).fill(0); fr[0] = 1; fr[108] = 0x40; fr[109] = 0x05; fr[110] = 0x14;
+var DEFS = [['A', 100, 35], ['B', 20, 10], ['C', 150, 78], ['D', 1, 1]];
+assert.strictEqual(P.used(fr), 0);
+assert.ok(P.addEffect(fr, 0, 1048592, DEFS, 0));                       // Delay
+assert.strictEqual(P.count(fr), 1); assert.strictEqual(P.effectKey(fr, 0), 1048592); assert.strictEqual(P.on(fr, 0), 1);
+assert.deepStrictEqual([0, 1, 2, 3].map(function (p) { return P.param(fr, 0, p); }), [35, 10, 78, 1]);
+assert.ok(P.addEffect(fr, 0, 1080165136, [['Mix', 100, 50]], 1));      // GRDLOOP before it, on bus A
+assert.strictEqual(P.count(fr), 2); assert.strictEqual(P.effectKey(fr, 0), 1080165136); assert.strictEqual(P.effectKey(fr, 1), 1048592);
+assert.strictEqual(P.effectId(fr, 0), 0x80001f1);
+assert.deepStrictEqual(P.routing(fr).bus, [1, 0, 0, 0, 0, 0]);
+assert.strictEqual(fr[110] >> 5, 0);                                    // tempo kept (160)
+assert.strictEqual((fr[108] | fr[109] << 8 | fr[110] << 16) >> 13 & 255, 160);
+for (var i = 0; i < 4; i++) assert.ok(P.addEffect(fr, 2, 1048592, DEFS, 3));
+assert.strictEqual(P.count(fr), 6); assert.ok(!P.addEffect(fr, 0, 1048592, DEFS, 0));   // full
+assert.ok(P.removeEffect(fr, 0));
+assert.strictEqual(P.count(fr), 5); assert.strictEqual(P.effectKey(fr, 0), 1048592); assert.strictEqual(P.effectId(fr, 5), 0);
+assert.deepStrictEqual(P.routing(fr).bus, [0, 3, 3, 3, 3, 0]);
+while (P.used(fr)) assert.ok(P.removeEffect(fr, 0));
+assert.strictEqual(P.count(fr), 1); assert.strictEqual(P.effectId(fr, 0), 0); assert.strictEqual(P.on(fr, 0), 1);
 console.log('patch.js OK');
