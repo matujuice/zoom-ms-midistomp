@@ -80,9 +80,10 @@ var Patch = (function () {
     setRouting(rec, r);
   }
 
-  // Effect parameters 1-9: [first bit, width] in the slot's 144-bit block (g200kg's apatch.js table, same for every slot).
-  // Bit 126 is set while parameter 8 is not 0.
-  var PARAM_BITS = [[29, 12], [42, 11], [55, 11], [68, 8], [76, 8], [84, 8], [92, 8], [100, 9], [128, 8]];
+  // Effect parameters 1-9: [first bit, width] in the slot's 144-bit block, as the firmware packs them
+  // (widths 13,13,13,8,8,8,8,28,8, docs/dev/mixer-mode-m0.md). g200kg's table reads fewer bits of P1-P3 and P8.
+  var PARAM_BITS = [[29, 13], [42, 13], [55, 13], [68, 8], [76, 8], [84, 8], [92, 8], [100, 28], [128, 8]];
+  function paramMax(p) { return 2 ** PARAM_BITS[p][1] - 1; }
   function param(rec, i, p) {
     var a = PARAM_BITS[p], v = 0;
     for (var b = 0; b < a[1]; b++) { var x = 144 * i + a[0] + b; v |= (rec[x >> 3] >> (x & 7) & 1) << b; }
@@ -92,7 +93,6 @@ var Patch = (function () {
   function setParam(rec, i, p, v) {
     var a = PARAM_BITS[p];
     for (var b = 0; b < a[1]; b++) setBit(rec, 144 * i + a[0] + b, v >> b & 1);
-    if (p === 7) setBit(rec, 144 * i + 126, v !== 0);
   }
   function setOn(rec, i, on) { setBit(rec, 144 * i, on); }
 
@@ -205,7 +205,7 @@ var Patch = (function () {
 
   return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite,
            perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, used: used, addEffect: addEffect, removeEffect: removeEffect, mv: mv, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
-           PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
+           PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, paramMax: paramMax, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };
 })();

@@ -83,19 +83,26 @@ for (t = 0; t < 200; t++) {
   }
   G_NAME.forEach(function (m, k) { assert.strictEqual(rec[111 + k] & 0x7f, msg[m], 'name ' + k); });
   [[0, G_P0], [5, G_P5]].forEach(function (s) {
-    s[1].forEach(function (bits, p) { assert.strictEqual(P.param(rec, s[0], p), gbits(msg, bits), 'slot ' + s[0] + ' param ' + (p + 1)); });
+    s[1].forEach(function (bits, p) {             // g200kg's table covers the low bits only
+      var n = bits.reduce(function (c, b) { return c + b[1].toString(2).replace(/0/g, '').length; }, 0);
+      assert.strictEqual(P.param(rec, s[0], p) % 2 ** n, gbits(msg, bits), 'slot ' + s[0] + ' param ' + (p + 1));
+    });
   });
 }
-// setParam writes only its own bits (and bit 126 for parameter 8)
+// setParam writes only its own bits, up to each field's width
 for (t = 0; t < 50; t++) {
   rec = rnd(122);
-  var s = t % 6, p = t % 9, v = Math.random() * 256 | 0, was = rec.slice();
+  var s = t % 6, p = t % 9, v = Math.random() * (P.paramMax(p) + 1) | 0, was = rec.slice();
   P.setParam(rec, s, p, v);
   assert.strictEqual(P.param(rec, s, p), v);
   for (i = 0; i < 9; i++) if (i !== p) assert.strictEqual(P.param(rec, s, i), P.param(was, s, i));
   assert.deepStrictEqual(rec.slice(0, 18 * s), was.slice(0, 18 * s));
   assert.deepStrictEqual(rec.slice(18 * s + 17), was.slice(18 * s + 17));
 }
+// A real MS-70CDR slot (backup 2026-11-08, patch 1 slot 3): P8 = 8 with bit 126 clear, P1 = 500
+rec = 'c10200903ee8031990b13400850000002303'.match(/../g).map(function (x) { return parseInt(x, 16); }).concat(Array(104).fill(0));
+assert.deepStrictEqual([0, 1, 2, 3, 4, 5, 6, 7, 8].map(function (p) { return P.param(rec, 0, p); }), [500, 250, 50, 25, 75, 3, 80, 8, 35]);
+assert.deepStrictEqual([P.paramMax(0), P.paramMax(3), P.paramMax(7)], [8191, 255, 268435455]);
 // MIXER: the hash as pages.c r50_hash (value from a separate Python FNV-1a), the 02 reply, and mix_get's choice
 rec = []; for (i = 0; i < 122; i++) rec.push(i * 7 & 255);
 assert.strictEqual(P.hash(rec), 0xba8022cd);

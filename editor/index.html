@@ -506,25 +506,32 @@ function addPicked() {
   render();
 }
 function slotsMoved(p) { return p.orig && [0, 1, 2, 3, 4, 5].some(function (i) { return Patch.effectId(p.orig, i) !== Patch.effectId(p.rec, i); }); }
-// Parameters from g200kg's table and the pack's manifests; effects neither knows show their raw values, read only.
+// Parameters from g200kg's table and the pack's manifests; effects neither knows show raw P1-P9, up to each field's width.
+// A value cut to fit (typed too high, stored above the table's max, or a max wider than the field) gets a note, not silence.
+var clampNote = '';
+function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); }
 function fxControls(rec, i) {
   var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
   var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
     + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button><br>';
+  var notes = clampNote ? [clampNote] : [];
+  clampNote = '';
   if (!defs) {
-    for (var p = 0; p < 9; p++) h += '<label>P' + (p + 1) + ' <input type="number" disabled value="' + Patch.param(rec, i, p) + '"></label>';
-    return h + '<div class="note">Parameter names for this effect are not known yet, so they are shown read only.</div>';
+    for (var p = 0; p < 9; p++) h += '<label>P' + (p + 1) + ' <input type="number" data-fx="' + p + '" min="0" max="' + Patch.paramMax(p) + '" value="' + Patch.param(rec, i, p) + '"></label>';
+    notes.push('Parameter names for this effect are not known, so these are the raw values P1-P9.');
+    return h + notes.map(function (t) { return '<div class="note">' + esc(t) + '</div>'; }).join('');
   }
   defs.forEach(function (d, p) {          // d = [name, max, default, display]
-    var v = Math.min(Patch.param(rec, i, p), d[1]), c;
+    var m = fxMax(d, p), raw = Patch.param(rec, i, p), v = Math.min(raw, m), o = typeof d[3] === 'number' ? d[3] : 0, c;
+    if (m < d[1]) notes.push(d[0] + ': the patch has room for ' + o + '-' + (m + o) + ' only, not up to ' + (d[1] + o) + '.');
+    if (raw > m) notes.push(d[0] + ' is ' + (raw + o) + ' in the patch, above its max; shown as ' + (m + o) + '.');
     if (Array.isArray(d[3])) c = '<select data-fx="' + p + '">' + d[3].map(function (t, k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>';
     else {
-      var o = typeof d[3] === 'number' ? d[3] : 0;
-      c = '<input type="number" data-fx="' + p + '" data-o="' + o + '" min="' + o + '" max="' + (d[1] + o) + '" value="' + (v + o) + '">';
+      c = '<input type="number" data-fx="' + p + '" data-o="' + o + '" min="' + o + '" max="' + (m + o) + '" value="' + (v + o) + '">';
     }
     h += '<label>' + esc(d[0]) + ' ' + c + '</label>';
   });
-  return h;
+  return h + notes.map(function (t) { return '<div class="note bad">' + esc(t) + '</div>'; }).join('');
 }
 // PERFORM, as the pedal's SETUP (asm/perform/perform_draw.c, perform_keys.c). Edits p.perf, the 208 bytes "Write" sends.
 var WHEN = ['NOW', '1 beat', '2 beats', '4 beats', '8 beats', '1 bar', '2 bars', '4 bars', '8 bars', '16 bars', '32 bars'];
@@ -683,8 +690,10 @@ $('detail').addEventListener('change', function (e) {
   if (fx && p && typeof focus === 'number') {
     if (fx === 'on') Patch.setOn(p.rec, focus, e.target.checked);
     else {
-      var d = EFFECT_PARAMS[Patch.effectKey(p.rec, focus)][+fx];
-      Patch.setParam(p.rec, focus, +fx, Math.max(0, Math.min(d[1], (+e.target.value | 0) - (+e.target.dataset.o || 0))));
+      var defs = EFFECT_PARAMS[Patch.effectKey(p.rec, focus)], d = defs && defs[+fx], o = +e.target.dataset.o || 0;
+      var want = Math.round(+e.target.value || 0) - o, m = fxMax(d, +fx), v = Math.max(0, Math.min(m, want));
+      if (v !== want) clampNote = (d ? d[0] : 'P' + (+fx + 1)) + ': ' + (want + o) + ' is out of range, set to ' + (v + o) + '.';
+      Patch.setParam(p.rec, focus, +fx, v);
     }
     render();
     return;
