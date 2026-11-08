@@ -554,9 +554,23 @@ var down = null;
 function dropHit(q) { var h = LCD.hit(chainHits, q); return h && h.it !== 'del' && h.it !== 'ins' && h.it !== chainDrag.slot ? h : null; }
 $('detail').addEventListener('pointerdown', function (e) {
   if (e.target.id !== 'chainLcd') return;
-  var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), cx: e.clientX, cy: e.clientY };
-  if (down.h && typeof down.h.it === 'number') try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
+  var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), cx: e.clientX, cy: e.clientY, qx: q.x, off: add.off };
+  if ((down.h && typeof down.h.it === 'number') || addRow()) try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
 });
+// the add screen's row of effects: dragged sideways or turned with the wheel, as the menus scroll
+function addRow() { return /^add\d$/.test(focus) && add.cat !== -1 && add.pick == null; }
+$('detail').addEventListener('pointermove', function (e) {
+  if (!down || e.target.id !== 'chainLcd' || !addRow()) return;
+  if (!down.drag && Math.abs(e.clientX - down.cx) < 5) return;
+  down.drag = true; add.cur = -1; add.off = down.off - (LCD.at(e.target, e).x - down.qx);
+  drawAdd(patches[sel]);
+});
+$('detail').addEventListener('wheel', function (e) {
+  if (e.target.id !== 'chainLcd' || !addRow()) return;
+  e.preventDefault();
+  add.cur = -1; add.off += ((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) < 0 ? -1 : 1) * 23;   // half a pill a notch
+  drawAdd(patches[sel]);
+}, { passive: false });
 $('detail').addEventListener('pointermove', function (e) {
   if (!down || e.target.id !== 'chainLcd' || !down.h || typeof down.h.it !== 'number') return;
   if (!chainDrag && Math.abs(e.clientX - down.cx) + Math.abs(e.clientY - down.cy) < 5) return;
@@ -583,7 +597,7 @@ $('detail').addEventListener('pointerup', function (e) {
     if (to) moveTo(p, g, to.z, to.at);
     return drawChain(patches[sel], chainMode);
   }
-  if (/^add\d$/.test(focus)) { if (h && d.h && h.it === d.h.it && h.i === d.h.i) addClick(h); return; }   // redrawn as it scrolls: same item, not same object
+  if (/^add\d$/.test(focus)) { if (!d.drag && h && d.h && h.it === d.h.it && h.i === d.h.i) addClick(h); return; }   // a drag scrolls, it picks nothing
   if (askDel) { askDel = false; if (h && h === d.h && h.it === 'yes') return removeFx(); return drawChain(p, chainMode); }
   if (!h || h !== d.h) return;
   if (h.it === 'del') { askDel = true; return drawChain(p, chainMode); }
@@ -595,8 +609,7 @@ $('detail').addEventListener('pointerup', function (e) {
   detail();
   refocus('#chainLcd');
 });
-$('detail').addEventListener('pointerover', function (e) { if (e.target.id === 'chainLcd') add.hover = true; });
-$('detail').addEventListener('pointerout', function (e) { if (e.target.id === 'chainLcd') add.hover = false; });// The effects of zone z in signal order (slot order), without slot skip
+// The effects of zone z in signal order (slot order), without slot skip
 function zoneSlots(rec, z, skip) {
   var r = Patch.routing(rec), l = [];
   for (var i = 0; i < Patch.used(rec); i++) if (i !== skip && r.bus[i] === z) l.push(i);
@@ -640,7 +653,7 @@ ADD_CATS.forEach(function (c) { c.n = c.keys.length; });
 var FIND_KEYS = byName([].concat.apply([], ADD_CATS.map(function (c) { return c.keys; })));
 var addAt = -1;   // the slot a new effect goes in, -1: the output end of its zone
 // cat: -1 the categories, -2 Find, else the category; cur: the keyboard's box or pill (-1: none); pick: the chosen effect's key
-var add = { cat: -1, cur: -1, off: 0, pick: null, q: '', hover: false, timer: 0 };
+var add = { cat: -1, cur: -1, off: 0, pick: null, q: '' };
 function addReset() { add.cat = -1; add.cur = -1; add.off = 0; add.pick = null; add.q = ''; }
 function addKeys() {
   if (add.cat !== -2) return ADD_CATS[add.cat].keys;
@@ -651,20 +664,15 @@ function addWhere(p, z) {
   return addAt < 0 ? (z === 1 || z === 2 ? 'TO ' : '') + ZONES[z] : addAt < Patch.used(p.rec) && Patch.routing(p.rec).bus[addAt] === z ? 'BEFORE ' + (fxName(p.rec, addAt) || 'THRU') : 'AFTER ' + (fxName(p.rec, addAt - 1) || 'THRU');
 }
 function drawAdd(p) {
-  var cv = $('chainLcd'), z = +focus[3], tt = 'ADD EFFECT ' + addWhere(p, z), moving = false;
+  var cv = $('chainLcd'), z = +focus[3], tt = 'ADD EFFECT ' + addWhere(p, z);
   if (!cv) return;
   if (add.pick != null) chainHits = LCD.chosen(tt, EFFECT_NAMES[add.pick]);
   else if (add.cat === -1) chainHits = LCD.categories(tt, ADD_CATS, add.cur);
   else {
     var ks = addKeys(), r = LCD.carousel(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.off, add.cur);
-    chainHits = r.hits; add.off = r.off; moving = ks.length * 46 - 8 > LCD.SW - 12;
+    chainHits = r.hits; add.off = r.off;
   }
   LCD.present(cv);
-  if (moving && !add.timer) add.timer = setInterval(function () {   // scrolls right to left; still while pointed at, keyed or hidden
-    if (!$('chainLcd') || !/^add\d$/.test(focus) || add.cat === -1 || add.pick != null) { clearInterval(add.timer); add.timer = 0; return; }
-    if (add.hover || add.cur >= 0 || document.hidden) return;
-    add.off++; drawAdd(patches[sel]);
-  }, 50);
 }
 function addClick(h) {
   if (h.it === 'exit') { focus = null; detail(); return refocus('#chainLcd'); }
@@ -694,7 +702,6 @@ function addKey(e) {
     if (k === 'Escape' || k === 'Backspace') return addClick({ it: 'back' });
     if (k === 'Enter' && a.cur >= 0 && n) a.pick = addKeys()[a.cur];
     if ((k === 'ArrowLeft' || k === 'ArrowRight') && n) a.cur = a.cur < 0 ? 0 : (a.cur + (k === 'ArrowRight' ? 1 : -1) + n) % n;
-    if (k === 'ArrowUp' || k === 'ArrowDown') a.cur = -1;   // back to scrolling
   }
   drawAdd(patches[sel]);
 }

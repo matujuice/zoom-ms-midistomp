@@ -125,6 +125,12 @@ var LCD = (function () {
     rect(x + 1, y + s + 1, x + w - 2, y + e + 1, 0);
     blit(x, y + h + 1, 5, 8, [1, 3, 7, 3, 1], true); blit(x, y - 4, 5, 8, [4, 6, 7, 6, 4], true);
   }
+  function hscrollbar(left, total, vis, x, y, w, h) {
+    rect(x, y, x + w - 1, y + h - 1, 1);
+    var s = Math.trunc(left * (w - 2) / total), e = left + vis >= total ? w - 3 : Math.trunc(vis * (w - 2) / total) + s;
+    rect(x + s + 1, y + 1, x + e + 1, y + h - 2, 0);
+    blit(x - 4, y, 3, 8, [4, 14, 31], true); blit(x + w + 1, y, 3, 8, [31, 14, 4], true);
+  }
 
   // ---- the LCD look (make_screens.py lcd()): bezel, glass, 6x9 cells, indigo ink fading across ----
   var CELLW = 6, CELLH = 9, MG = 18, BZ = 14;
@@ -428,7 +434,7 @@ var LCD = (function () {
       floating(c);
       d.hits.forEach(function (h) { if (h.it === 'land') { inv(h.x + 1, h.y, CW - 2, 1); inv(h.x + 1, h.y + CH - 1, CW - 2, 1); inv(h.x, h.y + 1, 1, CH - 2); inv(h.x + CW - 1, h.y + 1, 1, CH - 2); } });
     }
-    if (c.ask != null) return ask('DELETE ' + c.ask + '?', 'NO', 'YES');
+    if (c.ask != null) return ask('DELETE', c.ask + '?', 'NO', 'YES');
     return d.hits;
   }
   // a softkey: the softkey font in a 9-row box, filled when on; returns its hit
@@ -438,13 +444,19 @@ var LCD = (function () {
     if (on) inv(x, y, w, 9); else sq(x, y, w, 9);
     return { it: it, x: x - 1, y: y - 1, w: w + 2, h: 11 };
   }
-  // a question over the screen, with two keys; a click outside it is { it: 'no' } too
-  function ask(q, no, yes) {
-    var bw = Math.max(7 * q.length + 16, 120), bh = 30, bx = (W - bw) >> 1, by = 14, kw = softW(no) + 9, kv = softW(yes) + 9;
-    fill(bx - 2, by - 2, bw + 4, bh + 4, 0); sq(bx, by, bw, bh); sq(bx + 1, by + 1, bw - 2, bh - 2);
-    font7c(q, W >> 1, by + 5);
-    var cx = W >> 1;
-    return [{ it: 'no', x: 0, y: 0, w: W, h: H }, skey('no', no, cx - 6 - kw, by + 17, 0), skey('yes', yes, cx + 6, by + 17, 1)];
+  // the pedal's popup frame (tap tempo): corners cut in 2 steps, a 1-pixel line, shadow right and below
+  function rframe(x, y, w, h) {
+    fill(x + 3, y, w - 6, 1, 1); fill(x + 3, y + h - 1, w - 6, 1, 1); fill(x, y + 2, 1, h - 4, 1); fill(x + w - 1, y + 2, 1, h - 4, 1);
+    [[x + 1, y + 1], [x + 2, y + 1], [x + w - 3, y + 1], [x + w - 2, y + 1], [x + 1, y + h - 2], [x + 2, y + h - 2], [x + w - 3, y + h - 2], [x + w - 2, y + h - 2]].forEach(function (q) { fill(q[0], q[1], 1, 1, 1); });
+  }
+  // a question over the screen: an inverted label, then q; two keys; a click outside it is { it: 'no' } too
+  function ask(lb, q, no, yes) {
+    var tw = 7 * lb.length + 4, rw = tw + 6 + 7 * q.length, bw = Math.max(rw + 20, 110), bh = 33, bx = (W - bw - 1) >> 1, by = (67 - bh - 1) >> 1;
+    var kw = softW(no) + 9, cx = W >> 1, lx = (W - rw) >> 1, ty = by + 6;
+    fill(bx - 2, by - 2, bw + 5, bh + 5, 0);
+    rframe(bx + 1, by + 1, bw, bh); fill(bx + 1, by + 1, bw - 2, bh - 2, 0); fill(bx + 3, by, bw - 6, 1, 0); rframe(bx, by, bw, bh);
+    font7(lb, lx + 2, ty); inv(lx, ty - 2, tw, 11); font7(q, lx + tw + 6, ty);
+    return [{ it: 'no', x: 0, y: 0, w: W, h: H }, skey('no', no, cx - 6 - kw, by + bh - 14, 0), skey('yes', yes, cx + 6, by + bh - 14, 1)];
   }
 
   // ---- the add screen: categories, then their effects scrolling by, then the chosen one big ----------
@@ -466,36 +478,44 @@ var LCD = (function () {
         var ax = cx + 10; fill(ax, y + 12, 9, 1, 1); fill(ax + 6, y + 10, 1, 5, 1); fill(ax + 7, y + 11, 1, 3, 1); sq(ax + 10, y + 8, 6, 9);
         hits.push({ it: 'exit', x: x, y: y, w: bw, h: bh });
       }
-      if (i === cur) inv(x + 2, y + 2, bw - 4, bh - 4);
+      if (i === cur && i < cats.length) { [[1, 2], [bw - 2, 2], [1, bh - 3], [bw - 2, bh - 3]].forEach(function (q) { fill(x + q[0], y + q[1], 1, 1, 0); }); inv(x + 1, y + 2, bw - 2, bh - 4); }
+      else if (i === cur) inv(x + 1, y + 1, bw - 2, bh - 2);
     }
     return hits;
   }
-  // names in one row of pills scrolling right to left by off pixels (static and centered when they all fit);
-  // cur: the keyboard's pill (-1: none), kept in view. Returns { hits, off }
+  // names in one row of pills, scrolled off pixels to the left (centered when they all fit);
+  // cur: the keyboard's pill (-1: none), kept in view. Returns { hits, off } with off clamped
   function carousel(tt, names, off, cur) {
-    var hits = [], P = CW + 8, tot = names.length * P, y = 24, fit = tot - 8 <= SW - 12, x0 = fit ? (SW - tot + 8) >> 1 : 0;
+    var hits = [], P = CW + 8, tot = names.length * P - 8, y = 22;
     begin(SW, 67);
+    var room = W - 12, max = Math.max(0, tot - room), x0;
     fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
-    if (!fit && cur >= 0) {   // the cursor in view, 10 pixels in from the edges
-      var cx = ((cur * P - off) % tot + tot) % tot;
+    if (max && cur >= 0) {   // the cursor in view, 10 pixels in from the edges
+      var cx = 6 + cur * P - off;
       if (cx > W - CW - 10) off += cx - (W - CW - 10); else if (cx < 10) off -= 10 - cx;
     }
-    if (!fit) off = (off % tot + tot) % tot;
+    off = Math.max(0, Math.min(max, off | 0)); x0 = max ? 6 - off : (W - tot) >> 1;
     names.forEach(function (nm, i) {
-      var b = fit ? x0 + i * P : ((i * P - off) % tot + tot) % tot;
-      (fit ? [b] : [b, b - tot]).forEach(function (l) {
-        if (l <= -CW || l >= W) return;
-        pill(l, y, 0, 1); name2(nm, l, y);
-        if (i === cur) mark(l, y, CW, CH, 1);
-        hits.push({ it: 'fx', i: i, x: l, y: y, w: CW, h: CH });
-      });
+      var l = x0 + i * P;
+      if (l <= -CW || l >= W) return;
+      pill(l, y, 0, 2); name2(nm, l, y);
+      if (i === cur) mark(l, y, CW, CH, 1);
+      hits.push({ it: 'fx', i: i, x: l, y: y, w: CW, h: CH });
     });
+    if (max) hscrollbar(off, tot + 12, W, 24, 46, W - 48, 5);
     hits.push(skey('back', 'BACK', 3, 56, 0));
     var tip = names.length + ' EFFECTS'; small(tip, W - 3 - softW(tip), 58);
     return { hits: hits, off: off };
   }
-  // the chosen effect, twice as big, with ADD and BACK under it
-  function chosen(tt, nm) {
+  // the chosen effect, twice as big, with ADD and BACK under it; pic: its play-screen picture (1024 column bytes)
+  function chosen(tt, nm, pic) {
+    if (pic) {
+      begin(SW, 67);
+      var px0 = (W - 128) >> 1, kb = softW('BACK') + 9;
+      for (var p = 0; p < 8; p++) blit(px0, 2 + 8 * p, 128, 8, Array.prototype.slice.call(pic, 128 * p, 128 * p + 128), true);
+      t5(nm, 3, 3, 1, 1); t5(tt, 3, 13, 1, 0);
+      return [{ it: 'cover', x: px0, y: 2, w: 128, h: 64 }, skey('back', 'BACK', 3, 56, 0), skey('ok', 'ADD', W - 3 - (softW('ADD') + 9), 56, 1)];
+    }
     begin(CW, CH); pill(0, 0, 0, 2); name2(nm, 0, 0);
     var g = grab(), l = (SW - 2 * CW) >> 1, y = 12;
     begin(SW, 67);
