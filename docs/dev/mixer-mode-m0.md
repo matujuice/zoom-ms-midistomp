@@ -124,6 +124,13 @@ the last-saved copy at `0xC009C07C`).
 | 108-110 | tail, widths `0xC00ECB38` = 6,4,3,8 = **21 of 24 bits** |
 | 111-121 | name (11 B copied raw) |
 
+**Checked on a real MS-70CDR backup (2026-11-08):**
+- The tail at 108-110 is LSB first: DSP-off mask = bits 0-5, cursor = bits 6-9, COUNT = bits 10-12, tempo = bits 13-20. A fresh patch reads `40 05 14`: mask 0, cursor 5, count 1, tempo 160.
+- COUNT matches the slots in use (3, 1 or 6). A new patch's cursor is 6 - COUNT.
+- An empty slot is `01 00 … 00`: on = 1, id 0 (THRU). Byte 17 still carries the routing bits.
+- A patch with COUNT 1 can have id 0 in slot 0.
+- The name is 10 characters plus a NUL at byte 121.
+
 **Spare: 51 bits [C]:** byte 17 of each slot block (offsets 17, 35, 53, 71, 89, 107 = 48 bits)
 and bits 5-7 of byte 110. The pack routine `0xC00D382C` clears its output first (memset
 `0xC00DBAE0`), and the unpack routine `0xC00D3740` reads only the declared fields. So the OS
