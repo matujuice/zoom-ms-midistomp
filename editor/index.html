@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIDISTOMP Patches</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1b1b1b; --dim: #6b6b6b; --line: #d9d9d4; --card: #fff; --accent: #c2410c; --ok: #15803d; --bad: #b91c1c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #e8e8e6; --dim: #9a9a96; --line: #333; --card: #1f1f1f; --accent: #fb923c; --ok: #4ade80; --bad: #f87171; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 6px; cursor: pointer; }
+  button.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  #status { color: var(--dim); }
+  .note { color: var(--dim); font-size: 12px; margin: 4px 0 12px; }
+  .wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { font-weight: 600; color: var(--dim); font-size: 12px; }
+  tr.dirty td:first-child { box-shadow: inset 3px 0 var(--accent); }
+  tr.sel { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  td.fx { font-size: 12px; } td.fx .off { color: var(--dim); text-decoration: line-through; }
+  .bus { font-size: 10px; color: var(--accent); margin-left: 3px; }
+  input.name { font: inherit; width: 11ch; padding: 2px 4px; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 4px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  #detail { margin: 4px 0 8px; white-space: normal; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); display: none; }
+  #detail label { display: inline-flex; gap: 4px; align-items: center; margin: 4px 12px 4px 0; }
+  #detail input[type=number] { width: 5ch; }
+  .chain { display: flex; align-items: center; gap: 6px; margin: 10px 0; overflow-x: auto; font-size: 12px; }
+  .chain .box { border: 1px solid var(--fg); border-radius: 4px; padding: 3px 6px; min-width: 7ch; text-align: center; }
+  .chain .box.off { color: var(--dim); border-color: var(--dim); text-decoration: line-through; }
+  .chain .node { font-weight: 600; border-width: 2px; }
+  .chain .jack { color: var(--dim); }
+  .chain .ab { display: flex; flex-direction: column; gap: 4px; margin-left: 10px; }
+  .chain .zone { display: flex; flex-direction: row-reverse; gap: 6px; align-items: center; min-height: 26px; min-width: 40px; padding: 2px 4px; border: 1px dashed var(--dim); border-radius: 4px; position: relative; }
+  .chain .zone[data-l]::after { content: attr(data-l); position: absolute; left: -12px; color: var(--accent); font-size: 10px; }
+  .chain .box[draggable] { cursor: grab; }
+  .chain [data-it] { cursor: pointer; }
+  .chain .cur { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ctl { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MIDISTOMP Patches</h1>
+  <div class="note">Local patch manager for MS-70CDR / MS-50G. Reads all 50 patches, shows effects and MIDISTOMP routing, renames, edits routing, backs up and restores. Close Zoom Effect Manager and other editors first.</div>
+  <div class="bar">
+    <button class="main" id="connect">Connect</button>
+    <button id="readAll" disabled>Read all patches</button>
+    <button id="writeChanged" disabled>Write changed to pedal</button>
+    <button id="backup" disabled>Save backup</button>
+    <button id="restore">Load backup…</button>
+    <input type="file" id="file" accept=".json" hidden>
+    <span id="status">Not connected.</span>
+  </div>
+  <div class="note">Renaming a patch, or restoring it to another number, resets its MIXER settings and PERFORM to defaults (they live outside the patch, matched by effects and name). Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is kept.</div>
+  <div class="wrap"><table>
+    <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>MIDISTOMP</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div id="detail"></div>
+</main>
+<script src="effect-names.js"></script>
+<script src="effect-params.js"></script>
+<script src="patch.js"></script>
+<script>
+var MODELS = { 0x61: 'MS-70CDR', 0x58: 'MS-50G', 0x5f: 'MS-60B' };
+var midi, inp, outp, dev = 0, model = '', busy = false;
+var patches = [];          // { rec: [122], orig: [122] | null, note: '' }
+var waiters = [];          // { test(msg), resolve }
+var sel = -1;
+var $ = function (id) { return document.getElementById(id); };
+var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+function status(t, cls) { $('status').textContent = t; $('status').className = cls || ''; }
+function send(msg) { outp.send(msg); return sleep(msg.length > 16 ? 22 : 3); }   // paced like Modwerk
+function zoom(body) { return [0xf0, 0x52, 0x00, dev].concat(body, [0xf7]); }
+function expect(test, ms) {
+  return new Promise(function (resolve) {
+    var w = { test: test, resolve: resolve };
+    waiters.push(w);
+    setTimeout(function () { var i = waiters.indexOf(w); if (i >= 0) { waiters.splice(i, 1); resolve(null); } }, ms || 1500);
+  });
+}
+function onMidi(e) {
+  var m = Array.from(e.data);
+  for (var i = 0; i < waiters.length; i++)
+    if (waiters[i].test(m)) { var w = waiters.splice(i, 1)[0]; w.resolve(m); return; }
+}
+async function guard(fn) {
+  if (busy) return;
+  busy = true; buttons();
+  try { await fn(); } catch (err) { status(String(err.message || err), 'bad'); }
+  busy = false; buttons();
+}
+function buttons() {
+  var on = !!outp && !busy;
+  $('connect').disabled = busy;
+  $('readAll').disabled = !on;
+  $('writeChanged').disabled = !on || !patches.some(dirty);
+  $('backup').disabled = busy || !patches.length;
+  $('restore').disabled = busy;
+}
+function dirty(p) { return p && (!p.orig || p.rec.some(function (b, i) { return b !== p.orig[i]; })); }
+
+$('connect').onclick = function () { guard(async function () {
+  if (!navigator.requestMIDIAccess) throw new Error('This browser has no Web MIDI. Use Chrome or Edge.');
+  midi = midi || await navigator.requestMIDIAccess({ sysex: true });
+  var ins = Array.from(midi.inputs.values()), outs = Array.from(midi.outputs.values());
+  var zi = ins.filter(function (p) { return /zoom/i.test(p.name); }), zo = outs.filter(function (p) { return /zoom/i.test(p.name); });
+  inp = zi[0] || ins[0]; outp = zo[0] || outs[0];
+  if (!inp || !outp) throw new Error('No MIDI ports. Plug in the pedal and try again.');
+  inp.onmidimessage = onMidi;
+  var reply = expect(function (m) { return m[0] === 0xf0 && m[1] === 0x7e && m[4] === 0x02 && m[5] === 0x52; });
+  await send([0xf0, 0x7e, 0x00, 0x06, 0x01, 0xf7]);
+  var id = await reply;
+  if (!id) { outp = null; throw new Error('The pedal did not answer. Close other apps that use it, then try again.'); }
+  dev = id[6]; model = MODELS[dev] || ('Zoom 0x' + dev.toString(16));
+  if (dev === 0x5f) { outp = null; throw new Error('MS-60B patches have another layout: not supported yet.'); }
+  var fw = String.fromCharCode.apply(null, id.slice(10, 14)).replace(/[^ -~]/g, '');
+  await send(zoom([0x50]));                                     // editor mode on
+  pcKnown = false;
+  status('Connected: ' + model + ' ' + fw + ' (' + outp.name + ')', 'ok');
+}); };
+
+async function currentProgram() {
+  var r = expect(function (m) { return (m[0] & 0xf0) === 0xc0; }, 800);
+  await send(zoom([0x33]));
+  var m = await r;
+  return m ? m[1] : -1;
+}
+// Patches are loaded with Program Change, and MIDISTOMP has two settings that change it:
+// PROG CH START NO. (1, its default: PC 1 = patch 1; 0 or stock: PC 0 = patch 1) and MIDI CHANNEL.
+// findPc works both out once per connection from which patch a test PC loads.
+var pcStart = 0, pcCh = 0, pcKnown = false;
+async function waitChange(from) {                 // a real patch load takes a while
+  for (var t0 = Date.now(); Date.now() - t0 < 1500;) {
+    await sleep(100);
+    var now = await currentProgram();
+    if (now < 0) throw new Error('The pedal does not say which patch is loaded.');
+    if (now !== from) return now;
+  }
+  return from;
+}
+async function findPc() {
+  var cur = await currentProgram();
+  if (cur < 0) throw new Error('The pedal does not say which patch is loaded.');
+  // Channel 1 (or OMNI) first: one PC, so an OMNI pedal loads only one patch.
+  var v = cur >= 10 ? 5 : 20;                     // loads patch index v (start 0) or v-1 (start 1), neither is cur
+  await send([0xc0, v]);
+  var p = await waitChange(cur);
+  if (p === v || p === v - 1) { pcCh = 0; pcStart = v - p; pcKnown = true; return; }
+  // Not channel 1: one PC on each other channel, each to its own patch. Only one channel listens.
+  // Channel c sends base+2c, so the loaded index base+2c-start gives both c and start.
+  for (var base of [0, 19]) {
+    for (var c = 1; c < 16; c++) await send([0xc0 | c, base + 2 * c]);
+    p = await waitChange(cur);
+    if (p !== cur) {
+      var d = p - base, s = d & 1;
+      pcCh = (d + s) / 2; pcStart = s; pcKnown = true;
+      return;
+    }
+  }
+  throw new Error('The pedal ignores Program Change. Set PROG CH RECEIVE to ON in its MIDI settings.');
+}
+async function selectPatch(n) {
+  if (!pcKnown) await findPc();
+  await send([0xc0 | pcCh, n + pcStart]);
+  var now = await currentProgram();
+  if (now !== n) now = await waitChange(now);
+  if (now !== n) { pcKnown = false; throw new Error('Program Change did not load patch ' + (n + 1) + ' (the pedal is on patch ' + (now + 1) + '). Try again.'); }
+}
+async function readPatch(n) {
+  await selectPatch(n);
+  var r = expect(function (m) { return m.length === 146 && m[1] === 0x52 && m[3] === dev && m[4] === 0x28; });
+  await send(zoom([0x29]));
+  var m = await r;
+  return m && Patch.fromDump(m);
+}
+
+$('readAll').onclick = function () { guard(async function () {
+  var was = await currentProgram();
+  for (var n = 0; n < 50; n++) {
+    status('Reading patch ' + (n + 1) + ' / 50…');
+    var rec = await readPatch(n);
+    if (!rec) throw new Error('No answer for patch ' + (n + 1) + '. Stopped.');
+    patches[n] = { rec: rec, orig: rec.slice(), note: '' };
+    render();
+  }
+  if (was >= 0) await selectPatch(was);
+  status('Read 50 patches from ' + model + '.', 'ok');
+}); };
+
+async function writePatch(n) {
+  var p = patches[n];
+  await selectPatch(n);
+  await send(Patch.toDump(p.rec, dev));
+  await sleep(50);
+  await send(zoom([0x32, 0x01, 0x00, 0x00, n, 0x00, 0x00, 0x00, 0x00, 0x00]));   // store to patch n
+  await sleep(250);
+  var back = await readPatch(n);                                 // read back to check
+  var same = back && back.every(function (b, i) { return b === p.rec[i]; });
+  if (back) { p.rec = back; p.orig = back.slice(); }
+  p.note = same ? 'written' : back ? 'pedal changed it' : 'no read-back';
+  return same;
+}
+
+$('writeChanged').onclick = function () { guard(async function () {
+  var list = patches.map(function (p, n) { return dirty(p) ? n : -1; }).filter(function (n) { return n >= 0; });
+  if (!confirm('Write ' + list.length + ' patch(es) to the pedal: ' + list.map(function (n) { return n + 1; }).join(', ') + '?\nThis overwrites them on the pedal.')) return;
+  var was = await currentProgram(), bad = 0;
+  for (var k = 0; k < list.length; k++) {
+    status('Writing patch ' + (list[k] + 1) + ' (' + (k + 1) + ' / ' + list.length + ')…');
+    if (!await writePatch(list[k])) bad++;
+    render();
+  }
+  if (was >= 0) await selectPatch(was);
+  status(bad ? bad + ' patch(es) read back different: see the table.' : 'Wrote ' + list.length + ' patch(es), read back OK.', bad ? 'bad' : 'ok');
+}); };
+
+$('backup').onclick = function () {
+  var data = { format: 'midistomp-patches', version: 1, model: model, deviceId: dev, saved: new Date().toISOString(),
+    patches: patches.map(function (p) { return p ? p.rec.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null; }) };
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+  a.download = (model || 'zoom') + '-patches-' + data.saved.slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('restore').onclick = function () { $('file').click(); };
+$('file').onchange = async function () {
+  var f = this.files[0]; this.value = '';
+  if (!f) return;
+  try {
+    var d = JSON.parse(await f.text());
+    if (d.format !== 'midistomp-patches' || !Array.isArray(d.patches) || d.patches.length !== 50) throw new Error('Not a patch backup.');
+    if (dev && d.deviceId !== dev) throw new Error('This backup is from ' + d.model + ', the pedal is ' + model + '.');
+    d.patches.forEach(function (h, n) {
+      if (!/^[0-9a-f]{244}$/.test(h || '')) throw new Error('Patch ' + (n + 1) + ' in the backup is damaged.');
+      var rec = h.match(/../g).map(function (x) { return parseInt(x, 16); });
+      if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte.');
+      var old = patches[n];
+      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '' };
+      if (dirty(patches[n])) patches[n].note = 'from backup';
+    });
+    render();
+    status('Loaded ' + f.name + '. Changed patches are marked: "Write changed to pedal" sends them.', 'ok');
+  } catch (err) { status(String(err.message || err), 'bad'); }
+  buttons();
+};
+
+// zoom-ms-zdl-effects-pack: effect id (category 8 << 24 | fxid) -> ZDL name. ponytail: hand list, update when the pack adds effects.
+var PACK_NAMES = { 480: 'DualShft', 481: 'LOUDER', 485: 'DubSiren', 486: 'Choral', 487: 'WaveFold', 488: 'EuGate',
+  489: 'SGNL', 490: 'Scrub', 491: 'DirtBox', 492: 'Washout', 493: 'Breather', 494: 'Takeoff', 495: 'GRDELAY',
+  496: 'Sweep', 497: 'GRDLOOP', 498: 'DryPrb', 500: 'RoutePrb', 501: 'Gooey', 502: 'DJFilter' };
+function fxName(rec, i) {
+  var key = Patch.effectKey(rec, i), id = Patch.effectId(rec, i);
+  if (!key) return '';
+  return EFFECT_NAMES[key] || (id >>> 24 === 8 && PACK_NAMES[id & 0xffffff]) || ('id ' + id.toString(16));
+}
+function esc(s) { return s.replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+var detailBox = $('detail');                     // kept, since render() moves it into the table
+function render() {
+  var html = '';
+  patches.forEach(function (p, n) {
+    if (!p) return;
+    var r = Patch.routing(p.rec), cells = '';
+    for (var i = 0; i < 6; i++) {
+      var nm = fxName(p.rec, i);
+      cells += '<td class="fx">' + (nm ? '<span class="' + (Patch.on(p.rec, i) ? '' : 'off') + '">' + esc(nm) + '</span>'
+        + (r.used ? '<span class="bus">' + 'RABM'[r.bus[i]] + '</span>' : '') : '') + '</td>';
+    }
+    var ms = r.used ? 'In ' + r.inR + ' · Mst ' + r.masterR + ' · ' + Patch.OUT[r.out]
+      + (r.muteA ? ' · MuteA' : '') + (r.muteB ? ' · MuteB' : '') + (r.solo ? ' · Solo ' + Patch.SOLO[r.solo] : '') : '—';
+    html += '<tr data-n="' + n + '" class="' + (dirty(p) ? 'dirty ' : '') + (n === sel ? 'sel' : '') + '"><td>' + (n + 1) + '</td>'
+      + '<td><input class="name" maxlength="10" value="' + esc(Patch.name(p.rec)) + '"></td>' + cells
+      + '<td>' + ms + '</td><td class="' + (p.note === 'written' ? 'ok' : p.note && p.note !== 'from backup' ? 'bad' : '') + '">' + esc(p.note) + '</td></tr>';
+  });
+  $('rows').innerHTML = html;
+  var row = $('rows').querySelector('tr.sel');       // the patch panel opens under its row
+  if (row) { var tr = document.createElement('tr'), td = tr.insertCell(); td.colSpan = 10; td.appendChild(detailBox); row.after(tr); }
+  buttons();
+  detail();
+}
+$('rows').addEventListener('input', function (e) {
+  if (!e.target.classList.contains('name')) return;
+  var n = +e.target.closest('tr').dataset.n;
+  Patch.setName(patches[n].rec, e.target.value);
+  e.target.closest('tr').classList.toggle('dirty', dirty(patches[n]));
+  buttons();
+});
+$('rows').addEventListener('change', function (e) { if (e.target.classList.contains('name')) render(); });
+$('rows').addEventListener('click', function (e) {
+  if (e.target.tagName === 'INPUT' || e.target.closest('#detail')) return;
+  var tr = e.target.closest('tr[data-n]');
+  if (!tr) return;
+  sel = +tr.dataset.n === sel ? -1 : +tr.dataset.n;
+  focus = null;
+  render();
+});
+
+// As the pedal's Effect Chain screen: signal right to left, OUT ← Post ← [MIX] ← A / B ← [ROUTE] ← Pre ← IN.
+// Each zone lists its effects in signal order (row-reverse: the first one, nearest the input, on the right).
+// Drag a box onto another box or into a zone to move it; the patch's slots are then rewritten in signal order.
+function chainHtml(rec, r) {
+  function zone(z, label) {
+    var h = '<div class="zone" data-z="' + z + '"' + (label ? ' data-l="' + label + '"' : '') + '>';
+    for (var i = 0; i < 6; i++)
+      if (r.bus[i] === z && fxName(rec, i))
+        h += '<span class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '">' + esc(fxName(rec, i)) + '</span>';
+    return h + '</div>';
+  }
+  function node(it, t) { return '<span class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '">' + t + '</span>'; }
+  return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
+    + node('mix', 'MIX') + '<div class="ab">' + zone(1, 'A') + zone(2, 'B')
+    + '</div>' + node('route', 'ROUTE') + zone(0) + '<span class="jack">← IN</span></div>';
+}
+var dragSlot = -1, focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
+$('detail').addEventListener('click', function (e) {
+  var it = e.target.closest('[data-it]');
+  if (!it) return;
+  focus = /^\d$/.test(it.dataset.it) ? +it.dataset.it : it.dataset.it;
+  detail();
+});
+$('detail').addEventListener('dragstart', function (e) {
+  var b = e.target.closest && e.target.closest('.box[data-s]');
+  if (!b) return;
+  dragSlot = +b.dataset.s;
+  e.dataTransfer.effectAllowed = 'move';
+});
+$('detail').addEventListener('dragover', function (e) {
+  if (dragSlot >= 0 && e.target.closest('.zone')) e.preventDefault();
+});
+$('detail').addEventListener('drop', function (e) {
+  var zoneEl = e.target.closest('.zone'), p = patches[sel];
+  if (dragSlot < 0 || !zoneEl || !p) return;
+  e.preventDefault();
+  var r = Patch.routing(p.rec), z = +zoneEl.dataset.z, from = dragSlot;
+  dragSlot = -1;
+  // signal order of each zone, without the moved effect
+  var zones = [[], [], [], []], empty = [];
+  for (var i = 0; i < 6; i++) {
+    if (i === from) continue;
+    if (fxName(p.rec, i)) zones[r.bus[i]].push(i); else empty.push(i);
+  }
+  var at = zones[z].length, box = e.target.closest('.box[data-s]');
+  if (box && +box.dataset.s !== from) {               // right half of a box = before it (nearer the input)
+    var rc = box.getBoundingClientRect();
+    at = zones[z].indexOf(+box.dataset.s) + (e.clientX > rc.left + rc.width / 2 ? 0 : 1);
+  }
+  zones[z].splice(at, 0, from);
+  var order = zones[0].concat(zones[1], zones[2], zones[3]), bus = [];
+  zones.forEach(function (list, zz) { list.forEach(function () { bus.push(zz); }); });
+  empty.forEach(function (s) { order.push(s); bus.push(0); });
+  Patch.reorder(p.rec, order, bus);
+  focus = order.indexOf(from);
+  render();
+});
+$('detail').addEventListener('dragend', function () { dragSlot = -1; });
+// Parameters from g200kg's table; effects it does not know (the pack's) show their raw values, read only.
+function fxControls(rec, i) {
+  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
+  var h = '<b>' + esc(fxName(rec, i)) + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label><br>';
+  if (!defs) {
+    for (var p = 0; p < 9; p++) h += '<label>P' + (p + 1) + ' <input type="number" disabled value="' + Patch.param(rec, i, p) + '"></label>';
+    return h + '<div class="note">Parameter names for this effect are not known yet, so they are shown read only.</div>';
+  }
+  defs.forEach(function (d, p) {          // d = [name, max, default, display]
+    var v = Math.min(Patch.param(rec, i, p), d[1]), c;
+    if (Array.isArray(d[3])) c = '<select data-fx="' + p + '">' + d[3].map(function (t, k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>';
+    else {
+      var o = typeof d[3] === 'number' ? d[3] : 0;
+      c = '<input type="number" data-fx="' + p + '" data-o="' + o + '" min="' + o + '" max="' + (d[1] + o) + '" value="' + (v + o) + '">';
+    }
+    h += '<label>' + esc(d[0]) + ' ' + c + '</label>';
+  });
+  return h;
+}
+function detail() {
+  var box = detailBox, p = patches[sel];
+  if (!p) { box.style.display = 'none'; return; }
+  var r = Patch.routing(p.rec);
+  function opts(list, v) { return list.map(function (t, i) { return '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + t + '</option>'; }).join(''); }
+  function num(k, t) { return '<label>' + t + ' <input type="number" min="0" max="150" data-k="' + k + '" value="' + r[k] + '"></label>'; }
+  function check(k, t) { return '<label><input type="checkbox" data-k="' + k + '"' + (r[k] ? ' checked' : '') + '> ' + t + '</label>'; }
+  var h = '<b>Patch ' + (sel + 1) + '</b> <span class="note">Click an effect, ROUTE, MIX or OUT to edit it. Drag effects to move them.</span>'
+    + chainHtml(p.rec, r) + '<div class="ctl">';
+  if (focus === 'route')
+    h += '<b>ROUTE</b> ' + num('inR', 'Input R')
+      + '<div class="note">Mode (Serial, Parallel, Split, Mono Serial) is a MIXER setting kept on the pedal, not in the patch. '
+      + 'A and B only play in Parallel or Split: set Mode on the pedal for now.</div>';
+  else if (focus === 'mix')
+    h += '<b>MIX</b> ' + num('masterR', 'Master R') + check('muteA', 'Mute A') + check('muteB', 'Mute B')
+      + '<label>Solo <select data-k="solo">' + opts(Patch.SOLO, r.solo) + '</select></label>';
+  else if (focus === 'out')
+    h += '<b>OUT</b> <label>Output <select data-k="out">' + opts(Patch.OUT, r.out) + '</select></label>';
+  else if (typeof focus === 'number' && fxName(p.rec, focus))
+    h += fxControls(p.rec, focus);
+  else h += '<span class="note">Nothing selected.</span>';
+  h += '</div>' + (p.orig ? '<button id="undo">Undo changes</button>' : '');
+  box.innerHTML = h;
+  box.style.display = 'block';
+  if ($('undo')) $('undo').onclick = function () { p.rec = p.orig.slice(); p.note = ''; render(); };
+}
+$('detail').addEventListener('change', function (e) {
+  var k = e.target.dataset.k, fx = e.target.dataset.fx, p = patches[sel];
+  if (fx && p && typeof focus === 'number') {
+    if (fx === 'on') Patch.setOn(p.rec, focus, e.target.checked);
+    else {
+      var d = EFFECT_PARAMS[Patch.effectKey(p.rec, focus)][+fx];
+      Patch.setParam(p.rec, focus, +fx, Math.max(0, Math.min(d[1], (+e.target.value | 0) - (+e.target.dataset.o || 0))));
+    }
+    render();
+    return;
+  }
+  if (!k || !p) return;
+  var r = Patch.routing(p.rec);
+  if (e.target.type === 'checkbox') r[k] = e.target.checked ? 1 : 0;
+  else r[k] = Math.max(0, Math.min(150, +e.target.value | 0));
+  Patch.setRouting(p.rec, r);
+  render();
+});
+
+window.addEventListener('beforeunload', function () { if (outp) try { outp.send(zoom([0x51])); } catch (e) {} });   // editor mode off
+buttons();
+</script>
+</body>
+</html>
