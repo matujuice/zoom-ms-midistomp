@@ -56,13 +56,9 @@
   .chain .zone[data-l]::after { content: attr(data-l); position: absolute; left: -12px; color: var(--accent); font-size: 10px; }
   .chain .box[draggable] { cursor: grab; }
   .chain .add { min-width: 0; padding: 0 9px; border-style: dashed; color: var(--dim); }
-  .lcdwrap { overflow-x: auto; margin: 10px 0 4px; width: 0; min-width: 100%; }   /* inside a table cell: scroll, do not widen the table */
-  canvas.lcd { display: block; margin: 0 auto; height: 320px; cursor: pointer; touch-action: pan-x; }
-  canvas.lcd.knobs { height: 256px; cursor: ns-resize; touch-action: none; }
-  canvas.lcd.half { height: 256px; }
-  .prow { display: flex; flex-wrap: wrap; gap: 0 14px; align-items: flex-start; justify-content: center; }
-  #chainLcd { height: 335px; }   /* 67 rows: room for "-" under bus B */
-  .prow .lcdwrap { width: auto; min-width: 0; max-width: 100%; }
+  .lcdwrap { margin: 10px 0 4px; width: 0; min-width: 100%; }   /* inside a table cell: do not widen the table */
+  canvas.lcd { display: block; width: 100%; height: auto; cursor: pointer; touch-action: pan-y; }   /* every screen LCD.SW wide */
+  canvas.lcd.knobs { cursor: ns-resize; touch-action: none; }
   .tabs { display: flex; gap: 4px; margin: 8px 0 0; border-bottom: 1px solid var(--line); }
   .tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; }
   .tabs button.cur { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -489,7 +485,7 @@ function drawChain(p, mode) {
   if (!cv) return;
   for (var i = 0; i < 6; i++) { c.name.push(i < Patch.used(rec) ? fxName(rec, i) || 'THRU' : ''); c.on.push(Patch.on(rec, i) ? 1 : 0); }
   c.mode = m; c.stereo = pedalStereo; c.out = r.out; c.mute = [r.muteA, r.muteB]; c.sel = 1;
-  c.add = !Patch.used(rec); c.del = typeof focus === 'number' && focus < Patch.used(rec);
+  c.add = !Patch.used(rec); c.ins = Patch.used(rec) < 6; c.del = typeof focus === 'number' && focus < Patch.used(rec);
   c.z = [0, 1, 2, 3].map(function (z) { return zoneSlots(rec, z); });
   if (chainDrag) {   // the landing frame goes before the effect that will follow it (place `at` counts without the dragged one)
     c.drag = chainDrag;
@@ -521,12 +517,11 @@ function landing(p, from, h, q) {
 }
 var focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
 $('detail').addEventListener('click', function (e) {
-  var vw = e.target.closest('[data-view],[data-pc]');
+  var vw = e.target.closest('[data-view]');
   if (vw) {
-    if (vw.dataset.view) view = vw.dataset.view;
-    else { pctl = 6; prow = perfObj(patches[sel]).target[6] === Patch.T_NONE ? 0 : 1; pmv = 0; ptop = 0; ttop = -1; }
+    view = vw.dataset.view;
     detail();
-    refocus(vw.dataset.view ? '[data-view="' + view + '"]' : '[data-pc="6"]');
+    refocus('[data-view="' + view + '"]');
     return;
   }
 });
@@ -577,8 +572,10 @@ $('detail').addEventListener('pointerup', function (e) {
   }
   if (!h || h !== d.h) return;
   if (h.it === 'del') return removeFx();
-  addAt = h.it === 'ins' ? focus + h.after : -1;      // "+" beside the chosen effect: before or after it, in its zone
-  focus = h.it === 'ins' ? 'add' + Patch.routing(p.rec).bus[focus] : h.it === 'bus' || h.it === 'add' ? 'add' + h.z : h.it;
+  // "+" beside the chosen effect: before or after it, in its zone; beside IN, ROUTE, MIX or OUT: a zone's start or end
+  var ins = h.it === 'ins', byFx = ins && h.z === undefined, zl = ins && !byFx && zoneSlots(p.rec, h.z);
+  addAt = !ins ? -1 : byFx ? focus + h.after : h.end || !zl.length ? -1 : zl[0];
+  focus = byFx ? 'add' + Patch.routing(p.rec).bus[focus] : ins || h.it === 'bus' || h.it === 'add' ? 'add' + h.z : h.it;
   detail();
   if ($('pickq')) $('pickq').focus(); else refocus('#chainLcd');
 });// The effects of zone z in signal order (slot order), without slot skip
@@ -880,7 +877,7 @@ function perfChange(p, el) {
 }
 // ---- the PERFORM tab: the pedal's play screen; a click on the top bar, a knob column or a button opens its
 // SETUP list (TARGET, TURN, PRESS, HOLD) and, next to it, the chosen gesture's move page, as perform_draw.c draws them.
-var view = 'chain', pctl = 0, prow = 1, pmv = 0, ptop = 0, ttop = -1, playHits = [], listHits = [], moveHits = [], tgtHits = [], pturn = null;
+var view = 'chain', pctl = 0, prow = 1, pmv = 0, ptop = 0, ttop = -1, playHits = [], listHits = [], moveHits = [], pturn = null;
 var OFFON = ['Off', 'On'];
 var NPJ = [['InLvl', 88, 150, 'fader'], ['XFade', 85, 100, 'knob', 1], ['Mode', 93, 3, 'knob', 0, ['Serl', 'Paral', 'Split', 'MSerl']],
   ['BusA', 89, 150, 'fader'], ['BusB', 90, 150, 'fader'], ['XFade', 86, 100, 'fader', 1], ['Outpt', 98, 2, 'knob', 0, ['Ster', 'Mono', 'Split']],
@@ -960,28 +957,23 @@ function perfMove(o) {
 function perfView(p) {
   if (!mst || !entries.length) return perfHtml(p);
   var o = perfObj(p), m = perfMove(o);
-  return '<div class="lcdwrap"><canvas id="playLcd" class="lcd" tabindex="0" aria-label="PERFORM play screen. Click the top bar for CYCLE and the looper, a knob column or a button for its setup."></canvas></div>'
-    + '<div class="lcdwrap"><canvas id="ftswLcd" class="lcd" data-pc="6" tabindex="0" aria-label="Footswitch: ' + esc(tgtText(p.rec, o.target[6])) + '. Click to set it up."></canvas></div>'
-    + '<div class="prow"><div class="lcdwrap"><canvas id="listLcd" class="lcd half" tabindex="0" aria-label="Setup list: click a row; click CYCLE or LOOPER again to change it."></canvas></div>'
-    + (pctl !== 'bar' && !prow ? '<div class="lcdwrap"><canvas id="tgtLcd" class="lcd half" tabindex="0" aria-label="Targets: click one to set it. The Target field below does the same."></canvas></div>' : '')
-    + (m ? '<div class="lcdwrap"><canvas id="moveLcd" class="lcd knobs half" tabindex="0" aria-label="The move: drag Value, Next or Lag up or down, or use the mouse wheel. Value below 0 is unused."></canvas></div>' : '')
-    + '</div><div class="ctl">' + perfHtml(p, pctl) + '</div>';
+  return '<div class="lcdwrap"><canvas id="playLcd" class="lcd" tabindex="0" aria-label="PERFORM play screen and footswitch (' + esc(tgtText(p.rec, o.target[6])) + '). Click the top bar for CYCLE and the looper, a knob column, a button or the footswitch for its setup."></canvas></div>'
+    + '<div class="lcdwrap"><canvas id="listLcd" class="lcd" tabindex="0" aria-label="Setup list: click a row; click CYCLE or LOOPER again to change it. With TARGET chosen, the target list on the right: click one to set it."></canvas></div>'
+    + (m ? '<div class="lcdwrap"><canvas id="moveLcd" class="lcd knobs" tabindex="0" aria-label="The move: drag Value, Next or Lag up or down, or use the mouse wheel. Value below 0 is unused."></canvas></div>' : '')
+    + '<div class="ctl">' + perfHtml(p, pctl) + '</div>';
 }
 function drawPerf(p) {
   var cv = $('playLcd');
   if (!cv) return;
   var o = perfObj(p), rec = p.rec, m = perfMove(o);
-  playHits = LCD.play({ left: '', right: 'NO CLK', fill: 0, cycle: o.cycle, sel: pctl === 6 ? -1 : pctl,
+  playHits = LCD.perform({ left: '', right: 'NO CLK', fill: 0, cycle: o.cycle, sel: pctl === 6 ? -1 : pctl,
     cols: [0, 1, 2].map(function (i) {
       var t = o.target[i], q = pin(rec, t), v = liveVal(p, q, t);
       return t === Patch.T_NONE ? null : { fx: q.fx.toUpperCase(), lab: q.nm.toUpperCase(), look: q.look === 'trig' ? 'toggle' : q.look, v: v, max: q.max, text: natText(q, v).toUpperCase() };
     }),
-    keys: [3, 4, 5].map(function (i) { var t = o.target[i], q = pin(rec, t); return { name: t === Patch.T_NONE ? '' : q.fx.toUpperCase(), ftsw: isFtsw(t), on: isFtsw(t) && liveVal(p, q, t) }; }) });
+    keys: [3, 4, 5].map(function (i) { var t = o.target[i], q = pin(rec, t); return { name: t === Patch.T_NONE ? '' : q.fx.toUpperCase(), ftsw: isFtsw(t), on: isFtsw(t) && liveVal(p, q, t) }; }) },
+    tgtText(rec, o.target[6]), pctl === 6);
   LCD.present(cv);
-  var fc = $('ftswLcd'), ph = cv.getBoundingClientRect().height;
-  LCD.ftsw(tgtText(rec, o.target[6]), pctl === 6);
-  LCD.present(fc);
-  if (ph) fc.style.height = ph * fc.height / cv.height + 'px';     // as wide as the play screen
   var rows, name;
   if (pctl === 'bar') {
     name = 'PERFORM SETUP';
@@ -992,16 +984,15 @@ function drawPerf(p) {
     rows = [['TARGET', tgtText(rec, o.target[pctl])]];
     if (o.target[pctl] !== Patch.T_NONE) for (var g = pctl < 3 ? 0 : 1; g < 3; g++) rows.push([GN[g], gesText(rec, o, pctl, g)]);
   }
-  var l = LCD.list(name, rows, Math.min(prow, rows.length - 1), ptop);
-  listHits = l.hits; ptop = l.top;
-  LCD.present($('listLcd'));
-  if ($('tgtLcd')) {
+  var b = null;
+  if (pctl !== 'bar' && !prow) {                   // TARGET chosen: the target list beside the setup list
     var tl = targetList(rec), tc = Math.max(0, tl.findIndex(function (x) { return x[2] === o.target[pctl]; }));
     if (ttop < 0) ttop = tc - 1;                   // opened: the current target in view, one row from the top
-    l = LCD.list('TARGET', tl, tc, ttop);
-    tgtHits = l.hits; ttop = l.top;
-    LCD.present($('tgtLcd'));
+    b = ['TARGET', tl, tc, ttop];
   }
+  var l = LCD.lists([name, rows, Math.min(prow, rows.length - 1), ptop], b);
+  listHits = l.hits; ptop = l.top[0]; if (b) ttop = l.top[1];
+  LCD.present($('listLcd'));
   if (!m || !$('moveLcd')) return;
   var q = pin(rec, m.t), un = (m.w >>> 16 & 31) === 31, nx = un ? 0 : Math.min(m.w >>> 16 & 31, 10), lag = un ? 0 : m.w >>> 21 & 15;
   var tabs = pctl === 'bar' ? [LN[prow - 2], 'ACTION'] : [CID[pctl] + ' ' + GN[gesOf(pctl)]].concat(MN.slice(GFIRST[gesOf(pctl)], GFIRST[gesOf(pctl)] + GLEN[gesOf(pctl)]));
@@ -1029,10 +1020,11 @@ function moveSet(p, n, v, flip) {
 function moveVals(p) { var m = perfMove(perfObj(p)), un = (m.w >>> 16 & 31) === 31; return [un ? -1 : m.w & 0xffff, un ? 0 : m.w >>> 16 & 31, un ? 0 : m.w >>> 21 & 15]; }
 $('detail').addEventListener('pointerup', function (e) {
   var id = e.target.id, p = patches[sel];
-  if (id !== 'playLcd' && id !== 'listLcd' && id !== 'tgtLcd' || !p) return;
-  var h = LCD.hit(id === 'playLcd' ? playHits : id === 'tgtLcd' ? tgtHits : listHits, LCD.at(e.target, e)), o = perfObj(p);
+  if (id !== 'playLcd' && id !== 'listLcd' || !p) return;
+  var h = LCD.hit(id === 'playLcd' ? playHits : listHits, LCD.at(e.target, e)), o = perfObj(p);
   if (!h) return;
-  if (id === 'tgtLcd') {
+  if (h.it === 'ftsw') { pctl = 6; prow = o.target[6] === Patch.T_NONE ? 0 : 1; pmv = 0; ptop = 0; ttop = -1; }
+  else if (h.side) {
     if (h.it === 'row') { snap(p); setTarget(o, false, pctl, targetList(p.rec)[h.i][2]); p.perf = Patch.perfEncode(o); }
     else ttop += h.it === 'up' ? -1 : 1;
   }
@@ -1068,9 +1060,9 @@ $('detail').addEventListener('pointerup', function (e) {
   refocus('#moveLcd');
 });
 $('detail').addEventListener('wheel', function (e) {
-  if (e.target.id !== 'tgtLcd' && e.target.id !== 'listLcd') return;
+  if (e.target.id !== 'listLcd') return;
   e.preventDefault();
-  if (e.target.id === 'tgtLcd') ttop += e.deltaY < 0 ? -1 : 1; else ptop += e.deltaY < 0 ? -1 : 1;
+  if (pctl !== 'bar' && !prow && LCD.at(e.target, e).x > (LCD.SW - 3) >> 1) ttop += e.deltaY < 0 ? -1 : 1; else ptop += e.deltaY < 0 ? -1 : 1;
   drawPerf(patches[sel]);
 }, { passive: false });
 $('detail').addEventListener('wheel', function (e) {
@@ -1129,20 +1121,13 @@ function detail() {
   else h += '<span class="note">Nothing selected.</span>';
   h += '</div><div class="acts">' + (p.hist && p.hist.length ? '<button id="undo1">Undo last change</button>' : '')
     + ((p.orig ? recDirty(p) : 0) || p.mix || p.perf ? '<button id="undo">Undo all changes</button>' : '') + '</div>';
-  var f = focusSel(), old = $('chainLcd'), keep = old ? old.parentNode.scrollLeft : 1e6;   // a new patch starts at IN, on the right
+  var f = focusSel();
   box.innerHTML = h;
   box.style.display = 'block';
   refocus(f);
   drawChain(p, mode);
   drawKnobs(p);
   drawPerf(p);
-  var ch = chainHits.filter(function (h) { return h.it === focus; })[0], cv = $('chainLcd');   // keep the chosen item in view
-  if (cv) {
-    var k = cv.getBoundingClientRect().width / LCD.width(), w = cv.parentNode;
-    w.scrollLeft = keep;
-    if (ch && ch.x * k < w.scrollLeft) w.scrollLeft = ch.x * k - 20;
-    else if (ch && (ch.x + ch.w) * k > w.scrollLeft + w.clientWidth) w.scrollLeft = (ch.x + ch.w) * k - w.clientWidth + 20;
-  }
   if ($('pickadd')) $('pickadd').onclick = addPicked;
   if ($('undo1')) $('undo1').onclick = function () {
     var h = p.hist.pop(); p.rec = h.rec; p.mix = h.mix; p.perf = h.perf;

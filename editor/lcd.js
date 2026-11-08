@@ -4,8 +4,12 @@
 // Built by hand; the font and bitmap strings are copied from those files.
 var LCD = (function () {
   'use strict';
-  var W = 128, H = 64, fb = new Uint8Array(128 * 64);
+  var W = 128, H = 64, fb = new Uint8Array(128 * 64), SW = 0;   // SW: every screen's width, the widest Effect Chain (set at the end)
   function begin(w, h) { W = Math.max(128, w | 0); H = h || 64; fb = new Uint8Array(W * H); return W; }
+  // screens put side by side: grab() keeps what was drawn, paste() puts it into the next begin(), shift() moves its hits
+  function grab() { return { w: W, h: H, fb: fb }; }
+  function paste(g, ox, oy) { for (var y = 0; y < g.h; y++) for (var x = 0; x < g.w; x++) if (g.fb[y * g.w + x]) px(ox + x, oy + y, 1, 'set'); }
+  function shift(hits, ox, oy, tag) { return hits.map(function (h) { return Object.assign({}, h, { x: h.x + ox, y: h.y + oy }, tag); }); }
 
   const F7="0000000000000000005f5f00000003030003030000143e14143e1400242a7f7f2a12002333180c666200367f4957265000000b0700000000001c3e634100000041633e1c000024187e7e18240018187e7e1818000058380000000018181818181800006060000000002030180c0602003e7f594d7f3e0000427f7f400000466171594f4600224149497f36001814127f7f1000274745457d39003e7f49497930000101717d0f0300367f49497f3600064f49497f3e00000036360000000000563600000000081c36630000363636363636000063361c080000060151590f06003a7d457d423c00707c13137c70007f7f49497f36003e7f41414122007f7f41633e1c007f7f49494941007f7f09090901003e7f4149797a007f7f08087f7f0000417f7f4100000040417f3f00007f7f1c366341007f7f40404040007f0e3c3c0e7f007f7f0e1c7f7f003e7f41417f3e007f7f11111f0e003e7f31615f5e007f7f19396f4600264f4d5979320001017f7f0101003f7f40407f3f00071f78781f07003f703e3e703f0063771c1c776300030f7c7c0f03006171795d4f4700007f7f4141000002060c183020000041417f7f0000040603060400006060606060600000010306040000207454547c78007f7f44447c3800387c4444442800387c44447f7f00387c54545c580000047e7f050100085c54547c3c007f7f04047c780000007d7d0000000040447d3d00007f7f10386c440000007f7f0000007c047c780478007c7c04047c7800387c44447c38007c7c24243c1800183c24247c7c007c7c180c0c0400485c5c7474240000043f7f4400003c7c40407c7c000c3c70703c0c007c603c3c607c006c381010386c000c5c60203c0c00646454544c4c00083e774141000000007777000000004141773e080002010302010000";
   const OS6="00000000000000004f000000000700070000147f147f1400242a7f2a1200231308646200364955225000000503000000001c224100000041221c000014083e08140008083e0808000050300000000808080808000060600000002010080402003e5149453e0000427f4000004261514946002141454b31001814127f10002745454539003c4a49493000017109050300364949493600064949291e00003636000000005636000000081422410000141414141400412214080000020151090600324979413e007e1111117e007f49494936003e41414122007f4141221c007f49494941007f09090901003e4149497a007f0808087f0000417f4100002040413f01007f08142241007f40404040007f020c027f007f0408107f003e4141413e007f09090906003e4151215e007f091929460046494949310001017f0101003f4040403f001f2040201f003f4038403f00631408146300070870080700615149454300007f414100000204081020000041417f00000402010204004040404040000001020400002054545478007f4844443800384444442000384444487f00385454541800087e090102000c5252523e007f080404780000447d4000002040443d00007f102844000000417f4000007c04180478007c08040478003844444438007c1414140800081414187c007c0804040800485454542000043f444020003c4040207c001c2040201c003c4030403c004428102844000c5050503c004464544c4400000836410000000077000000004136080000000201020100";
@@ -219,11 +223,11 @@ var LCD = (function () {
     var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(64 - CH - 2, g.y - (CH >> 1)));
     fill(l - 2, y - 2, CW + 4, CH + 4, 0); pill(l, y, 0, 1); label(c, g.slot, l, y); inv(l - 2, y - 2, CW + 4, CH + 4);
   }
-  // a 9 x 9 square "+" or "-" (box at x, y); hit is its click region
-  var AW = 11, PAD = 14;
+  // a "+" or "-" box (at x, y), 13 x 9 pixels: square on the 6 x 9 cells; hit is its click region
+  var AW = 13, PAD = 15;
   function btn(d, x, y, plus, hit) {
-    fill(x, y, 9, 9, 0); sq(x, y, 9, 9); fill(x + 2, y + 4, 5, 1, 1); if (plus) fill(x + 4, y + 2, 1, 5, 1);
-    hit.x = x - 1; hit.y = y - 1; hit.w = 11; hit.h = 11; d.hits.push(hit);
+    fill(x, y, 13, 9, 0); sq(x, y, 13, 9); fill(x + 3, y + 4, 7, 1, 1); if (plus) fill(x + 6, y + 2, 1, 5, 1);
+    hit.x = x - 1; hit.y = y - 1; hit.w = 15; hit.h = 11; d.hits.push(hit);
   }
   // "+": add an effect at this zone's output end (only on an empty chain)
   function addBox(d, z, l, cy) { btn(d, l + 1, cy - 4, 1, { it: 'add', z: z }); }
@@ -330,7 +334,7 @@ var LCD = (function () {
     });
     wires(h, v);
     var y0 = ys[0] - 4, hh = ys[ys.length - 1] - ys[0] + 10;
-    if (d.cur === (out ? IT_OUT : IT_IN)) mark(l, y0, CW, hh, 0);
+    if (d.cur === (out ? IT_OUT : IT_IN)) mark(l, y0, CW, hh, d.c.sel);
     if (out && d.c.limit) { var k = ys.length > 1 ? YC - 3 : 12; fill(l + 9, k, w3('LIMIT') + 2, 7, 1); t3('LIMIT', l + 10, k + 1, 0); }
     d.hits.push({ it: out ? 'out' : 'in', x: l, y: 12, w: CW, h: 42 });
   }
@@ -341,7 +345,8 @@ var LCD = (function () {
   }
   // c: { mode 0-3, stereo, out 0-2, mute [A, B], name[6], on[6], z [Pre, A, B, Post] slot lists, cur (slot or IT_*), sel }
   // Every column, IN at the right edge. Returns the click regions: { it: slot | 'route' | 'mix' | 'in' | 'out' | 'bus', z, x, y, w, h }.
-  // c.add: show a "+" at each zone's output end; c.del: a "-" under the chosen effect; c.drag / c.drop: see floating, dropMark
+  // c.add: show a "+" at each zone's output end (empty chain); c.ins: "+" beside the chosen item (room for an effect);
+  // c.del: a "-" under the chosen effect; c.drag / c.land: see floating. As wide as its columns, centered in SW.
   function chain(c) {
     var cols = [], par = isPar(c), d = { c: c, cur: c.cur, hits: [], delX: -1 }, i, j, n;
     function push(kind, e, a, b, bi) { cols.push({ kind: kind, e: e, a: a, b: b, bi: bi, jn: 0 }); }
@@ -369,10 +374,11 @@ var LCD = (function () {
     if (c.add) push(K_ADD, POST, -1, -1, -1);
     push(K_OUT, IT_OUT, -1, -1, -1);
     var gap = cols.map(function (_, j) { return j + 1 < cols.length ? (fanKind(c, cols, j) ? 7 : 4) : 0; }), pc = -1;
-    if (c.del && !c.drag) cols.forEach(function (col, j) { if (col.e === d.cur && col.kind === K_EFF || col.kind === K_BUS && (col.a === d.cur || col.b === d.cur)) pc = j; });
-    if (pc >= 0) { gap[pc] += PAD; if (pc > 0) gap[pc - 1] += PAD; }   // room for the "+" on each side
+    if (!c.drag && d.cur >= 0) cols.forEach(function (col, j) { if (col.kind !== K_ADD && (col.e === d.cur || col.kind === K_BUS && (col.a === d.cur || col.b === d.cur))) pc = j; });
+    var plus = pc >= 0 && c.ins && !c.add;
+    if (plus) { if (pc + 1 < cols.length) gap[pc] += PAD; if (pc > 0) gap[pc - 1] += PAD; }   // room for the "+" on each side
     var w = 6 + cols.reduce(function (a, col) { return a + cw(col); }, 0) + gap.reduce(function (a, b) { return a + b; }, 0), X = [];
-    begin(w, 67);
+    begin(Math.max(w, SW), 67);
     X[0] = W - 3 - CW - ((W - w) >> 1);
     for (i = 1; i < cols.length; i++) X[i] = X[i - 1] - cw(cols[i]) - gap[i - 1];
     for (j = 0; j + 1 < cols.length; j++) {   // the lines in the gap between column j and j + 1
@@ -400,11 +406,22 @@ var LCD = (function () {
     });
     fill(0, 0, W, 9, 1);
     t5('EFFECT CHAIN', (W >> 1) - Math.trunc(w5('EFFECT CHAIN', 1) / 2), 1, 0, 1);
+    function boxX(j) {   // a box in gap j, clear of a fan's vertical lines
+      var g = X[j + 1] + cw(cols[j + 1]), gw = X[j] - g, f = fanKind(c, cols, j);
+      return f === 1 ? g + gw - AW - 3 : f ? g + 3 : g + ((gw - AW) >> 1);
+    }
+    function one(j, y, z, end) { btn(d, boxX(j), y - 4, 1, { it: 'ins', z: z, end: end }); }
+    var k = pc >= 0 ? cols[pc].kind : -1;
     if (pc >= 0 && d.delX >= 0) {   // "+" before (right, nearer IN) and after the chosen effect, "-" under it
       var l0 = d.delX, cy = d.delY, by = cy === YA ? 57 : cy + 14;
-      btn(d, l0 + CW + 4, cy - 4, 1, { it: 'ins', after: 0 });
-      btn(d, l0 - 13, cy - 4, 1, { it: 'ins', after: 1 });
-      btn(d, l0 + ((CW - 9) >> 1), by, 0, { it: 'del' });
+      if (plus) { btn(d, boxX(pc - 1), cy - 4, 1, { it: 'ins', after: 0 }); btn(d, boxX(pc), cy - 4, 1, { it: 'ins', after: 1 }); }
+      if (c.del) btn(d, l0 + ((CW - AW) >> 1), by, 0, { it: 'del' });
+    } else if (plus && k !== K_EFF && k !== K_BUS) {   // beside IN, ROUTE, MIX or OUT: the start or end of the zones next to it
+      var e = cols[pc].e;
+      if (e === IT_IN) one(0, YC, PRE, 0);
+      else if (e === IT_OUT) one(pc - 1, YC, POST, 1);
+      else if (e === IT_ROUTE) { one(pc - 1, YC, PRE, 1); if (par) { one(pc, YA, BUS_A, 0); one(pc, YB, BUS_B, 0); } else one(pc, YC, BUS_A, 0); }
+      else { one(pc - 1, YA, BUS_A, 1); one(pc - 1, YB, BUS_B, 1); one(pc, YC, POST, 0); }
     }
     if (c.drag) {   // the landing frame shows through the dragged effect
       floating(c);
@@ -415,19 +432,20 @@ var LCD = (function () {
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
   // tabs: names, cur the outlined one; ps: [{ name, look: 'knob' | 'fader' | 'toggle', v, max, text }]. Returns click regions.
-  function knobPage(tabs, cur, ps) {
-    var hits = [], x = 0;
-    begin(Math.max(40 * ps.length + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
+  function knobPage(tabs, cur, ps) {   // SW wide; the knobs centered, each in a column up to 60 wide
+    var hits = [], x = 0, n = ps.length, cell, x0;
+    begin(Math.max(SW, 40 * n + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
+    cell = Math.min(60, Math.floor((W - 8) / Math.max(1, n))); x0 = (W - n * cell) >> 1;
     frame(0, 11, W, 53); line(0, 63, W - 1, 63);
     tabs.forEach(function (s, i) { var tw = tab(x, 0, i < cur ? 2 : i === cur ? 0 : 1, s); hits.push({ it: 'tab', i: i, x: x, y: 0, w: tw, h: 11 }); x += tw - 1; });
     ps.forEach(function (p, i) {
-      var cx = 8 + 40 * i;
+      var cx = x0 + cell * i + ((cell - 31) >> 1);
       font7(p.name, cx, 16);
       if (p.look === 'toggle') toggle(p.v >= 1, cx, 24);
       else if (p.look === 'fader') fader(cx, 24, p.v, 0, p.max);
       else knob(p.max ? p.v / p.max : 0, cx, 24);
       font7r(p.text, cx + 30, 48);
-      hits.push({ it: 'param', i: i, x: 40 * i + 4, y: 12, w: 40, h: 52 });
+      hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: 52 });
     });
     return hits;
   }
@@ -477,50 +495,78 @@ var LCD = (function () {
   }
   // the stock list: title, 4 OS-font rows, cursor, scroll bar. rows [[label, value]], top the first row shown.
   // Returns { hits, top }: { it: 'row', i } and { it: 'up' | 'down' } on the scroll bar.
-  function list(name, rows, cur, top) {
-    var n = rows.length, bar = n > 4, hits = [], i;
-    begin(128);
+  function list(name, rows, cur, top, w) {   // w wide (128 on the pedal)
+    var n = rows.length, bar = n > 4, hits = [], i, e;
+    w = w || 128; begin(w); e = bar ? w - 7 : w - 1;
     top = Math.max(0, Math.min(top, n - 4));   // the caller keeps cur in view when it moves it; the scroll bar may scroll it out
-    font7c(name, 64, 1); invert(0, 0, 127, 8);
+    font7c(name, w >> 1, 1); invert(0, 0, w - 1, 8);
     for (i = 0; i < 4 && top + i < n; i++) {
       var l = rows[top + i][0], v = rows[top + i][1];
       os6(l, 1, 12 + 9 * i);
-      os6(v, (bar ? 121 : 127) - 6 * v.length, 12 + 9 * i);
-      hits.push({ it: 'row', i: top + i, x: 0, y: 11 + 9 * i, w: bar ? 122 : 128, h: 9 });
+      os6(v, e - 6 * v.length, 12 + 9 * i);
+      hits.push({ it: 'row', i: top + i, x: 0, y: 11 + 9 * i, w: e + 1, h: 9 });
     }
-    if (cur >= top && cur < top + 4) invert(0, 11 + 9 * (cur - top), bar ? 121 : 127, 19 + 9 * (cur - top));
+    if (cur >= top && cur < top + 4) invert(0, 11 + 9 * (cur - top), e, 19 + 9 * (cur - top));
     if (bar) {
-      rect(122, 11, 127, 54, 2); rect(123, 16, 127, 41, 1);
+      rect(w - 6, 11, w - 1, 54, 2); rect(w - 5, 16, w - 1, 41, 1);
       var s0 = Math.trunc(top * 24 / n), e0 = top + 4 > n ? 23 : Math.trunc(96 / n) + s0;
-      rect(124, 17 + s0, 126, 17 + e0, 0);
-      blit(123, 43, 5, 8, [1, 3, 7, 3, 1], true); blit(123, 12, 5, 8, [4, 6, 7, 6, 4], true);
-      hits.push({ it: 'up', x: 122, y: 11, w: 6, h: 22 }, { it: 'down', x: 122, y: 33, w: 6, h: 22 });
+      rect(w - 4, 17 + s0, w - 2, 17 + e0, 0);
+      blit(w - 5, 43, 5, 8, [1, 3, 7, 3, 1], true); blit(w - 5, 12, 5, 8, [4, 6, 7, 6, 4], true);
+      hits.push({ it: 'up', x: w - 6, y: 11, w: 6, h: 22 }, { it: 'down', x: w - 6, y: 33, w: 6, h: 22 });
     }
     return { hits: hits, top: top };
   }
-  // the footswitch box under the play screen, 128 x 24, drawn as a softkey: dark, white in a frame when chosen.
-  // The stomp is seen at an angle: a base ring, the cap's top face and its side.
-  function ellipse(cx, cy, rx, ry, lower) {
+  // one or two lists on one SW-wide screen, a line between them; a, b: [name, rows, cur, top], b may be null.
+  // Returns { hits (side 0 or 1), top: [a's, b's] }
+  function lists(a, b) {
+    if (!b) { var r = list(a[0], a[1], a[2], a[3], SW); return { hits: shift(r.hits, 0, 0, { side: 0 }), top: [r.top] }; }
+    var L = (SW - 3) >> 1, ra = list(a[0], a[1], a[2], a[3], L), ga = grab(), rb = list(b[0], b[1], b[2], b[3], SW - L - 3), gb = grab();
+    begin(SW); paste(ga, 0, 0); paste(gb, L + 3, 0); line(L + 1, 0, L + 1, 63);
+    return { hits: shift(ra.hits, 0, 0, { side: 0 }).concat(shift(rb.hits, L + 3, 0, { side: 1 })), top: [ra.top, rb.top] };
+  }
+  // the footswitch key, w x 24, drawn as a softkey: dark, white in a frame when chosen.
+  // The stomp is seen at an angle: a base ring, the cap's top face and its side; the cap hides the ring behind it.
+  function ellipse(cx, cy, rx, ry, lower, clr) {
+    if (clr) { for (var yy = -ry; yy <= ry; yy++) if (!lower || yy >= 0) { var hw = Math.round(rx * Math.sqrt(1 - yy * yy / (ry * ry))); fill(cx - hw, cy + yy, 2 * hw + 1, 1, 0); } return; }
     for (var a = 0; a < 360; a += 2) {
       var t = a * Math.PI / 180, y = Math.round(cy + ry * Math.sin(t));
       if (!lower || y >= cy) px(Math.round(cx + rx * Math.cos(t)), y);
     }
   }
-  function ftsw(target, on) {
-    begin(128, 24);
-    ellipse(15, 15, 10, 4, 0);                       // base ring
-    ellipse(15, 13, 6, 2, 1);                        // the cap's lower edge
-    line(9, 8, 9, 13); line(21, 8, 21, 13);          // the cap's sides
-    ellipse(15, 8, 6, 2, 0);                         // the cap's top face
-    font7('FOOTSWITCH', 32, 3);
-    var t = String(target || 'OFF'); while (softW(t) > 90) t = t.slice(0, -1);
-    small(t, 32, 14);
-    if (on) rect(0, 0, 127, 23, 3); else invert(0, 0, 127, 23);
-    return [{ it: 'ftsw', x: 0, y: 0, w: 128, h: 24 }];
+  function ftsw(target, on, w) {
+    w = w || 128; begin(w, 24);
+    ellipse(15, 14, 10, 4, 0);                       // base ring
+    ellipse(15, 12, 6, 2, 1, 1); fill(9, 7, 13, 6, 0); ellipse(15, 7, 6, 2, 0, 1);   // the cap is solid
+    ellipse(15, 12, 6, 2, 1);                        // the cap's lower edge
+    line(9, 7, 9, 12); line(21, 7, 21, 12);          // the cap's sides
+    ellipse(15, 7, 6, 2, 0);                         // the cap's top face
+    font7('FOOTSWITCH', 32, 4);
+    var t = String(target || 'OFF').toUpperCase(); while (softW(t) > w - 38) t = t.slice(0, -1);
+    small(t, 32, 15);
+    if (on) rect(0, 0, w - 1, 23, 3); else invert(0, 0, w - 1, 23);
+    return [{ it: 'ftsw', x: 0, y: 0, w: w, h: 24 }];
+  }
+  // the play screen with the footswitch key under it (one blank row between, the softkeys' side margins), SW wide
+  function perform(s, target, on) {
+    var h1 = play(s), a = grab(), h2 = ftsw(target, on, 124), b = grab(), ox;
+    begin(SW, 89); ox = (W - 128) >> 1;
+    paste(a, ox, 0); paste(b, ox + 2, 65);
+    return shift(h1, ox, 0).concat(shift(h2, ox + 2, 65));
   }
 
+  SW = (function () {   // the widest Effect Chain: 6 effects before ROUTE, or 5 with room for "+"
+    var m = 0, e = [];
+    [0, 1, 2, 3].forEach(function (mode) {
+      [5, 6].forEach(function (n) {
+        chain({ mode: mode, stereo: 1, out: 0, mute: [0, 0], name: [], on: [1, 1, 1, 1, 1, 1], z: [[0, 1, 2, 3, 4, 5].slice(0, n), e, e, e], cur: 0, sel: 1, del: 1, ins: n < 6 });
+        m = Math.max(m, W);
+      });
+    });
+    return m;
+  })();
+
   return {
-    play: play, list: list, control: control, ftsw: ftsw,
+    play: play, list: list, lists: lists, control: control, ftsw: ftsw, perform: perform, SW: SW,
     begin: begin, present: present, at: at, hit: hit, px: px, line: line, rect: rect, invert: invert, blit: blit,
     font7: font7, font7r: font7r, font7c: font7c, os6: os6, small: small, softText: softText, softW: softW,
     statusBar: statusBar, widthP: widthP, toggle: toggle, fader: fader, knob: knob, tab: tab, frame: frame,
