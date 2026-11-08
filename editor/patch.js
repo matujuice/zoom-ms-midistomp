@@ -49,7 +49,7 @@ var Patch = (function () {
   }
 
   // MIDISTOMP byte 17: bits 0-1 the slot's bus, bits 2-6 a 5-bit chunk of a 22-bit word
-  var BUS = ['PRE', 'A', 'B', 'POST'], OUT = ['Ster', 'Mono', 'Split'], SOLO = ['Off', 'A', 'B'];
+  var BUS = ['PRE', 'A', 'B', 'POST'], OUT = ['Stereo', 'Mono', 'Split'], SOLO = ['Off', 'A', 'B'];
   function routing(rec) {
     var w = 0, bus = [], used = false;
     for (var i = 0; i < 6; i++) {

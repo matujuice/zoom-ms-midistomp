@@ -5,48 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MIDISTOMP Patches</title>
 <style>
-  :root { --bg: #f6f6f4; --fg: #1b1b1b; --dim: #6b6b6b; --line: #d9d9d4; --card: #fff; --accent: #c2410c; --ok: #15803d; --bad: #b91c1c; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #e8e8e6; --dim: #9a9a96; --line: #333; --card: #1f1f1f; --accent: #fb923c; --ok: #4ade80; --bad: #f87171; } }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
-  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
-  button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 6px; cursor: pointer; }
-  button.main { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: .45; cursor: default; }
-  #status { color: var(--dim); }
-  .note { color: var(--dim); font-size: 12px; margin: 4px 0 12px; }
-  .wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  /* Modwerk's look (modwerk.app, src/styles.css): charcoal surfaces, soft indigo accent, system fonts. Modwerk is dark only;
+     light is the same palette inverted. Theme: auto, or the switch's data-theme. */
+  :root { --bg: #f4f4f7; --panel: #fff; --raised: #f0f0f4; --hover: #e6e6ec; --field: #fafafc; --fg: #19191c; --dim: #5c5c68; --line: #dcdce3; --control: #b4b4bf;
+    --accent: #4a52c9; --accent-hover: #3a41b0; --on-accent: #fff; --ok: #1f8a52; --bad: #a85f00; color-scheme: light;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --display: var(--body); --mono: "SFMono-Regular", Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #19191c; --panel: #2c2c31; --raised: #303036; --hover: #38383f; --field: #1a1a1e; --fg: #f5f5f8; --dim: #bebec9; --line: #3d3d45; --control: #55555f;
+    --accent: #a5adff; --accent-hover: #c0c6ff; --on-accent: #171722; --ok: #7ed3a0; --bad: #f0b95e; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #19191c; --panel: #2c2c31; --raised: #303036; --hover: #38383f; --field: #1a1a1e; --fg: #f5f5f8; --dim: #bebec9; --line: #3d3d45; --control: #55555f;
+    --accent: #a5adff; --accent-hover: #c0c6ff; --on-accent: #171722; --ok: #7ed3a0; --bad: #f0b95e; color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--body); }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font: 650 32px/1.25 var(--display); margin: 0 0 6px; letter-spacing: -.7px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+  .bar .theme { margin-left: auto; }
+  button { font: 500 13px var(--body); padding: 7px 13px; min-height: 36px; border: 1px solid var(--line); background: var(--raised); color: var(--fg); border-radius: 6px; cursor: pointer; transition: background .15s; }
+  button:hover:not(:disabled) { background: var(--hover); }
+  button.main { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: inset 0 1px #ffffff30, 0 1px 3px #00000018; }
+  button.main:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #status { color: var(--dim); font: 12px var(--mono); }
+  .note { color: var(--dim); font-size: 12px; margin: 4px 0 12px; max-width: 90ch; }
+  .wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
   table { border-collapse: collapse; width: 100%; min-width: 900px; }
-  th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
-  th { font-weight: 600; color: var(--dim); font-size: 12px; }
+  th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
+  tr[data-n] { cursor: pointer; }
   tr.dirty td:first-child { box-shadow: inset 3px 0 var(--accent); }
-  tr.sel { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  tr.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
   td.fx { font-size: 12px; } td.fx .off { color: var(--dim); text-decoration: line-through; }
-  .bus { font-size: 10px; color: var(--accent); margin-left: 3px; }
-  input.name { font: inherit; width: 11ch; padding: 2px 4px; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 4px; }
+  .bus { font: 10px var(--mono); color: var(--accent); margin-left: 4px; }
+  input, select { font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--control); border-radius: 6px; padding: 3px 6px; }
+  input.name { font: 13px var(--mono); width: 11ch; background: transparent; }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
-  #detail { margin: 4px 0 8px; white-space: normal; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); display: none; }
+  #detail { margin: 6px 0 10px; white-space: normal; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: none; cursor: default; }
+  #detail b { font: 600 16px var(--display); letter-spacing: -.15px; }
   #detail label { display: inline-flex; gap: 4px; align-items: center; margin: 4px 12px 4px 0; }
-  #detail input[type=number] { width: 5ch; }
-  .chain { display: flex; align-items: center; gap: 6px; margin: 10px 0; overflow-x: auto; font-size: 12px; }
-  .chain .box { border: 1px solid var(--fg); border-radius: 4px; padding: 3px 6px; min-width: 7ch; text-align: center; }
+  #detail input[type=number] { width: 6ch; }
+  .chain { display: flex; align-items: center; gap: 6px; margin: 10px 0; overflow-x: auto; padding: 4px 2px; font: 12px var(--mono); }
+  .chain > *, .chain .zone > * { flex-shrink: 0; }
+  .chain .box { font: 12px var(--mono); color: var(--fg); border: 1px solid var(--control); border-radius: 6px; padding: 3px 6px; min-width: 7ch; min-height: 28px; text-align: center; background: var(--raised); }
   .chain .box.off { color: var(--dim); border-color: var(--dim); text-decoration: line-through; }
-  .chain .node { font-weight: 600; border-width: 2px; }
-  .chain .jack { color: var(--dim); }
-  .chain .ab { display: flex; flex-direction: column; gap: 4px; margin-left: 10px; }
-  .chain .zone { display: flex; flex-direction: row-reverse; gap: 6px; align-items: center; min-height: 26px; min-width: 40px; padding: 2px 4px; border: 1px dashed var(--dim); border-radius: 4px; position: relative; }
+  .chain .node { font-weight: 600; border-color: var(--dim); }
+  .chain .jack { color: var(--dim); white-space: nowrap; }
+  .chain .ab { display: flex; flex-direction: column; gap: 4px; margin-left: 12px; }
+  .chain .zone { display: flex; flex-direction: row-reverse; gap: 6px; align-items: center; min-height: 34px; min-width: 40px; padding: 2px 4px; border: 1px dashed var(--line); border-radius: 8px; position: relative; }
   .chain .zone[data-l]::after { content: attr(data-l); position: absolute; left: -12px; color: var(--accent); font-size: 10px; }
   .chain .box[draggable] { cursor: grab; }
-  .chain [data-it] { cursor: pointer; }
-  .chain .add { padding: 0 7px; border-style: dashed; color: var(--dim); }
-  #pick { min-width: 22ch; margin: 4px 0; }
+  .chain .add { min-width: 0; padding: 0 9px; border-style: dashed; color: var(--dim); }
   .chain .cur { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #pick { min-width: 22ch; margin: 4px 0; }
   fieldset.pctl { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; padding: 4px 10px 8px; }
-  fieldset.pctl legend { font-weight: 600; padding: 0 4px; }
-  .ges { font-size: 12px; color: var(--dim); margin-top: 4px; }
+  fieldset.pctl legend { font: 600 14px var(--display); padding: 0 4px; }
+  .ges { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-top: 4px; }
   .mv { padding-left: 12px; }
   .ctl { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* Phones: each patch is a card (number and name, then the six slots, then mixer and note) */
+  @media (max-width: 720px) {
+    .wrap { border: 0; background: none; overflow: visible; }
+    table, tbody, tr:not([data-n]), tr:not([data-n]) td { display: block; min-width: 0; }
+    thead { display: none; }
+    tr[data-n] { display: grid; grid-template-columns: 3ch repeat(3, minmax(0, 1fr)); gap: 2px 8px; padding: 8px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    tr[data-n] td { border: 0; padding: 0; white-space: normal; }
+    tr[data-n] td:nth-child(2) { grid-column: 2 / -1; }
+    tr[data-n] td:nth-child(3), tr[data-n] td:nth-child(6) { grid-column: 2; }
+    tr[data-n] td:nth-child(n+9) { grid-column: 1 / -1; font-size: 12px; }
+    tr.dirty { border-left: 3px solid var(--accent); } tr.dirty td:first-child { box-shadow: none; }
+    #detail { padding: 10px; }
+    button, .chain .box { min-height: 36px; }
+  }
 </style>
 </head>
 <body>
@@ -60,11 +91,12 @@
     <button id="backup" disabled>Save backup</button>
     <button id="restore">Load backup…</button>
     <input type="file" id="file" accept=".json" hidden>
-    <span id="status">Not connected.</span>
+    <span id="status" aria-live="polite">Not connected.</span>
+    <button id="theme" class="theme" title="Switch between the system theme, light and dark">Theme: Auto</button>
   </div>
   <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER and PERFORM settings when you rename a patch or move its effects; on older firmware they go back to defaults. Backups carry both. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
   <div class="wrap"><table>
-    <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>MIDISTOMP</th><th></th></tr></thead>
+    <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>Mixer and routing</th><th>Note</th></tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
   <div id="detail"></div>
@@ -82,6 +114,8 @@ var waiters = [];          // { test(msg), resolve }
 var sel = -1;
 var $ = function (id) { return document.getElementById(id); };
 var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+function hex(a) { return a.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
+function unhex(h) { return h.match(/../g).map(function (x) { return parseInt(x, 16); }); }
 
 function status(t, cls) { $('status').textContent = t; $('status').className = cls || ''; }
 function send(msg) { outp.send(msg); return sleep(msg.length > 16 ? 22 : 3); }   // paced like Modwerk
@@ -263,7 +297,7 @@ async function writePatch(n, pre) {
   var same = back && back.every(function (b, i) { return b === p.rec[i]; });
   // The pedal turns an effect it does not have into THRU (an MS-70CDR has no "Comp" of the MS-50G)
   var gone = back ? [0, 1, 2, 3, 4, 5].filter(function (i) { return Patch.effectId(p.rec, i) && !Patch.effectId(back, i); }).map(function (i) { return fxName(p.rec, i); }) : [];
-  if (back) { p.rec = back; p.orig = back.slice(); p.restored = false; }
+  if (back) { p.rec = back; p.orig = back.slice(); p.restored = false; p.hist = []; }
   p.note = same ? 'written' : gone.length ? 'not on this pedal: ' + gone.join(', ') : back ? 'pedal changed it' : 'no read-back';
   return same;
 }
@@ -315,11 +349,11 @@ $('writeChanged').onclick = function () { guard(async function () {
 
 $('backup').onclick = function () {
   var data = { format: 'midistomp-patches', version: 1, model: model, deviceId: dev, saved: new Date().toISOString(),
-    patches: patches.map(function (p) { return p ? p.rec.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null; }) };
+    patches: patches.map(function (p) { return p ? hex(p.rec) : null; }) };
   if (entries.length) data.mixer = patches.map(function (p, n) { return p ? p.mix || Patch.mixer(p.rec, n, entries).set : null; });
   if (perfs.length) data.perform = patches.map(function (p, n) {     // 208 bytes as hex, null = an empty PERFORM
     var e = p && (p.perf || Patch.perform(p.rec, n, entries, perfs));
-    return e ? e.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null;
+    return e ? hex(e) : null;
   });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
@@ -335,10 +369,13 @@ $('file').onchange = async function () {
     var d = JSON.parse(await f.text());
     if (d.format !== 'midistomp-patches' || !Array.isArray(d.patches) || d.patches.length !== 50) throw new Error('Not a patch backup.');
     if (dev && d.deviceId !== dev) throw new Error('This backup is from ' + d.model + ', the pedal is ' + model + '.');
-    d.patches.forEach(function (h, n) {
-      if (!/^[0-9a-f]{244}$/.test(h || '')) throw new Error('Patch ' + (n + 1) + ' in the backup is damaged.');
-      var rec = h.match(/../g).map(function (x) { return parseInt(x, 16); });
-      if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte.');
+    var recs = d.patches.map(function (h, n) {          // check them all before replacing any
+      if (!/^[0-9a-f]{244}$/.test(h || '')) throw new Error('Patch ' + (n + 1) + ' in the backup is damaged. Nothing was loaded.');
+      var rec = unhex(h);
+      if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte. Nothing was loaded.');
+      return rec;
+    });
+    recs.forEach(function (rec, n) {
       var old = patches[n];
       patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null, perf: null, restored: true };   // not slot n's MIXER or PERFORM
       var mx = d.mixer && d.mixer[n];                 // backups from MIDISTOMP firmware carry MIXER settings too
@@ -346,7 +383,7 @@ $('file').onchange = async function () {
           && !(entries.length && Patch.mixer(rec, n, entries).set.every(function (v, i) { return v === mx[i]; }))) patches[n].mix = mx;
       var pf = d.perform && d.perform[n], cur = perfs.length && Patch.perform(rec, n, entries, perfs);   // and PERFORM
       if (perfs.length && /^[0-9a-f]{416}$/.test(pf || '')) {
-        pf = pf.match(/../g).map(function (x) { return parseInt(x, 16); });
+        pf = unhex(pf);
         if (pf[15] === Patch.PERF_OK && !(cur && cur.every(function (b, i) { return b === pf[i]; }))) patches[n].perf = pf;
       }
       if (dirty(patches[n])) patches[n].note = 'from backup';
@@ -366,21 +403,31 @@ function fxName(rec, i) {
 }
 function esc(s) { return s.replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
 var detailBox = $('detail');                     // kept, since render() moves it into the table
+// render() and detail() rebuild their HTML, so they put the keyboard focus back on the same control
+function focusSel() {
+  var a = document.activeElement;
+  if (!a || a === document.body) return null;
+  if (a.classList.contains('name')) return 'tr[data-n="' + a.closest('tr').dataset.n + '"] input.name';
+  if (a.id) return '#' + a.id;
+  var d = a.dataset, k = ['fx', 'k', 'mx', 'pf', 'c', 'it'].filter(function (x) { return d[x] != null; });
+  return k.length ? a.tagName.toLowerCase() + k.map(function (x) { return '[data-' + x + '="' + d[x] + '"]'; }).join('') : null;
+}
+function refocus(f) { var el = f && document.querySelector(f); if (el && el !== document.activeElement) el.focus(); }
 function render() {
-  var html = '';
+  var html = '', f = focusSel();
   patches.forEach(function (p, n) {
     if (!p) return;
     var r = Patch.routing(p.rec), cells = '';
     for (var i = 0; i < 6; i++) {
       var nm = fxName(p.rec, i);
       cells += '<td class="fx">' + (nm ? '<span class="' + (Patch.on(p.rec, i) ? '' : 'off') + '">' + esc(nm) + '</span>'
-        + (r.used ? '<span class="bus">' + 'RABM'[r.bus[i]] + '</span>' : '') : '') + '</td>';
+        + (r.used ? '<span class="bus">' + ZONES[r.bus[i]] + '</span>' : '') : '') + '</td>';
     }
     var mx = entries.length ? Patch.MIXER[0][3][Patch.mixer(p.rec, n, entries).set[0]] + ' · ' : '';
-    var ms = mx + (r.used ? 'In ' + r.inR + ' · Mst ' + r.masterR + ' · ' + Patch.OUT[r.out]
-      + (r.muteA ? ' · MuteA' : '') + (r.muteB ? ' · MuteB' : '') + (r.solo ? ' · Solo ' + Patch.SOLO[r.solo] : '') : '—');
+    var ms = mx + (r.used ? 'Input ' + r.inR + ' · Master ' + r.masterR + ' · ' + Patch.OUT[r.out]
+      + (r.muteA ? ' · Mute A' : '') + (r.muteB ? ' · Mute B' : '') + (r.solo ? ' · Solo ' + Patch.SOLO[r.solo] : '') : '—');
     html += '<tr data-n="' + n + '" class="' + (dirty(p) ? 'dirty ' : '') + (n === sel ? 'sel' : '') + '"><td>' + (n + 1) + '</td>'
-      + '<td><input class="name" maxlength="10" value="' + esc(Patch.name(p.rec)) + '"></td>' + cells
+      + '<td><input class="name" maxlength="10" aria-label="Name of patch ' + (n + 1) + '" value="' + esc(Patch.name(p.rec)) + '"></td>' + cells
       + '<td>' + ms + '</td><td class="' + (p.note === 'written' ? 'ok' : p.note && p.note !== 'from backup' ? 'bad' : '') + '">' + esc(p.note) + '</td></tr>';
   });
   $('rows').innerHTML = html;
@@ -388,15 +435,18 @@ function render() {
   if (row) { var tr = document.createElement('tr'), td = tr.insertCell(); td.colSpan = 10; td.appendChild(detailBox); row.after(tr); }
   buttons();
   detail();
+  refocus(f);
 }
+var nameSnap = -1;                               // one undo step per name edit, not per letter
 $('rows').addEventListener('input', function (e) {
   if (!e.target.classList.contains('name')) return;
   var n = +e.target.closest('tr').dataset.n;
+  if (nameSnap !== n) { snap(patches[n]); nameSnap = n; }
   Patch.setName(patches[n].rec, e.target.value);
   e.target.closest('tr').classList.toggle('dirty', dirty(patches[n]));
   buttons();
 });
-$('rows').addEventListener('change', function (e) { if (e.target.classList.contains('name')) render(); });
+$('rows').addEventListener('change', function (e) { if (e.target.classList.contains('name')) { nameSnap = -1; render(); } });
 $('rows').addEventListener('click', function (e) {
   if (e.target.tagName === 'INPUT' || e.target.closest('#detail')) return;
   var tr = e.target.closest('tr[data-n]');
@@ -416,10 +466,12 @@ function chainHtml(rec, r, mode) {
     var h = '<div class="zone" data-z="' + z + '"' + (label ? ' data-l="' + label + '"' : '') + '>';
     for (var i = 0; i < 6; i++)
       if (r.bus[i] === z && i < Patch.used(rec))
-        h += '<span class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '">' + esc(fxName(rec, i) || 'THRU') + '</span>';
+        h += '<button type="button" class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '"'
+          + ' aria-label="Effect ' + (i + 1) + ', ' + esc(fxName(rec, i) || 'THRU') + (Patch.on(rec, i) ? '' : ', off') + ', in ' + ZONES[z] + '. Left and right arrows move it."'
+          + (focus === i ? ' aria-current="true"' : '') + '>' + esc(fxName(rec, i) || 'THRU') + '</button>';
     return h + (full ? '' : '<button class="add' + (focus === 'add' + z ? ' cur' : '') + '" data-it="add' + z + '" title="Add an effect to ' + ZONES[z] + '" aria-label="Add an effect to ' + ZONES[z] + '">+</button>') + '</div>';
   }
-  function node(it, t) { return '<span class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '">' + t + '</span>'; }
+  function node(it, t) { return '<button type="button" class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '"' + (focus === it ? ' aria-current="true"' : '') + '>' + t + '</button>'; }
   var route = node('route', 'ROUTE' + (mode >= 0 ? ' · ' + Patch.MIXER[0][3][mode] : ''));
   if (mode === 0 || mode === 3)
     return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
@@ -435,10 +487,15 @@ $('detail').addEventListener('click', function (e) {
   focus = /^\d$/.test(it.dataset.it) ? +it.dataset.it : it.dataset.it;
   detail();
   if ($('pickq')) $('pickq').focus();
+  else refocus('[data-it="' + it.dataset.it + '"]');
 });
 $('detail').addEventListener('input', function (e) { if (e.target.id === 'pickq') $('pick').innerHTML = pickOpts(e.target.value); });
 $('detail').addEventListener('dblclick', function (e) { if (e.target.closest('#pick')) addPicked(); });
-$('detail').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.target.id === 'pick' || e.target.id === 'pickq')) addPicked(); });
+$('detail').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && (e.target.id === 'pick' || e.target.id === 'pickq')) addPicked();
+  var b = e.target.closest && e.target.closest('.box[data-s]');      // arrows move an effect as the chain is drawn: left is OUT
+  if (b && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); stepFx(+b.dataset.s, e.key === 'ArrowLeft' ? 1 : -1); }
+});
 $('detail').addEventListener('dragstart', function (e) {
   var b = e.target.closest && e.target.closest('.box[data-s]');
   if (!b) return;
@@ -452,27 +509,40 @@ $('detail').addEventListener('drop', function (e) {
   var zoneEl = e.target.closest('.zone'), p = patches[sel];
   if (dragSlot < 0 || !zoneEl || !p) return;
   e.preventDefault();
-  var r = Patch.routing(p.rec), z = +zoneEl.dataset.z, from = dragSlot;
+  var z = +zoneEl.dataset.z, from = dragSlot, list = zoneSlots(p.rec, z, from), at = list.length, box = e.target.closest('.box[data-s]');
   dragSlot = -1;
-  // signal order of each zone, without the moved effect
-  var zones = [[], [], [], []], empty = [];
-  for (var i = 0; i < 6; i++) {
-    if (i === from) continue;
-    if (fxName(p.rec, i)) zones[r.bus[i]].push(i); else empty.push(i);
-  }
-  var at = zones[z].length, box = e.target.closest('.box[data-s]');
   if (box && +box.dataset.s !== from) {               // right half of a box = before it (nearer the input)
     var rc = box.getBoundingClientRect();
-    at = zones[z].indexOf(+box.dataset.s) + (e.clientX > rc.left + rc.width / 2 ? 0 : 1);
+    at = list.indexOf(+box.dataset.s) + (e.clientX > rc.left + rc.width / 2 ? 0 : 1);
   }
+  moveTo(p, from, z, at);
+});
+// The effects of zone z in signal order (slot order), without slot skip
+function zoneSlots(rec, z, skip) {
+  var r = Patch.routing(rec), l = [];
+  for (var i = 0; i < Patch.used(rec); i++) if (i !== skip && r.bus[i] === z) l.push(i);
+  return l;
+}
+// Move slot `from` to place `at` of zone z (counted without it); the slots are rewritten in signal order
+function moveTo(p, from, z, at) {
+  snap(p);
+  var zones = [0, 1, 2, 3].map(function (zz) { return zoneSlots(p.rec, zz, from); }), order = [], bus = [];
   zones[z].splice(at, 0, from);
-  var order = zones[0].concat(zones[1], zones[2], zones[3]), bus = [];
-  zones.forEach(function (list, zz) { list.forEach(function () { bus.push(zz); }); });
-  empty.forEach(function (s) { order.push(s); bus.push(0); });
+  zones.forEach(function (list, zz) { list.forEach(function (s) { order.push(s); bus.push(zz); }); });
+  for (var s = Patch.used(p.rec); s < 6; s++) { order.push(s); bus.push(0); }
   Patch.reorder(p.rec, order, bus);
   focus = order.indexOf(from);
   render();
-});
+}
+// One step toward OUT (dir 1) or IN (-1); past the end of its zone it goes into the next zone
+function stepFx(s, dir) {
+  var p = patches[sel], z = Patch.routing(p.rec).bus[s], list = zoneSlots(p.rec, z, s);
+  var at = list.filter(function (i) { return i < s; }).length + dir;
+  if (at < 0) { if (!z) return; z--; at = zoneSlots(p.rec, z, s).length; }
+  else if (at > list.length) { if (z === 3) return; z++; at = 0; }
+  moveTo(p, s, z, at);
+  refocus('.box[data-s="' + focus + '"]');
+}
 $('detail').addEventListener('dragend', function () { dragSlot = -1; });
 // Add an effect: a picker of the stock effects (g200kg's list, by category) and the pack's, filtered by name.
 // It goes at the output end of its zone (the "+" side); drag it to move it. The pedal checks DSP use itself.
@@ -501,7 +571,9 @@ function addPicked() {
   if (!p || !k) return;
   var n = Patch.used(p.rec), bus = Patch.routing(p.rec).bus, at = 0;
   for (var i = 0; i < n; i++) if (bus[i] <= z) at = i + 1;    // after the last effect of this zone or an earlier one
+  var was = p.rec.slice();
   if (!Patch.addEffect(p.rec, at, +k, EFFECT_PARAMS[k], z)) return;
+  snap(p, was);
   focus = at;
   render();
 }
@@ -513,6 +585,7 @@ function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); 
 function fxControls(rec, i) {
   var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
   var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
+    + ' <button id="mvOut" title="Arrow left on the effect does the same">← Toward OUT</button> <button id="mvIn" title="Arrow right on the effect does the same">Toward IN →</button>'
     + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button><br>';
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
@@ -653,7 +726,7 @@ function detail() {
   var po = perfs.length && slotsMoved(p) && perfObj(p);
   if (po && po.target.concat(po.loopTarget).some(function (t) { return isFtsw(t) || t >= 14 && t <= 73; }))
     h += '<div class="note bad">Effects moved: PERFORM targets keep their slot numbers, as on the pedal. Check PERFORM.</div>';
-  h += chainHtml(p.rec, r, mode) + '<div class="chain"><span class="box node' + (focus === 'perf' ? ' cur' : '') + '" data-it="perf">PERFORM</span></div><div class="ctl">';
+  h += chainHtml(p.rec, r, mode) + '<div class="chain"><button type="button" class="box node' + (focus === 'perf' ? ' cur' : '') + '" data-it="perf"' + (focus === 'perf' ? ' aria-current="true"' : '') + '>PERFORM</button></div><div class="ctl">';
   function mset(list) {
     if (!mx) return '<div class="note">' + (mst ? 'Read all patches to see this patch\'s MIXER settings.'
       : 'MIXER settings (Mode, levels, crossfades) are kept on the pedal, not in the patch. This pedal\'s firmware does not report them to the editor.') + '</div>';
@@ -678,15 +751,32 @@ function detail() {
     h += fxControls(p.rec, focus);
   else if (/^add\d$/.test(focus)) h += pickHtml(+focus[3]);
   else h += '<span class="note">Nothing selected.</span>';
-  h += '</div>' + (p.orig || p.mix || p.perf ? '<button id="undo">Undo changes</button>' : '');
+  h += '</div><div class="acts">' + (p.hist && p.hist.length ? '<button id="undo1">Undo last change</button>' : '')
+    + ((p.orig ? recDirty(p) : 0) || p.mix || p.perf ? '<button id="undo">Undo all changes</button>' : '') + '</div>';
+  var f = focusSel();
   box.innerHTML = h;
   box.style.display = 'block';
+  refocus(f);
+  var cur = box.querySelector('.chain .cur');      // a phone shows part of the chain: keep the chosen item in view
+  if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   if ($('pickadd')) $('pickadd').onclick = addPicked;
-  if ($('remove')) $('remove').onclick = function () { Patch.removeEffect(p.rec, focus); focus = null; render(); };
-  if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.perf = null; p.note = ''; render(); };
+  if ($('remove')) $('remove').onclick = function () { snap(p); Patch.removeEffect(p.rec, focus); focus = null; render(); };
+  if ($('mvOut')) { $('mvOut').onclick = function () { stepFx(focus, 1); }; $('mvIn').onclick = function () { stepFx(focus, -1); }; }
+  if ($('undo1')) $('undo1').onclick = function () {
+    var h = p.hist.pop(); p.rec = h.rec; p.mix = h.mix; p.perf = h.perf;
+    if (typeof focus === 'number' && focus >= Patch.used(p.rec)) focus = null;
+    render();
+  };
+  if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.perf = null; p.note = ''; p.hist = []; render(); };
+}
+// Undo for the last change: a copy of what an edit changes, taken before it (`was`: the record before, when taken after)
+function snap(p, was) {
+  (p.hist = p.hist || []).push({ rec: was || p.rec.slice(), mix: p.mix && p.mix.slice(), perf: p.perf && p.perf.slice() });
+  if (p.hist.length > 100) p.hist.shift();
 }
 $('detail').addEventListener('change', function (e) {
   var k = e.target.dataset.k, fx = e.target.dataset.fx, p = patches[sel];
+  if (p && (fx || k || e.target.dataset.pf || e.target.dataset.mx)) snap(p);
   if (fx && p && typeof focus === 'number') {
     if (fx === 'on') Patch.setOn(p.rec, focus, e.target.checked);
     else {
@@ -717,7 +807,18 @@ $('detail').addEventListener('change', function (e) {
   render();
 });
 
-window.addEventListener('beforeunload', function () { if (outp) try { outp.send(zoom([0x51])); } catch (e) {} });   // editor mode off
+window.addEventListener('beforeunload', function (e) { if (patches.some(dirty)) { e.preventDefault(); e.returnValue = ''; } });   // unwritten changes
+window.addEventListener('pagehide', function () { if (outp) try { outp.send(zoom([0x51])); } catch (e) {} });   // editor mode off
+var THEMES = ['auto', 'light', 'dark'];
+function setTheme(t) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = t;
+  $('theme').textContent = 'Theme: ' + t[0].toUpperCase() + t.slice(1);
+  try { localStorage.setItem('theme', t); } catch (e) {}
+}
+var savedTheme = null;
+try { savedTheme = localStorage.getItem('theme'); } catch (e) {}
+setTheme(THEMES.indexOf(savedTheme) >= 0 ? savedTheme : 'auto');
+$('theme').onclick = function () { setTheme(THEMES[(THEMES.indexOf(document.documentElement.dataset.theme || 'auto') + 1) % 3]); };
 buttons();
 </script>
 </body>
