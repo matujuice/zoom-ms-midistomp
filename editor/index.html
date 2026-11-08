@@ -56,6 +56,16 @@
   .chain .zone[data-l]::after { content: attr(data-l); position: absolute; left: -12px; color: var(--accent); font-size: 10px; }
   .chain .box[draggable] { cursor: grab; }
   .chain .add { min-width: 0; padding: 0 9px; border-style: dashed; color: var(--dim); }
+  .lcdwrap { overflow-x: auto; margin: 10px 0 4px; width: 0; min-width: 100%; }   /* inside a table cell: scroll, do not widen the table */
+  canvas.lcd { display: block; height: 320px; cursor: pointer; touch-action: pan-x; }
+  canvas.lcd.knobs { height: 256px; cursor: ns-resize; touch-action: none; }
+  canvas.lcd.half { height: 256px; }
+  .prow { display: flex; flex-wrap: wrap; gap: 0 14px; align-items: flex-start; }
+  .prow .lcdwrap { width: auto; min-width: 0; max-width: 100%; }
+  .tabs { display: flex; gap: 4px; margin: 8px 0 0; border-bottom: 1px solid var(--line); }
+  .tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; }
+  .tabs button.cur { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  canvas.lcd:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
   .chain .cur { outline: 2px solid var(--accent); outline-offset: 2px; }
   #pick { min-width: 22ch; margin: 4px 0; }
   fieldset.pctl { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; padding: 4px 10px 8px; }
@@ -105,6 +115,7 @@
 <script src="effect-params.js"></script>
 <script src="pack-params.js"></script>
 <script src="patch.js"></script>
+<script src="lcd.js"></script>
 <script>
 Object.keys(PACK_EFFECTS).forEach(function (k) { EFFECT_NAMES[k] = PACK_EFFECTS[k].n; EFFECT_PARAMS[k] = PACK_EFFECTS[k].p; });
 var MODELS = { 0x61: 'MS-70CDR', 0x58: 'MS-50G', 0x5f: 'MS-60B' };
@@ -460,28 +471,50 @@ $('rows').addEventListener('click', function (e) {
 // Each zone lists its effects in signal order (row-reverse: the first one, nearest the input, on the right).
 // Drag a box onto another box or into a zone to move it; the patch's slots are then rewritten in signal order.
 // mode: MIXER Mode 0-3, or -1 when not known. Serial and Mono Serial have no [MIX]: A then B in a row (chain_draw.c).
-function chainHtml(rec, r, mode) {
+function chainHtml(rec) {
   var full = Patch.used(rec) >= 6;
-  function zone(z, label) {
-    var h = '<div class="zone" data-z="' + z + '"' + (label ? ' data-l="' + label + '"' : '') + '>';
-    for (var i = 0; i < 6; i++)
-      if (r.bus[i] === z && i < Patch.used(rec))
-        h += '<button type="button" class="box' + (Patch.on(rec, i) ? '' : ' off') + (focus === i ? ' cur' : '') + '" draggable="true" data-s="' + i + '" data-it="' + i + '"'
-          + ' aria-label="Effect ' + (i + 1) + ', ' + esc(fxName(rec, i) || 'THRU') + (Patch.on(rec, i) ? '' : ', off') + ', in ' + ZONES[z] + '. Left and right arrows move it."'
-          + (focus === i ? ' aria-current="true"' : '') + '>' + esc(fxName(rec, i) || 'THRU') + '</button>';
-    return h + (full ? '' : '<button class="add' + (focus === 'add' + z ? ' cur' : '') + '" data-it="add' + z + '" title="Add an effect to ' + ZONES[z] + '" aria-label="Add an effect to ' + ZONES[z] + '">+</button>') + '</div>';
-  }
-  function node(it, t) { return '<button type="button" class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '"' + (focus === it ? ' aria-current="true"' : '') + '>' + t + '</button>'; }
-  var route = node('route', 'ROUTE' + (mode >= 0 ? ' · ' + Patch.MIXER[0][3][mode] : ''));
-  if (mode === 0 || mode === 3)
-    return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
-      + zone(2, 'B') + zone(1, 'A') + route + zone(0) + '<span class="jack">← IN</span></div>';
-  return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
-    + node('mix', 'MIX') + '<div class="ab">' + zone(1, 'A') + zone(2, 'B')
-    + '</div>' + route + zone(0) + '<span class="jack">← IN</span></div>';
+  return '<div class="lcdwrap"><canvas id="chainLcd" class="lcd" tabindex="0" aria-label="Effect chain. Click an item to edit it, drag an effect to move it; with an effect chosen, the arrow keys move it (up and down switch A and B)."></canvas></div>'
+    + '<div class="chain">' + (full ? '<span class="note">6 effects: the chain is full.</span>' : ZONES.map(function (n, z) {
+      return '<button class="add' + (focus === 'add' + z ? ' cur' : '') + '" data-it="add' + z + '">+ ' + (z === 1 || z === 2 ? 'Bus ' : '') + n + '</button>';
+    }).join('')) + '</div>';
 }
-var dragSlot = -1, focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
+// The pedal's Effect Chain screen (lcd.js, from chain_draw.c), every column at once; mode -1 (not known) draws as Parallel
+var chainHits = [];
+function drawChain(p, mode) {
+  var cv = $('chainLcd'), rec = p.rec, r = Patch.routing(rec), m = mode < 0 ? 1 : mode, c = { name: [], on: [] };
+  if (!cv) return;
+  for (var i = 0; i < 6; i++) { c.name.push(i < Patch.used(rec) ? fxName(rec, i) || 'THRU' : ''); c.on.push(Patch.on(rec, i) ? 1 : 0); }
+  c.mode = m; c.stereo = m === 2 || m === 3 ? 1 : 0; c.out = r.out; c.mute = [r.muteA, r.muteB]; c.sel = 0;
+  c.z = [0, 1, 2, 3].map(function (z) { return zoneSlots(rec, z); });
+  c.cur = typeof focus === 'number' ? focus : ({ route: LCD.IT_ROUTE, mix: LCD.IT_MIX, 'in': LCD.IT_IN, out: LCD.IT_OUT })[focus];
+  if (c.cur === undefined) c.cur = -1;
+  chainHits = LCD.chain(c);
+  LCD.present(cv);
+}
+// Where a dragged effect lands: on an effect, its right half is before it (nearer IN, which is on the right)
+function dropAt(p, from, h, q) {
+  var right = q.x >= h.x + h.w / 2, ab = q.y < 32 ? 1 : 2, mode = entries.length ? (p.mix || mixOf(p, sel).set)[0] : 1, par = mode === 1 || mode === 2;
+  if (typeof h.it === 'number') {
+    if (h.it === from) return;
+    var z = Patch.routing(p.rec).bus[h.it], l = zoneSlots(p.rec, z, from);
+    return moveTo(p, from, z, l.indexOf(h.it) + (right ? 0 : 1));
+  }
+  var end = function (z) { return zoneSlots(p.rec, z, from).length; };
+  if (h.it === 'bus') return moveTo(p, from, h.z, end(h.z));
+  if (h.it === 'in') return moveTo(p, from, 0, 0);
+  if (h.it === 'out') return moveTo(p, from, 3, end(3));
+  if (h.it === 'route') return right ? moveTo(p, from, 0, end(0)) : moveTo(p, from, par ? ab : 1, 0);
+  if (h.it === 'mix') return right ? moveTo(p, from, ab, end(ab)) : moveTo(p, from, 3, 0);
+}var dragSlot = -1, focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
 $('detail').addEventListener('click', function (e) {
+  var vw = e.target.closest('[data-view],[data-pc]');
+  if (vw) {
+    if (vw.dataset.view) view = vw.dataset.view;
+    else { pctl = 6; prow = perfObj(patches[sel]).target[6] === Patch.T_NONE ? 0 : 1; pmv = 0; ptop = 0; }
+    detail();
+    refocus(vw.dataset.view ? '[data-view="' + view + '"]' : '[data-pc="6"]');
+    return;
+  }
   var it = e.target.closest('[data-it]');
   if (!it) return;
   focus = /^\d$/.test(it.dataset.it) ? +it.dataset.it : it.dataset.it;
@@ -493,32 +526,28 @@ $('detail').addEventListener('input', function (e) { if (e.target.id === 'pickq'
 $('detail').addEventListener('dblclick', function (e) { if (e.target.closest('#pick')) addPicked(); });
 $('detail').addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && (e.target.id === 'pick' || e.target.id === 'pickq')) addPicked();
-  var b = e.target.closest && e.target.closest('.box[data-s]');      // arrows move an effect as the chain is drawn: left is OUT
-  if (b && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); stepFx(+b.dataset.s, e.key === 'ArrowLeft' ? 1 : -1); }
-  if (b && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); swapAB(+b.dataset.s, e.key === 'ArrowUp' ? 1 : 2); }
+  if (e.target.id !== 'chainLcd' || typeof focus !== 'number') return;      // arrows move an effect as the chain is drawn: left is OUT
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepFx(focus, e.key === 'ArrowLeft' ? 1 : -1); }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); swapAB(focus, e.key === 'ArrowUp' ? 1 : 2); }
 });
-$('detail').addEventListener('dragstart', function (e) {
-  var b = e.target.closest && e.target.closest('.box[data-s]');
-  if (!b) return;
-  dragSlot = +b.dataset.s;
-  e.dataTransfer.effectAllowed = 'move';
+// The chain screen: click an item to edit it, drag an effect onto another place to move it
+var down = null;
+$('detail').addEventListener('pointerdown', function (e) {
+  if (e.target.id !== 'chainLcd') return;
+  var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), q: q };
+  if (down.h && typeof down.h.it === 'number') try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
 });
-$('detail').addEventListener('dragover', function (e) {
-  if (dragSlot >= 0 && e.target.closest('.zone')) e.preventDefault();
-});
-$('detail').addEventListener('drop', function (e) {
-  var zoneEl = e.target.closest('.zone'), p = patches[sel];
-  if (dragSlot < 0 || !zoneEl || !p) return;
-  e.preventDefault();
-  var z = +zoneEl.dataset.z, from = dragSlot, list = zoneSlots(p.rec, z, from), at = list.length, box = e.target.closest('.box[data-s]');
-  dragSlot = -1;
-  if (box && +box.dataset.s !== from) {               // right half of a box = before it (nearer the input)
-    var rc = box.getBoundingClientRect();
-    at = list.indexOf(+box.dataset.s) + (e.clientX > rc.left + rc.width / 2 ? 0 : 1);
-  }
-  moveTo(p, from, z, at);
-});
-// The effects of zone z in signal order (slot order), without slot skip
+$('detail').addEventListener('pointerup', function (e) {
+  if (e.target.id !== 'chainLcd' || !down) return;
+  var cv = e.target, q = LCD.at(cv, e), h = LCD.hit(chainHits, q), d = down, p = patches[sel];
+  down = null;
+  if (!h) return;
+  if (d.h && typeof d.h.it === 'number' && h !== d.h) return dropAt(p, d.h.it, h, q);
+  if (h !== d.h) return;
+  focus = h.it === 'bus' ? 'add' + h.z : h.it;
+  detail();
+  if ($('pickq')) $('pickq').focus(); else refocus('#chainLcd');
+});// The effects of zone z in signal order (slot order), without slot skip
 function zoneSlots(rec, z, skip) {
   var r = Patch.routing(rec), l = [];
   for (var i = 0; i < Patch.used(rec); i++) if (i !== skip && r.bus[i] === z) l.push(i);
@@ -542,13 +571,13 @@ function stepFx(s, dir) {
   if (at < 0) { if (!z) return; z--; at = zoneSlots(p.rec, z, s).length; }
   else if (at > list.length) { if (z === 3) return; z++; at = 0; }
   moveTo(p, s, z, at);
-  refocus('.box[data-s="' + focus + '"]');
+  refocus('#chainLcd');
 }
 // A and B are drawn one above the other: up/down moves an effect to the other one, at its output end
 function swapAB(s, z) {
   var p = patches[sel];
   if (Patch.routing(p.rec).bus[s] === 3 - z) moveTo(p, s, z, zoneSlots(p.rec, z, s).length);
-  refocus('.box[data-s="' + focus + '"]');
+  refocus('#chainLcd');
 }
 $('detail').addEventListener('dragend', function () { dragSlot = -1; });
 // Add an effect: a picker of the stock effects (g200kg's list, by category) and the pack's, filtered by name.
@@ -601,7 +630,8 @@ function fxControls(rec, i) {
   var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
     + ' <button id="mvOut" title="Arrow left on the effect does the same">← Toward OUT</button> <button id="mvIn" title="Arrow right on the effect does the same">Toward IN →</button>'
     + (bus === 1 ? ' <button id="mvB" title="Arrow down on the effect does the same">↓ To B</button>' : bus === 2 ? ' <button id="mvA" title="Arrow up on the effect does the same">↑ To A</button>' : '')
-    + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button><br>';
+    + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button>'
+    + '<div class="lcdwrap"><canvas id="knobLcd" class="lcd knobs" tabindex="0" aria-label="Parameters as on the pedal: drag a knob up or down, or use the mouse wheel. The fields below take exact values."></canvas></div>';
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
   if (!defs) {
@@ -621,6 +651,53 @@ function fxControls(rec, i) {
   });
   return h + notes.map(function (t) { return '<div class="note bad">' + esc(t) + '</div>'; }).join('');
 }
+// The effect's knob page as on the pedal, every parameter on one wide page
+function knobParams(rec, i) {
+  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)] || [0, 1, 2, 3, 4, 5, 6, 7, 8].map(function (p) { return ['P' + (p + 1), Patch.paramMax(p), 0]; });
+  return defs.map(function (d, p) {
+    var m = fxMax(d, p), v = Math.min(Patch.param(rec, i, p), m), o = typeof d[3] === 'number' ? d[3] : 0;
+    return { name: d[0].slice(0, 5), max: m, v: v, look: m === 1 ? 'toggle' : /^level$/i.test(d[0]) && m === 150 ? 'fader' : 'knob',
+      text: String(Array.isArray(d[3]) ? d[3][v] : v + o).slice(0, 5) };
+  });
+}
+var knobHits = [], turn = null;
+function drawKnobs(p) {
+  var cv = $('knobLcd');
+  if (!cv) return;
+  knobHits = LCD.knobPage([fxName(p.rec, focus) || 'THRU'], 0, knobParams(p.rec, focus));
+  LCD.present(cv);
+}
+function knobSet(p, n, v) { Patch.setParam(p.rec, focus, n, Math.max(0, Math.min(knobParams(p.rec, focus)[n].max, v))); drawKnobs(p); }
+$('detail').addEventListener('pointerdown', function (e) {
+  if (e.target.id !== 'knobLcd') return;
+  var h = LCD.hit(knobHits, LCD.at(e.target, e)), p = patches[sel];
+  if (!h || h.it !== 'param') return;
+  var k = knobParams(p.rec, focus)[h.i];
+  snap(p);
+  turn = { n: h.i, y: e.clientY, v: k.v, max: k.max, moved: 0 };
+  try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
+});
+$('detail').addEventListener('pointermove', function (e) {     // up turns it up: the whole range in 200 screen pixels
+  if (!turn || e.target.id !== 'knobLcd' || turn.max <= 1) return;
+  var d = Math.round((turn.y - e.clientY) * turn.max / 200);
+  if (d) turn.moved = 1;
+  knobSet(patches[sel], turn.n, turn.v + d);
+});
+$('detail').addEventListener('pointerup', function (e) {
+  if (!turn) return;
+  var t = turn; turn = null;
+  if (t.max <= 1 && !t.moved) knobSet(patches[sel], t.n, 1 - t.v);     // a toggle flips on a click
+  render();
+});
+$('detail').addEventListener('wheel', function (e) {
+  if (e.target.id !== 'knobLcd') return;
+  var h = LCD.hit(knobHits, LCD.at(e.target, e)), p = patches[sel];
+  if (!h || h.it !== 'param') return;
+  e.preventDefault();
+  if (!drawKnobs.t) snap(p);          // one undo step per spin
+  knobSet(p, h.i, knobParams(p.rec, focus)[h.i].v + (e.deltaY < 0 ? 1 : -1));
+  clearTimeout(drawKnobs.t); drawKnobs.t = setTimeout(function () { drawKnobs.t = 0; render(); }, 400);   // the table and fields catch up when the wheel stops
+}, { passive: false });
 // PERFORM, as the pedal's SETUP (asm/perform/perform_draw.c, perform_keys.c). Edits p.perf, the 208 bytes "Write" sends.
 var WHEN = ['NOW', '1 beat', '2 beats', '4 beats', '8 beats', '1 bar', '2 bars', '4 bars', '8 bars', '16 bars', '32 bars'];
 var LAGS = ['Off', 'Micro', '50 ms', '100 ms', '500 ms', '1 s', '1 beat', '2 beats', '4 beats', '8 beats', '1 bar', '2 bars', '4 bars', '8 bars', '16 bars', '32 bars'];
@@ -676,14 +753,15 @@ function moveHtml(rec, t, w, key, label) {
   if (!used) return box + '<span class="note">not used</span></div>';
   return box + '<label>Value ' + val + '</label><label>When ' + pick('n', WHEN, used ? nx : 0) + '</label><label>Lag ' + pick('g', LAGS, lag) + '</label></div>';
 }
-function perfHtml(p) {
+function perfHtml(p, only) {           // only: 'bar' (CYCLE and the looper) or one control; none = everything
   if (!mst) return '<b>PERFORM</b><div class="note">PERFORM is kept on the pedal, not in the patch. This pedal\'s firmware does not report it to the editor.</div>';
   if (!entries.length) return '<b>PERFORM</b><div class="note">Read all patches to see this patch\'s PERFORM setup.</div>';
-  var o = perfObj(p), rec = p.rec, warn = [], h = '<b>PERFORM</b> <label>Cycle <select data-pf="cycle">'
-    + CYCLES.map(function (c) { return '<option value="' + c + '"' + (c === o.cycle ? ' selected' : '') + '>' + (c ? c + (c > 1 ? ' bars' : ' bar') : 'None') + '</option>'; }).join('') + '</select></label>';
+  var all = only == null, o = perfObj(p), rec = p.rec, warn = [], bar = all || only === 'bar', h = (all ? '<b>PERFORM</b> ' : '') + (!bar ? '' : '<label>Cycle <select data-pf="cycle">'
+    + CYCLES.map(function (c) { return '<option value="' + c + '"' + (c === o.cycle ? ' selected' : '') + '>' + (c ? c + (c > 1 ? ' bars' : ' bar') : 'None') + '</option>'; }).join('') + '</select></label>');
   function check(t, what) { var i = targetInfo(rec, t); if (i.bad) warn.push(what + ': ' + i.bad + '.'); }
   o.target.forEach(function (t, c) {
     check(t, CTLS[c]);
+    if (!all && only !== c) return;
     h += '<fieldset class="pctl"><legend>' + CTLS[c] + '</legend><label>Target ' + targetSelect(rec, t, c + ',0') + '</label>';
     if (t !== Patch.T_NONE) {
       if (c < 3) h += '<div class="ges">Turn</div>' + moveHtml(rec, t, o.move[c][0], c + ',0', 'Follow');
@@ -694,7 +772,7 @@ function perfHtml(p) {
   });
   var loop = false;
   for (var s = 0; s < Patch.count(rec); s++) if (fxName(rec, s) === 'GRDLOOP') loop = true;
-  if (loop || o.loopOn) {                          // the looper events only fire in a patch with GRDLOOP
+  if (bar && (loop || o.loopOn)) {                          // the looper events only fire in a patch with GRDLOOP
     h += '<fieldset class="pctl"><legend>Looper events</legend><label><input type="checkbox" data-pf="loopOn"' + (o.loopOn ? ' checked' : '') + '> On</label>';
     o.loopTarget.forEach(function (t, l) {
       check(t, 'Looper ' + LOOPEV[l]);
@@ -727,6 +805,175 @@ function perfChange(p, el) {
   }
   p.perf = Patch.perfEncode(o);
 }
+// ---- the PERFORM tab: the pedal's play screen; a click on the top bar, a knob column or a button opens its
+// SETUP list (TARGET, TURN, PRESS, HOLD) and, next to it, the chosen gesture's move page, as perform_draw.c draws them.
+var view = 'chain', pctl = 0, prow = 1, pmv = 0, ptop = 0, playHits = [], listHits = [], moveHits = [], pturn = null;
+var OFFON = ['Off', 'On'];
+var NPJ = [['InLvl', 88, 150, 'fader'], ['XFade', 85, 100, 'knob', 1], ['Mode', 93, 3, 'knob', 0, ['Serl', 'Paral', 'Split', 'MSerl']],
+  ['BusA', 89, 150, 'fader'], ['BusB', 90, 150, 'fader'], ['XFade', 86, 100, 'fader', 1], ['Outpt', 98, 2, 'knob', 0, ['Ster', 'Mono', 'Split']],
+  ['Curve', 94, 2, 'knob', 0, ['Smoth', 'DJ', 'Cut']], ['MixA', 91, 150, 'fader'], ['MixB', 92, 150, 'fader'], ['PhasB', 95, 1, 'toggle', 0, ['Norm', 'Inv']],
+  ['MuteA', 99, 1, 'toggle', 0, OFFON], ['MuteB', 100, 1, 'toggle', 0, OFFON], ['Solo', 101, 2, 'knob', 0, ['Off', 'A', 'B']], ['Mastr', 87, 150, 'fader']];
+var NMID = ['IN', 'ROUTE', 'MIX', 'OUT'], NFX = ['INPUT', 'ROUTE', 'MIX', 'OUTPUT'];
+var CN = ['KNOB 1', 'KNOB 2', 'KNOB 3', 'LEFT BTN', 'DOWN BTN', 'RIGHT BTN', 'FOOTSW'], CID = ['K1', 'K2', 'K3', 'LB', 'DB', 'RB', 'FS'];
+var LN = ['REC START', 'REC END', 'PLAY', 'STOP', 'DELETE', 'LOOP START'], GN = ['TURN', 'PRESS', 'HOLD'];
+var MN = ['FOLLOW', 'ACTION', 'FOLLOW', 'ACTION', 'RELEASE', 'FOLLOW'], GFIRST = [0, 1, 3], GLEN = [1, 2, 3];
+var WHEN_L = ['NOW', '1BEAT', '2BEAT', '4BEAT', '8BEAT', '1BAR', '2BAR', '4BAR', '8BAR', '16BAR', '32BAR'];
+var LAG_L = ['OFF', 'MICRO', '50MS', '100MS', '500MS', '1S', '1BEAT', '2BEAT', '4BEAT', '8BEAT', '1BAR', '2BAR', '4BAR', '8BAR', '16BAR', '32BAR'];
+var MIXSET = { 93: 0, 85: 1, 88: 2, 89: 3, 90: 4, 86: 5, 87: 6, 94: 7, 91: 8, 92: 9, 95: 10 }, ROUTEF = { 98: 'out', 99: 'muteA', 100: 'muteB', 101: 'solo' };
+function pin(rec, t) {                         // perform_draw.c pinfo: the target's name, range, control and texts
+  var p = { nm: '', max: 127, look: 'knob', mid: '', fx: '', s: -1 };
+  if (t === Patch.T_NONE) return p;
+  var s = isFtsw(t) ? t & 7 : t >= 14 && t <= 73 ? (t - 14) / 10 | 0 : -1, i = NPJ.findIndex(function (q) { return q[1] === t; });
+  if (s >= 0) { p.s = s; p.mid = 'FX' + (s + 1); p.fx = s < Patch.count(rec) ? (fxName(rec, s) || 'THRU').slice(0, 9) : p.mid; }
+  if (isFtsw(t)) return Object.assign(p, { nm: 'Footsw', max: 1, look: 'trig' });
+  if (i >= 0) {
+    var q = NPJ[i], n = i < 1 ? 0 : i < 5 ? 1 : i < 14 ? 2 : 3;
+    return Object.assign(p, { nm: q[0], max: q[2], look: q[3], x: q[4], opt: q[5], mid: NMID[n], fx: NFX[n], cc: t });
+  }
+  if (s < 0) return p;
+  var k = (t - 14) % 10, defs = s < Patch.count(rec) && EFFECT_PARAMS[Patch.effectKey(rec, s)], d = defs && defs[k - 1];
+  p.k = k;
+  if (!k) return Object.assign(p, { nm: 'Footsw', max: 1, look: 'toggle', opt: OFFON });
+  if (!d) return Object.assign(p, { nm: defs ? 'Knob' + k : 'P' + k });
+  p.nm = d[0].slice(0, 8); p.max = Math.max(1, Math.min(d[1], Patch.paramMax(k - 1)));
+  if (Array.isArray(d[3])) p.opt = d[3]; else p.o = d[3] || 0;
+  if (p.max === 1) { p.look = 'toggle'; p.opt = p.opt || OFFON; }
+  return p;
+}
+function natText(p, d) {                       // nat_text: "-" unused, TAP, an option, A26 / AB / B40 for a crossfade, or the number
+  if (d < 0) return '-';
+  if (p.look === 'trig') return 'TAP';
+  d = Math.min(d, p.max);
+  if (p.opt) return p.opt[d] || String(d);
+  if (p.x) return d === 50 ? 'AB' : (d < 50 ? 'A' : 'B') + 2 * Math.abs(d - 50);
+  return String(d + (p.o || 0));
+}
+function tgtText(rec, t) { return t === Patch.T_NONE ? 'OFF' : (function (q) { return q.mid + ' ' + q.nm; })(pin(rec, t)); }
+function liveVal(p, q, t) {                    // what the control shows now: the patch's value, a Footsw its effect on or off
+  var rec = p.rec;
+  if (q.s >= 0) {
+    if (q.s >= Patch.count(rec)) return 0;
+    return isFtsw(t) || !q.k ? (Patch.on(rec, q.s) ? 1 : 0) : Patch.param(rec, q.s, q.k - 1);
+  }
+  if (ROUTEF[t]) return Patch.routing(rec)[ROUTEF[t]];
+  var set = p.mix || (entries.length && mixOf(p, sel).set);
+  return set && MIXSET[t] != null ? set[MIXSET[t]] : 0;
+}
+function gesText(rec, o, c, g) {
+  var l = o.move[c].slice(GFIRST[g], GFIRST[g] + GLEN[g]).filter(function (m) { return (m >>> 16 & 31) !== 31; });
+  return l.length ? l.map(function (m) { return natText(pin(rec, o.target[c]), m & 0xffff); }).join('>') : '-';
+}
+function gesOf(c) { return prow - (c < 3 ? 1 : 0); }     // the list's gesture rows: knobs TURN PRESS HOLD, buttons PRESS HOLD
+// The move the move page edits: { t, w, set(w) }, or null when the TARGET row (or CYCLE / LOOPER) is chosen
+function perfMove(o) {
+  if (pctl === 'bar') return prow >= 2 && o.loopOn ? { t: o.loopTarget[prow - 2], w: o.loopMove[prow - 2], at: function (w) { o.loopMove[prow - 2] = w; } } : null;
+  if (!prow || o.target[pctl] === Patch.T_NONE) return null;
+  var i = GFIRST[gesOf(pctl)] + pmv;
+  return { t: o.target[pctl], w: o.move[pctl][i], at: function (w) { o.move[pctl][i] = w; } };
+}
+function perfView(p) {
+  if (!mst || !entries.length) return perfHtml(p);
+  var o = perfObj(p), m = perfMove(o);
+  return '<div class="lcdwrap"><canvas id="playLcd" class="lcd" tabindex="0" aria-label="PERFORM play screen. Click the top bar for CYCLE and the looper, a knob column or a button for its setup."></canvas></div>'
+    + '<div class="chain"><button class="box node' + (pctl === 6 ? ' cur' : '') + '" data-pc="6">Footswitch · ' + esc(tgtText(p.rec, o.target[6])) + '</button></div>'
+    + '<div class="prow"><div class="lcdwrap"><canvas id="listLcd" class="lcd half" tabindex="0" aria-label="Setup list: click a row; click CYCLE or LOOPER again to change it."></canvas></div>'
+    + (m ? '<div class="lcdwrap"><canvas id="moveLcd" class="lcd knobs half" tabindex="0" aria-label="The move: drag Value, Next or Lag up or down, or use the mouse wheel. Value below 0 is unused."></canvas></div>' : '')
+    + '</div><div class="ctl">' + perfHtml(p, pctl) + '</div>';
+}
+function drawPerf(p) {
+  var cv = $('playLcd');
+  if (!cv) return;
+  var o = perfObj(p), rec = p.rec, m = perfMove(o);
+  playHits = LCD.play({ left: '', right: 'NO CLK', fill: 0, cycle: o.cycle, sel: pctl === 6 ? -1 : pctl,
+    cols: [0, 1, 2].map(function (i) {
+      var t = o.target[i], q = pin(rec, t), v = liveVal(p, q, t);
+      return t === Patch.T_NONE ? null : { fx: q.fx.toUpperCase(), lab: q.nm.toUpperCase(), look: q.look === 'trig' ? 'toggle' : q.look, v: v, max: q.max, text: natText(q, v).toUpperCase() };
+    }),
+    keys: [3, 4, 5].map(function (i) { var t = o.target[i], q = pin(rec, t); return { name: t === Patch.T_NONE ? '' : q.fx.toUpperCase(), ftsw: isFtsw(t), on: isFtsw(t) && liveVal(p, q, t) }; }) });
+  LCD.present(cv);
+  var rows, name;
+  if (pctl === 'bar') {
+    name = 'PERFORM SETUP';
+    rows = [['CYCLE', o.cycle ? o.cycle + (o.cycle > 1 ? ' BARS' : ' BAR') : 'OFF'], ['LOOPER', o.loopOn ? 'ON' : 'OFF']]
+      .concat(o.loopOn ? LN.map(function (l, i) { return [l, o.loopTarget[i] === Patch.T_NONE ? '-' : tgtText(rec, o.loopTarget[i])]; }) : []);
+  } else {
+    name = CN[pctl];
+    rows = [['TARGET', tgtText(rec, o.target[pctl])]];
+    if (o.target[pctl] !== Patch.T_NONE) for (var g = pctl < 3 ? 0 : 1; g < 3; g++) rows.push([GN[g], gesText(rec, o, pctl, g)]);
+  }
+  var l = LCD.list(name, rows, Math.min(prow, rows.length - 1), ptop, false);
+  listHits = l.hits; ptop = l.top;
+  LCD.present($('listLcd'));
+  if (!m || !$('moveLcd')) return;
+  var q = pin(rec, m.t), un = (m.w >>> 16 & 31) === 31, nx = un ? 0 : Math.min(m.w >>> 16 & 31, 10), lag = un ? 0 : m.w >>> 21 & 15;
+  var tabs = pctl === 'bar' ? [LN[prow - 2], 'ACTION'] : [CID[pctl] + ' ' + GN[gesOf(pctl)]].concat(MN.slice(GFIRST[gesOf(pctl)], GFIRST[gesOf(pctl)] + GLEN[gesOf(pctl)]));
+  moveHits = LCD.knobPage(tabs, pctl === 'bar' ? 1 : 1 + pmv, [
+    { name: m.t === Patch.T_NONE ? 'Value' : q.nm.slice(0, 5), look: q.look === 'trig' ? 'toggle' : q.look, v: un ? 0 : m.w & 0xffff, max: q.max, text: natText(q, un ? -1 : m.w & 0xffff) },
+    { name: 'Next', look: 'knob', v: nx, max: 10, text: WHEN_L[nx] }, { name: 'Lag', look: 'knob', v: lag, max: 15, text: LAG_L[lag] }]);
+  LCD.present($('moveLcd'));
+}
+// A move's Value, Next or Lag turned to v (Value below 0: unused, as pd_step); a toggle or a Footsw press flips on a click
+function moveSet(p, n, v, flip) {
+  var o = perfObj(p), m = perfMove(o);
+  if (!m) return;
+  var q = pin(p.rec, m.t), w = m.w, un = (w >>> 16 & 31) === 31;
+  if (n === 0) {
+    if (flip) w = q.look === 'trig' ? (un ? Patch.mv(127, 0, 0) : Patch.MV_UNUSED) : Patch.mv(un || !(w & 0xffff) ? 1 : 0, un ? 0 : w >>> 16 & 31, w >>> 21 & 15);
+    else if (v < 0) w = Patch.MV_UNUSED;
+    else w = Patch.mv(Math.min(q.max, v), un ? 0 : w >>> 16 & 31, un ? 0 : w >>> 21 & 15);
+  } else if (un) return;
+  else if (n === 1) w = Patch.mv(w & 0xffff, Math.max(0, Math.min(10, v)), w >>> 21 & 15);
+  else w = Patch.mv(w & 0xffff, w >>> 16 & 31, Math.max(0, Math.min(15, v)));
+  m.at(w);
+  p.perf = Patch.perfEncode(o);
+  drawPerf(p);
+}
+function moveVals(p) { var m = perfMove(perfObj(p)), un = (m.w >>> 16 & 31) === 31; return [un ? -1 : m.w & 0xffff, un ? 0 : m.w >>> 16 & 31, un ? 0 : m.w >>> 21 & 15]; }
+$('detail').addEventListener('pointerup', function (e) {
+  var id = e.target.id, p = patches[sel];
+  if (id !== 'playLcd' && id !== 'listLcd' || !p) return;
+  var h = LCD.hit(id === 'playLcd' ? playHits : listHits, LCD.at(e.target, e)), o = perfObj(p);
+  if (!h) return;
+  if (id === 'playLcd') { pctl = h.it === 'bar' ? 'bar' : h.i; prow = pctl === 'bar' || o.target[pctl] === Patch.T_NONE ? 0 : 1; pmv = 0; ptop = 0; }
+  else if (h.it === 'up' || h.it === 'down') ptop += h.it === 'up' ? -1 : 1;
+  else if (pctl === 'bar' && h.i === prow && h.i < 2) {     // CYCLE and LOOPER change on a second click, as ENTER
+    snap(p);
+    if (h.i) o.loopOn = o.loopOn ? 0 : 1; else o.cycle = CYCLES[(CYCLES.indexOf(o.cycle) + 1) % CYCLES.length];
+    p.perf = Patch.perfEncode(o);
+  } else { prow = h.i; pmv = 0; }
+  render();
+  refocus('#' + id);
+});
+$('detail').addEventListener('pointerdown', function (e) {
+  if (e.target.id !== 'moveLcd') return;
+  var h = LCD.hit(moveHits, LCD.at(e.target, e)), p = patches[sel];
+  if (!h) return;
+  if (h.it === 'tab') { if (h.i > 0 && pctl !== 'bar') { pmv = h.i - 1; detail(); refocus('#moveLcd'); } return; }
+  snap(p);
+  pturn = { n: h.i, y: e.clientY, v: moveVals(p)[h.i], max: [pin(p.rec, perfMove(perfObj(p)).t).max, 10, 15][h.i], moved: 0 };
+  try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
+});
+$('detail').addEventListener('pointermove', function (e) {
+  if (!pturn || e.target.id !== 'moveLcd' || pturn.max <= 1 && !pturn.n) return;
+  var d = Math.round((pturn.y - e.clientY) * Math.max(pturn.max, 10) / 200);
+  if (d) { pturn.moved = 1; moveSet(patches[sel], pturn.n, pturn.v + d); }
+});
+$('detail').addEventListener('pointerup', function (e) {
+  if (!pturn) return;
+  var t = pturn; pturn = null;
+  if (!t.moved && !t.n && t.max <= 1) moveSet(patches[sel], 0, 0, true);
+  render();
+  refocus('#moveLcd');
+});
+$('detail').addEventListener('wheel', function (e) {
+  if (e.target.id !== 'moveLcd') return;
+  var h = LCD.hit(moveHits, LCD.at(e.target, e)), p = patches[sel];
+  if (!h || h.it !== 'param') return;
+  e.preventDefault();
+  if (!drawPerf.t) snap(p);
+  moveSet(p, h.i, moveVals(p)[h.i] + (e.deltaY < 0 ? 1 : -1));
+  clearTimeout(drawPerf.t); drawPerf.t = setTimeout(function () { drawPerf.t = 0; render(); }, 400);
+}, { passive: false });
 function detail() {
   var box = detailBox, p = patches[sel];
   if (!p) { box.style.display = 'none'; return; }
@@ -741,7 +988,11 @@ function detail() {
   var po = perfs.length && slotsMoved(p) && perfObj(p);
   if (po && po.target.concat(po.loopTarget).some(function (t) { return isFtsw(t) || t >= 14 && t <= 73; }))
     h += '<div class="note bad">Effects moved: PERFORM targets keep their slot numbers, as on the pedal. Check PERFORM.</div>';
-  h += chainHtml(p.rec, r, mode) + '<div class="chain"><button type="button" class="box node' + (focus === 'perf' ? ' cur' : '') + '" data-it="perf"' + (focus === 'perf' ? ' aria-current="true"' : '') + '>PERFORM</button></div><div class="ctl">';
+  h += '<div class="tabs" role="tablist">' + [['chain', 'Effect chain'], ['perf', 'PERFORM']].map(function (v) {
+    return '<button role="tab" data-view="' + v[0] + '" aria-selected="' + (view === v[0]) + '"' + (view === v[0] ? ' class="cur"' : '') + '>' + v[1] + '</button>';
+  }).join('') + '</div>';
+  if (view === 'perf') h += perfView(p) + '<div>';
+  else h += chainHtml(p.rec) + '<div class="ctl">';
   function mset(list) {
     if (!mx) return '<div class="note">' + (mst ? 'Read all patches to see this patch\'s MIXER settings.'
       : 'MIXER settings (Mode, levels, crossfades) are kept on the pedal, not in the patch. This pedal\'s firmware does not report them to the editor.') + '</div>';
@@ -761,19 +1012,27 @@ function detail() {
       + '<label>Solo <select data-k="solo">' + opts(Patch.SOLO, r.solo) + '</select></label>' + mset([5, 7, 8, 9, 10]);
   else if (focus === 'out')
     h += '<b>OUT</b> <label>Output <select data-k="out">' + opts(Patch.OUT, r.out) + '</select></label>' + mset([6]);
-  else if (focus === 'perf') h += perfHtml(p);
+  if (view === 'perf') ;
   else if (typeof focus === 'number' && focus < Patch.used(p.rec))
     h += fxControls(p.rec, focus);
   else if (/^add\d$/.test(focus)) h += pickHtml(+focus[3]);
   else h += '<span class="note">Nothing selected.</span>';
   h += '</div><div class="acts">' + (p.hist && p.hist.length ? '<button id="undo1">Undo last change</button>' : '')
     + ((p.orig ? recDirty(p) : 0) || p.mix || p.perf ? '<button id="undo">Undo all changes</button>' : '') + '</div>';
-  var f = focusSel();
+  var f = focusSel(), old = $('chainLcd'), keep = old ? old.parentNode.scrollLeft : 1e6;   // a new patch starts at IN, on the right
   box.innerHTML = h;
   box.style.display = 'block';
   refocus(f);
-  var cur = box.querySelector('.chain .cur');      // a phone shows part of the chain: keep the chosen item in view
-  if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  drawChain(p, mode);
+  drawKnobs(p);
+  drawPerf(p);
+  var ch = chainHits.filter(function (h) { return h.it === focus; })[0], cv = $('chainLcd');   // keep the chosen item in view
+  if (cv) {
+    var k = cv.getBoundingClientRect().width / LCD.width(), w = cv.parentNode;
+    w.scrollLeft = keep;
+    if (ch && ch.x * k < w.scrollLeft) w.scrollLeft = ch.x * k - 20;
+    else if (ch && (ch.x + ch.w) * k > w.scrollLeft + w.clientWidth) w.scrollLeft = (ch.x + ch.w) * k - w.clientWidth + 20;
+  }
   if ($('pickadd')) $('pickadd').onclick = addPicked;
   if ($('remove')) $('remove').onclick = function () { snap(p); Patch.removeEffect(p.rec, focus); focus = null; render(); };
   if ($('mvOut')) { $('mvOut').onclick = function () { stepFx(focus, 1); }; $('mvIn').onclick = function () { stepFx(focus, -1); }; }
