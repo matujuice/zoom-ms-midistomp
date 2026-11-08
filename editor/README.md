@@ -18,9 +18,10 @@ then open http://localhost:8737 and press Connect. Close Zoom Effect Manager and
   `docs/dev/modwerk-research.md` section 2), but matched by its effects and name. On MIDISTOMP
   firmware with the SysEx receiver (`F0 7D "MST"`: hello `01`, read `02`, write `03`, see that doc
   section 1) the editor shows and edits them on the ROUTE, MIX and OUT slots, and when a rename,
-  effect move or restore changes the match it writes the old settings back under the new one.
-  Backups then carry the MIXER settings too. PERFORM, and MIXER on stock or older firmware, go
-  back to defaults.
+  effect move changes the match it writes the old settings under the new one first, so the
+  pedal keeps MIXER and PERFORM. Input and Master also set Input R and Master R, as on the pedal.
+  Backups carry the MIXER settings too, not PERFORM. On stock or older firmware both go back to
+  defaults.
 - MS-60B: not supported yet (other patch layout).
 - Effect names: `effect-names.js`, from g200kg/zoom-ms-utility (MIT). Pack effects show as `id …`.
 

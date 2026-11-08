@@ -94,8 +94,12 @@ writes nothing. Otherwise the entry is written and record 50 is saved to flash
 (`0xC00BA3E4`, as the stock MIXER store, also from Task_MIDI). If n is the patch played
 (`B14+324`), the live and saved copies (`0xC00F60E0`, `0xC00F60F8`) change too and the UI is
 redrawn (event 64). The editor uses it to edit settings and to keep them on a rename or move
-(write the old settings under the new hash). ponytail: no PEDAL-mono Mode limit and no
-Input→Input R / Master→Master R mirroring, as the CC path does.
+(write the old settings under the new hash). For a patch with its own entry n it sends 03 before
+the patch dump (28) and store (32): loading the patch then finds entry n and the PERFORM entry n,
+and the store saves both; sent after, the store would save PERFORM defaults. A restored backup
+patch is not slot n's, so it gets 03 after the store and PERFORM defaults. The editor mirrors
+Input→Input R and Master→Master R itself, as the knobs and CCs do. ponytail: 03 has no
+PEDAL-mono Mode limit, and backups carry no PERFORM.
 
 **Firmware work for step B** (1 session plus a hardware test):
 1. Find the 70CDR transmit routine used by the identity reply and the SysEx executor

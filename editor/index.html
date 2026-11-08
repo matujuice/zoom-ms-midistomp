@@ -56,7 +56,7 @@
     <input type="file" id="file" accept=".json" hidden>
     <span id="status">Not connected.</span>
   </div>
-  <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER settings when you rename or move a patch; PERFORM, and MIXER on older firmware, go back to defaults. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
+  <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER and PERFORM settings when you rename a patch or move its effects; on older firmware they go back to defaults. Backups carry MIXER settings, not PERFORM. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
   <div class="wrap"><table>
     <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>MIDISTOMP</th><th></th></tr></thead>
     <tbody id="rows"></tbody>
@@ -217,16 +217,19 @@ $('readAll').onclick = function () { guard(async function () {
   status('Read 50 patches' + (mst ? ' and their MIXER settings' : '') + ' from ' + model + '.', 'ok');
 }); };
 
-async function writePatch(n) {
+// pre: MIXER settings to write under the new hash first, so the pedal finds them and the PERFORM entry
+// of slot n when it loads the patch, and its STORE saves them (pages.c mix_put, perform_store.c find).
+async function writePatch(n, pre) {
   var p = patches[n];
   await selectPatch(n);
+  if (pre && !await writeMixer(n, pre)) { p.note = 'MIXER not saved'; return false; }
   await send(Patch.toDump(p.rec, dev));
   await sleep(50);
   await send(zoom([0x32, 0x01, 0x00, 0x00, n, 0x00, 0x00, 0x00, 0x00, 0x00]));   // store to patch n
   await sleep(250);
   var back = await readPatch(n);                                 // read back to check
   var same = back && back.every(function (b, i) { return b === p.rec[i]; });
-  if (back) { p.rec = back; p.orig = back.slice(); }
+  if (back) { p.rec = back; p.orig = back.slice(); p.restored = false; }
   p.note = same ? 'written' : back ? 'pedal changed it' : 'no read-back';
   return same;
 }
@@ -244,9 +247,10 @@ $('writeChanged').onclick = function () { guard(async function () {
   for (var k = 0; k < list.length; k++) {
     status('Writing patch ' + (list[k] + 1) + ' (' + (k + 1) + ' / ' + list.length + ')…');
     var n = list[k], p = patches[n], old = p.orig && entries.length && Patch.mixer(p.orig, n, entries);
-    var keep = p.mix || (old && old.from >= 0 && Patch.hash(p.orig) !== Patch.hash(p.rec) ? old.set : null);
-    if (recDirty(p) && !await writePatch(n)) bad++;
-    else if (keep && !await writeMixer(n, keep)) { bad++; p.note = 'MIXER not saved'; }
+    var moved = old && !p.restored && old.from >= 0 && Patch.hash(p.orig) !== Patch.hash(p.rec);
+    var keep = p.mix || (moved ? old.set : null), pre = recDirty(p) && moved && old.from === n ? keep : null;
+    if (recDirty(p) && !await writePatch(n, pre)) bad++;
+    else if (keep && !pre && !await writeMixer(n, keep)) { bad++; p.note = 'MIXER not saved'; }
     else if (keep) { p.mix = null; if (!recDirty(p) && p.note !== 'written') p.note = 'written'; }
     render();
   }
@@ -278,7 +282,7 @@ $('file').onchange = async function () {
       var rec = h.match(/../g).map(function (x) { return parseInt(x, 16); });
       if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte.');
       var old = patches[n];
-      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null };
+      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null, restored: true };   // not slot n's MIXER or PERFORM
       var mx = d.mixer && d.mixer[n];                 // backups from MIDISTOMP firmware carry MIXER settings too
       if (mst && Array.isArray(mx) && mx.length === 11 && mx.every(function (v, i) { return v >= 0 && v <= Patch.MIXER[i][1]; })
           && !(entries.length && Patch.mixer(rec, n, entries).set.every(function (v, i) { return v === mx[i]; }))) patches[n].mix = mx;
@@ -477,6 +481,9 @@ $('detail').addEventListener('change', function (e) {
   if (mi && p && entries.length) {
     p.mix = (p.mix || Patch.mixer(p.rec, sel, entries).set).slice();
     p.mix[+mi] = Math.max(0, Math.min(Patch.MIXER[+mi][1], +e.target.value | 0));
+    var rm = Patch.routing(p.rec), v = p.mix[+mi];        // as the knobs and CCs (pages.c pages_key)
+    if (mi === '2' && p.mix[0] !== 2 && rm.inR !== v) { rm.inR = v; Patch.setRouting(p.rec, rm); }
+    if (mi === '6' && rm.out !== 2 && rm.masterR !== v) { rm.masterR = v; Patch.setRouting(p.rec, rm); }
     render();
     return;
   }
