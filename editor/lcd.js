@@ -4,8 +4,8 @@
 // Built by hand; the font and bitmap strings are copied from those files.
 var LCD = (function () {
   'use strict';
-  var W = 128, fb = new Uint8Array(128 * 64);
-  function begin(w) { W = Math.max(128, w | 0); fb = new Uint8Array(W * 64); return W; }
+  var W = 128, H = 64, fb = new Uint8Array(128 * 64);
+  function begin(w, h) { W = Math.max(128, w | 0); H = h || 64; fb = new Uint8Array(W * H); return W; }
 
   const F7="0000000000000000005f5f00000003030003030000143e14143e1400242a7f7f2a12002333180c666200367f4957265000000b0700000000001c3e634100000041633e1c000024187e7e18240018187e7e1818000058380000000018181818181800006060000000002030180c0602003e7f594d7f3e0000427f7f400000466171594f4600224149497f36001814127f7f1000274745457d39003e7f49497930000101717d0f0300367f49497f3600064f49497f3e00000036360000000000563600000000081c36630000363636363636000063361c080000060151590f06003a7d457d423c00707c13137c70007f7f49497f36003e7f41414122007f7f41633e1c007f7f49494941007f7f09090901003e7f4149797a007f7f08087f7f0000417f7f4100000040417f3f00007f7f1c366341007f7f40404040007f0e3c3c0e7f007f7f0e1c7f7f003e7f41417f3e007f7f11111f0e003e7f31615f5e007f7f19396f4600264f4d5979320001017f7f0101003f7f40407f3f00071f78781f07003f703e3e703f0063771c1c776300030f7c7c0f03006171795d4f4700007f7f4141000002060c183020000041417f7f0000040603060400006060606060600000010306040000207454547c78007f7f44447c3800387c4444442800387c44447f7f00387c54545c580000047e7f050100085c54547c3c007f7f04047c780000007d7d0000000040447d3d00007f7f10386c440000007f7f0000007c047c780478007c7c04047c7800387c44447c38007c7c24243c1800183c24247c7c007c7c180c0c0400485c5c7474240000043f7f4400003c7c40407c7c000c3c70703c0c007c603c3c607c006c381010386c000c5c60203c0c00646454544c4c00083e774141000000007777000000004141773e080002010302010000";
   const OS6="00000000000000004f000000000700070000147f147f1400242a7f2a1200231308646200364955225000000503000000001c224100000041221c000014083e08140008083e0808000050300000000808080808000060600000002010080402003e5149453e0000427f4000004261514946002141454b31001814127f10002745454539003c4a49493000017109050300364949493600064949291e00003636000000005636000000081422410000141414141400412214080000020151090600324979413e007e1111117e007f49494936003e41414122007f4141221c007f49494941007f09090901003e4149497a007f0808087f0000417f4100002040413f01007f08142241007f40404040007f020c027f007f0408107f003e4141413e007f09090906003e4151215e007f091929460046494949310001017f0101003f4040403f001f2040201f003f4038403f00631408146300070870080700615149454300007f414100000204081020000041417f00000402010204004040404040000001020400002054545478007f4844443800384444442000384444487f00385454541800087e090102000c5252523e007f080404780000447d4000002040443d00007f102844000000417f4000007c04180478007c08040478003844444438007c1414140800081414187c007c0804040800485454542000043f444020003c4040207c001c2040201c003c4030403c004428102844000c5050503c004464544c4400000836410000000077000000004136080000000201020100";
@@ -17,7 +17,7 @@ var LCD = (function () {
   function hex(s, o, n) { var a = []; for (var i = 0; i < n; i++) a.push(parseInt(s.substr((o + i) * 2, 2), 16)); return a; }
   function px(x, y, v, op) {
     if (v === undefined) v = 1;
-    if (x < 0 || x >= W || y < 0 || y > 63) return;
+    if (x < 0 || x >= W || y < 0 || y >= H) return;
     var i = y * W + x; fb[i] = op === 'xor' ? fb[i] ^ 1 : op === 'set' ? v : fb[i] | v;
   }
   function line(x0, y0, x1, y1) {   // 0xC00A132C: a single point draws nothing; ORs; C integer division
@@ -132,18 +132,18 @@ var LCD = (function () {
     }
   }
   function present(cv) {
-    var sw = W * CELLW + 2 * MG, sh = 64 * CELLH + 2 * MG, g, x, y;
+    var sw = W * CELLW + 2 * MG, sh = H * CELLH + 2 * MG, g, x, y;
     cv.width = sw + 2 * BZ; cv.height = sh + 2 * BZ;
     g = cv.getContext('2d');
     g.clearRect(0, 0, cv.width, cv.height);
     g.fillStyle = 'rgb(24,24,27)'; g.beginPath(); g.roundRect(0, 0, cv.width, cv.height, 16); g.fill();
     g.fillStyle = 'rgb(220,222,226)'; g.beginPath(); g.roundRect(BZ, BZ, sw, sh, 4); g.fill();
-    g.fillStyle = 'rgb(226,228,231)'; g.fillRect(BZ + MG, BZ + MG, W * CELLW, 64 * CELLH);
+    g.fillStyle = 'rgb(226,228,231)'; g.fillRect(BZ + MG, BZ + MG, W * CELLW, H * CELLH);
     g.fillStyle = 'rgb(209,212,218)';
-    for (y = 0; y < 64; y++) for (x = 0; x < W; x++) if (!fb[y * W + x]) g.fillRect(BZ + MG + x * CELLW, BZ + MG + y * CELLH, CELLW - 1, CELLH - 1);
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (!fb[y * W + x]) g.fillRect(BZ + MG + x * CELLW, BZ + MG + y * CELLH, CELLW - 1, CELLH - 1);
     for (x = 0; x < W; x++) {
       g.fillStyle = inkAt(x / (W - 1));
-      for (y = 0; y < 64; y++) if (fb[y * W + x]) g.fillRect(BZ + MG + x * CELLW, BZ + MG + y * CELLH, CELLW - 1, CELLH - 1);
+      for (y = 0; y < H; y++) if (fb[y * W + x]) g.fillRect(BZ + MG + x * CELLW, BZ + MG + y * CELLH, CELLW - 1, CELLH - 1);
     }
   }
   // a click on the canvas, in LCD pixels
@@ -154,7 +154,7 @@ var LCD = (function () {
   function hit(hits, p) { for (var i = hits.length - 1; i >= 0; i--) { var h = hits[i]; if (p.x >= h.x && p.x < h.x + h.w && p.y >= h.y && p.y < h.y + h.h) return h; } return null; }
 
   // ---- the Effect Chain (asm/mixer/chain_draw.c) ----------------------------------------
-  var CW = 38, CH = 19, YC = 32, YA = 21, YB = 43, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4;
+  var CW = 38, CH = 19, YC = 32, YA = 21, YB = 43, K_IN = 0, K_OUT = 1, K_EFF = 2, K_NODE = 3, K_BUS = 4, K_ADD = 5;
   var IT_ROUTE = 0x10, IT_MIX = 0x11, IT_IN = 0x12, IT_OUT = 0x13, PRE = 0, BUS_A = 1, BUS_B = 2, POST = 3;
   var K5 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 []-.!/';
   var G5 = [[14,17,17,31,17,17,17],[30,17,17,30,17,17,30],[14,17,16,16,16,17,14],[28,18,17,17,17,18,28],[31,16,16,30,16,16,31],[31,16,16,30,16,16,16],
@@ -198,15 +198,37 @@ var LCD = (function () {
     prect(l, y, dot, 0, t, 1, CH - 2 * t); prect(l, y, dot, CW - 1, t, 1, CH - 2 * t);
     prect(l, y, dot, 1, t, 1, 1); prect(l, y, dot, CW - 2, t, 1, 1); prect(l, y, dot, 1, CH - 1 - t, 1, 1); prect(l, y, dot, CW - 2, CH - 1 - t, 1, 1);
   }
-  function cover(d, slot, l, cy) {
-    var y = cy - 9, cur = d.cur === slot, c = d.c, nm = c.name[slot] || '', a = nm.substr(0, 5), z = nm.substr(5, 5);
-    clear(l, y, CW, CH, cur);
-    pill(l, y, !c.on[slot], cur && c.sel ? 1 : 2);
+  function label(c, slot, l, y) {
+    var nm = c.name[slot] || '', a = nm.substr(0, 5), z = nm.substr(5, 5);
     t7(a, l + 1 + Math.trunc((CW - 2 - w5(a, 1)) / 2), y + 2);
     if (c.full && c.full[slot]) z = 'FULL';
     t7(z, l + 1 + Math.trunc((CW - 2 - w5(z, 1)) / 2), y + 10);
-    if (cur) mark(l, y, CW, CH, c.sel);
+  }
+  function cover(d, slot, l, cy) {
+    var y = cy - 9, cur = d.cur === slot, c = d.c;
     d.hits.push({ it: slot, x: l, y: y, w: CW, h: CH });
+    if (c.drag && c.drag.slot === slot) { clear(l, y, CW, CH, 0); pill(l, y, 1, 1); return; }   // dragged away: a dotted outline stays
+    clear(l, y, CW, CH, cur);
+    pill(l, y, !c.on[slot], cur && c.sel ? 1 : 2);
+    label(c, slot, l, y);
+    if (cur) { mark(l, y, CW, CH, c.sel); d.delX = l; }
+  }
+  // the dragged effect, inverted as when chosen, under the pointer; c.drag: { slot, x, y } in LCD pixels
+  function floating(c) {
+    var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(H - CH - 2, g.y - (CH >> 1)));
+    fill(l - 2, y - 2, CW + 4, CH + 4, 0); pill(l, y, 0, 1); label(c, g.slot, l, y); inv(l - 2, y - 2, CW + 4, CH + 4);
+  }
+  // where it would land, c.drop: { h (a click region), right }: a bar in the gap, or a box round an empty bus or "+"
+  function dropMark(c) {
+    var h = c.drop.h, right = h.it === 'out' ? 1 : h.it === 'in' ? 0 : c.drop.right;
+    if (h.it === 'bus' || h.it === 'add') return sq(h.x - 1, h.y - 1, h.w + 2, h.h + 2);
+    fill(right ? h.x + h.w + 1 : h.x - 3, h.y - 1, 2, h.h + 2, 1);
+  }
+  // "+": add an effect at this zone's output end
+  var AW = 11;
+  function addBox(d, z, l, cy) {
+    fill(l + 1, cy - 4, 9, 9, 0); sq(l + 1, cy - 4, 9, 9); fill(l + 3, cy, 5, 1, 1); fill(l + 5, cy - 2, 1, 5, 1);
+    d.hits.push({ it: 'add', z: z, x: l, y: cy - 6, w: AW, h: 13 });
   }
   var IC_SERIAL = [2, 0, 6, 29, 6, 0], IC_SPLIT = [2, 0, 2, 29, 2, 2, 0, 10, 29, 10, 0];
   var IC_PARAL = [4, 0, 2, 11, 2, 19, 6, 29, 6, 4, 0, 10, 11, 10, 19, 6, 29, 6, 0];
@@ -249,6 +271,7 @@ var LCD = (function () {
     if (col.kind === K_OUT) return [];
     if (col.kind === K_BUS) return lanesAB(c);
     if (col.kind === K_NODE) return isPar(c) ? lanesAB(c) : lanesL(c);
+    if (col.kind === K_ADD) return col.e === PRE ? lanesM(c) : col.e === POST ? lanesP(c) : isPar(c) ? lanesAB(c) : lanesL(c);
     var z = zoneOf(c, col.e);
     return z === PRE ? lanesM(c) : z === POST ? lanesP(c) : lanesL(c);
   }
@@ -319,41 +342,38 @@ var LCD = (function () {
     var n = !out ? lanesM(c) : fanKind(c, cols, i - 1) ? lanesP(c) : leftOf(c, cols[nb]);
     return cols[nb].kind === K_NODE ? plugs(c, out, n.length) : n;
   }
-  function softkeys(x0, lab, hint) {   // stock softkeys at x 42k+2..42k+41, y 57-63
-    for (var i = 0; i < 3; i++) {
-      var x = x0 + 2 + 42 * i, w = 40, h = hint[i] ? (hint[i] === '^v' ? 11 : w3(hint[i])) + 3 : 0;
-      fill(x, 57, w, 7, 1);
-      if (hint[i] === '^v') for (var r = 0; r < 3; r++) { fill(x + 3 - r, 59 + r, 2 * r + 1, 1, 0); fill(x + 7 + r, 59 + r, 5 - 2 * r, 1, 0); }
-      else if (h) t3(hint[i], x + 1, 58, 0);
-      t3(lab[i], x + h + Math.trunc((w - h - w3(lab[i])) / 2), 58, 0);
-    }
-  }
   // c: { mode 0-3, stereo, out 0-2, mute [A, B], name[6], on[6], z [Pre, A, B, Post] slot lists, cur (slot or IT_*), sel }
   // Every column, IN at the right edge. Returns the click regions: { it: slot | 'route' | 'mix' | 'in' | 'out' | 'bus', z, x, y, w, h }.
+  // c.add: show a "+" at each zone's output end; c.del: a "-" under the chosen effect; c.drag / c.drop: see floating, dropMark
   function chain(c) {
-    var cols = [], par = isPar(c), d = { c: c, cur: c.cur, hits: [] }, i, j, n;
+    var cols = [], par = isPar(c), d = { c: c, cur: c.cur, hits: [], delX: -1 }, i, j, n;
     function push(kind, e, a, b, bi) { cols.push({ kind: kind, e: e, a: a, b: b, bi: bi, jn: 0 }); }
+    function cw(col) { return col.kind === K_ADD ? AW : CW; }
     if (!par && d.cur === IT_MIX) d.cur = IT_ROUTE;   // Serial has no [MIX]
     push(K_IN, IT_IN, -1, -1, -1);
     c.z[PRE].forEach(function (s) { push(K_EFF, s, -1, -1, -1); });
+    if (c.add) push(K_ADD, PRE, -1, -1, -1);
     push(K_NODE, IT_ROUTE, -1, -1, -1);
     if (par) {
-      n = Math.max(c.z[BUS_A].length, c.z[BUS_B].length, 1);
+      n = Math.max(c.z[BUS_A].length, c.z[BUS_B].length, c.add ? 0 : 1);
       for (i = 0; i < n; i++) push(K_BUS, -1, i < c.z[BUS_A].length ? c.z[BUS_A][i] : -1, i < c.z[BUS_B].length ? c.z[BUS_B][i] : -1, i);
+      if (c.add) push(K_ADD, BUS_A, -1, -1, n);
       push(K_NODE, IT_MIX, -1, -1, -1);
     } else {
       c.z[BUS_A].concat(c.z[BUS_B]).forEach(function (s) { push(K_EFF, s, -1, -1, -1); });
+      if (c.add) push(K_ADD, c.z[BUS_B].length ? BUS_B : BUS_A, -1, -1, -1);
       cols[cols.length - 1].jn = 1;
     }
     c.z[POST].forEach(function (s) { push(K_EFF, s, -1, -1, -1); });
+    if (c.add) push(K_ADD, POST, -1, -1, -1);
     push(K_OUT, IT_OUT, -1, -1, -1);
     var gap = cols.map(function (_, j) { return j + 1 < cols.length ? (fanKind(c, cols, j) ? 7 : 4) : 0; });
-    var w = 6 + cols.length * CW + gap.reduce(function (a, b) { return a + b; }, 0), X = [];
+    var w = 6 + cols.reduce(function (a, col) { return a + cw(col); }, 0) + gap.reduce(function (a, b) { return a + b; }, 0), X = [];
     begin(w);
     X[0] = W - 3 - CW - ((W - w) >> 1);
-    for (i = 1; i < cols.length; i++) X[i] = X[i - 1] - CW - gap[i - 1];
+    for (i = 1; i < cols.length; i++) X[i] = X[i - 1] - cw(cols[i]) - gap[i - 1];
     for (j = 0; j + 1 < cols.length; j++) {   // the lines in the gap between column j and j + 1
-      var g = X[j + 1] + CW, gw = X[j] - g, f = fanKind(c, cols, j), s = -1;
+      var g = X[j + 1] + cw(cols[j + 1]), gw = X[j] - g, f = fanKind(c, cols, j), s = -1;
       if (cols[j].kind <= K_OUT && cols[j + 1].kind === K_NODE) s = j;
       else if (cols[j + 1].kind <= K_OUT && cols[j].kind === K_NODE) s = j + 1;
       if (s >= 0) jackLanes(c, cols, s).forEach(function (y) { hline(g, y, gw, 0); });
@@ -365,6 +385,10 @@ var LCD = (function () {
       if (col.kind <= K_OUT) jack(d, col.kind === K_OUT, l, jackLanes(c, cols, i));
       else if (col.kind === K_NODE) node(d, col.e, l);
       else if (col.kind === K_EFF) cover(d, col.e, l, YC);
+      else if (col.kind === K_ADD) {
+        leftOf(c, col).forEach(function (y) { hline(l, y, AW, dead(c, col, y)); });
+        if (col.e === BUS_A && par) { addBox(d, BUS_A, l, YA); addBox(d, BUS_B, l, YB); } else addBox(d, col.e, l, YC);
+      }
       else [[col.a, YA, BUS_A], [col.b, YB, BUS_B]].forEach(function (e) {
         if (e[0] >= 0) return cover(d, e[0], l, e[1]);
         lanesBus(c, e[1]).forEach(function (y) { hline(l, y, CW, c.mute[e[2] - 1]); });
@@ -373,7 +397,12 @@ var LCD = (function () {
     });
     fill(0, 0, W, 9, 1);
     t5('EFFECT CHAIN', (W >> 1) - Math.trunc(w5('EFFECT CHAIN', 1) / 2), 1, 0, 1);
-    softkeys((W - 128) >> 1, [d.cur === IT_IN || d.cur === IT_OUT ? '' : 'SELECT', 'EXIT', 'OPEN'], ['{}', '', '']);
+    if (c.del && d.delX >= 0 && !c.drag) {   // "-": remove the chosen effect
+      var bx = d.delX + ((CW - 9) >> 1);
+      sq(bx, 55, 9, 9); fill(bx + 2, 59, 5, 1, 1);
+      d.hits.push({ it: 'del', x: bx - 1, y: 54, w: 11, h: 10 });
+    }
+    if (c.drag) { if (c.drop) dropMark(c); floating(c); }
     return d.hits;
   }
 
@@ -391,7 +420,6 @@ var LCD = (function () {
       else if (p.look === 'fader') fader(cx, 24, p.v, 0, p.max);
       else knob(p.max ? p.v / p.max : 0, cx, 24);
       font7r(p.text, cx + 30, 48);
-      softkey40(i, '');
       hits.push({ it: 'param', i: i, x: 40 * i + 4, y: 12, w: 40, h: 52 });
     });
     return hits;
@@ -442,10 +470,10 @@ var LCD = (function () {
   }
   // the stock list: title, 4 OS-font rows, cursor, scroll bar. rows [[label, value]], top the first row shown.
   // Returns { hits, top }: { it: 'row', i } and { it: 'up' | 'down' } on the scroll bar.
-  function list(name, rows, cur, top, turn3) {
+  function list(name, rows, cur, top) {
     var n = rows.length, bar = n > 4, hits = [], i;
     begin(128);
-    top = Math.max(0, Math.min(top, n - 4, cur < 0 ? n : cur)); if (cur > top + 3) top = cur - 3;
+    top = Math.max(0, Math.min(top, n - 4));   // the caller keeps cur in view when it moves it; the scroll bar may scroll it out
     font7c(name, 64, 1); invert(0, 0, 127, 8);
     for (i = 0; i < 4 && top + i < n; i++) {
       var l = rows[top + i][0], v = rows[top + i][1];
@@ -461,13 +489,25 @@ var LCD = (function () {
       blit(123, 43, 5, 8, [1, 3, 7, 3, 1], true); blit(123, 12, 5, 8, [4, 6, 7, 6, 4], true);
       hits.push({ it: 'up', x: 122, y: 11, w: 6, h: 22 }, { it: 'down', x: 122, y: 33, w: 6, h: 22 });
     }
-    turnArrows(24); if (turn3) turnArrows(104);
-    softkey42(0, 'ENTER'); softkey42(1, 'EXIT'); softkey42(2, '');
     return { hits: hits, top: top };
+  }
+  // the footswitch box under the play screen, 128 x 21: a stomp seen from above, FOOTSWITCH and its target; on: inverted
+  function ftsw(target, on) {
+    begin(128, 21);
+    rect(0, 0, 127, 20, 3); rect(1, 1, 126, 19, 3);
+    for (var y = -8; y <= 8; y++) for (var x = -8; x <= 8; x++) {
+      var r = x * x + y * y;
+      if ((r <= 72 && r >= 49) || r <= 16) px(14 + x, 10 + y);
+    }
+    font7('FOOTSWITCH', 30, 2);
+    var t = String(target || 'OFF'); while (softW(t) > 94) t = t.slice(0, -1);
+    small(t, 30, 13);
+    if (on) invert(2, 2, 125, 18);
+    return [{ it: 'ftsw', x: 0, y: 0, w: 128, h: 21 }];
   }
 
   return {
-    play: play, list: list, control: control,
+    play: play, list: list, control: control, ftsw: ftsw,
     begin: begin, present: present, at: at, hit: hit, px: px, line: line, rect: rect, invert: invert, blit: blit,
     font7: font7, font7r: font7r, font7c: font7c, os6: os6, small: small, softText: softText, softW: softW,
     statusBar: statusBar, widthP: widthP, toggle: toggle, fader: fader, knob: knob, tab: tab, frame: frame,
