@@ -449,9 +449,9 @@ var LCD = (function () {
       hits.push({ it: 'param', i: i, x: x0 + cell * i, y: 12, w: cell, h: 52 });
     });
     if (on != null) {
-      var s = on ? 'EFFECT ON' : 'EFFECT OFF', bw = softW('EFFECT OFF') + 9, bx = W - 3 - bw;
+      var s = on ? 'EFFECT ON' : 'EFFECT OFF', bw = softW('EFFECT OFF') + 15, bx = W - bw;   // flush right as the frame, as tall as the tab, 1 row above the frame
       small(s, bx + ((bw - softW(s)) >> 1), 3);
-      if (on) invert(bx, 2, bx + bw - 1, 8); else rect(bx, 2, bx + bw - 1, 8, 3);
+      if (on) invert(bx, 0, W - 1, 9); else rect(bx, 0, W - 1, 9, 3);
       hits.push({ it: 'onoff', x: bx, y: 0, w: bw, h: 11 });
     }
     return hits;
