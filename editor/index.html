@@ -57,10 +57,11 @@
   .chain .box[draggable] { cursor: grab; }
   .chain .add { min-width: 0; padding: 0 9px; border-style: dashed; color: var(--dim); }
   .lcdwrap { overflow-x: auto; margin: 10px 0 4px; width: 0; min-width: 100%; }   /* inside a table cell: scroll, do not widen the table */
-  canvas.lcd { display: block; height: 320px; cursor: pointer; touch-action: pan-x; }
+  canvas.lcd { display: block; margin: 0 auto; height: 320px; cursor: pointer; touch-action: pan-x; }
   canvas.lcd.knobs { height: 256px; cursor: ns-resize; touch-action: none; }
   canvas.lcd.half { height: 256px; }
-  .prow { display: flex; flex-wrap: wrap; gap: 0 14px; align-items: flex-start; }
+  .prow { display: flex; flex-wrap: wrap; gap: 0 14px; align-items: flex-start; justify-content: center; }
+  #chainLcd { height: 335px; }   /* 67 rows: room for "-" under bus B */
   .prow .lcdwrap { width: auto; min-width: 0; max-width: 100%; }
   .tabs { display: flex; gap: 4px; margin: 8px 0 0; border-bottom: 1px solid var(--line); }
   .tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; }
@@ -488,28 +489,35 @@ function drawChain(p, mode) {
   if (!cv) return;
   for (var i = 0; i < 6; i++) { c.name.push(i < Patch.used(rec) ? fxName(rec, i) || 'THRU' : ''); c.on.push(Patch.on(rec, i) ? 1 : 0); }
   c.mode = m; c.stereo = pedalStereo; c.out = r.out; c.mute = [r.muteA, r.muteB]; c.sel = 1;
-  c.add = Patch.used(rec) < 6; c.del = typeof focus === 'number' && focus < Patch.used(rec);
-  if (chainDrag) { c.drag = chainDrag; c.drop = chainDrag.drop; }
+  c.add = !Patch.used(rec); c.del = typeof focus === 'number' && focus < Patch.used(rec);
   c.z = [0, 1, 2, 3].map(function (z) { return zoneSlots(rec, z); });
+  if (chainDrag) {   // the landing frame goes before the effect that will follow it (place `at` counts without the dragged one)
+    c.drag = chainDrag;
+    var L = chainDrag.land, l = L && zoneSlots(rec, L.z, chainDrag.slot);
+    c.land = L && { z: L.z, i: L.at < l.length ? c.z[L.z].indexOf(l[L.at]) : c.z[L.z].length };
+  }
   c.cur = typeof focus === 'number' ? focus : ({ route: LCD.IT_ROUTE, mix: LCD.IT_MIX, 'in': LCD.IT_IN, out: LCD.IT_OUT })[focus];
   if (c.cur === undefined) c.cur = -1;
   chainHits = LCD.chain(c);
   LCD.present(cv);
 }
-// Where a dragged effect lands: on an effect, its right half is before it (nearer IN, which is on the right)
-function dropAt(p, from, h, q) {
-  var right = q.x >= h.x + h.w / 2, ab = q.y < 32 ? 1 : 2, mode = effMode(entries.length ? (p.mix || mixOf(p, sel).set)[0] : 1), par = mode === 1 || mode === 2;
+// Where a dragged effect lands, { z, at } as moveTo takes it, or null where it stays: on an effect, its right half
+// is before it (nearer IN, which is on the right); on ROUTE or MIX, the upper half is bus A
+function landing(p, from, h, q) {
+  var right = q.x >= h.x + h.w / 2, ab = q.y < h.y + h.h / 2 ? 1 : 2, mode = effMode(entries.length ? (p.mix || mixOf(p, sel).set)[0] : 1), par = mode === 1 || mode === 2;
+  var end = function (z) { return zoneSlots(p.rec, z, from).length; }, t = null;
   if (typeof h.it === 'number') {
-    if (h.it === from) return;
-    var z = Patch.routing(p.rec).bus[h.it], l = zoneSlots(p.rec, z, from);
-    return moveTo(p, from, z, l.indexOf(h.it) + (right ? 0 : 1));
+    var z = Patch.routing(p.rec).bus[h.it];
+    t = { z: z, at: zoneSlots(p.rec, z, from).indexOf(h.it) + (right ? 0 : 1) };
   }
-  var end = function (z) { return zoneSlots(p.rec, z, from).length; };
-  if (h.it === 'bus' || h.it === 'add') return moveTo(p, from, h.z, end(h.z));
-  if (h.it === 'in') return moveTo(p, from, 0, 0);
-  if (h.it === 'out') return moveTo(p, from, 3, end(3));
-  if (h.it === 'route') return right ? moveTo(p, from, 0, end(0)) : moveTo(p, from, par ? ab : 1, 0);
-  if (h.it === 'mix') return right ? moveTo(p, from, ab, end(ab)) : moveTo(p, from, 3, 0);
+  else if (h.it === 'bus' || h.it === 'add') t = { z: h.z, at: end(h.z) };
+  else if (h.it === 'in') t = { z: 0, at: 0 };
+  else if (h.it === 'out') t = { z: 3, at: end(3) };
+  else if (h.it === 'route') t = right ? { z: 0, at: end(0) } : { z: par ? ab : 1, at: 0 };
+  else if (h.it === 'mix') t = right ? { z: ab, at: end(ab) } : { z: 3, at: 0 };
+  var z0 = Patch.routing(p.rec).bus[from];
+  if (!t || t.z === z0 && t.at === zoneSlots(p.rec, z0).indexOf(from)) return null;   // its own place
+  return t;
 }
 var focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
 $('detail').addEventListener('click', function (e) {
@@ -530,12 +538,12 @@ $('detail').addEventListener('keydown', function (e) {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepFx(focus, e.key === 'ArrowLeft' ? 1 : -1); }
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); swapAB(focus, e.key === 'ArrowUp' ? 1 : 2); }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeFx(); }
-  if (e.key === '+' && Patch.used(patches[sel].rec) < 6) { focus = 'add' + Patch.routing(patches[sel].rec).bus[focus]; detail(); $('pickq').focus(); }
+  if (e.key === '+' && Patch.used(patches[sel].rec) < 6) { addAt = focus + 1; focus = 'add' + Patch.routing(patches[sel].rec).bus[focus]; detail(); $('pickq').focus(); }
 });
 function removeFx() { var p = patches[sel]; snap(p); Patch.removeEffect(p.rec, focus); focus = null; render(); refocus('#chainLcd'); }
 // The chain screen: click an item to edit it. A dragged effect turns over and follows the pointer; it lands where it is let go.
 var down = null;
-function dropHit(q) { var h = LCD.hit(chainHits, q); return h && h.it !== 'del' && h.it !== chainDrag.slot ? h : null; }
+function dropHit(q) { var h = LCD.hit(chainHits, q); return h && h.it !== 'del' && h.it !== 'ins' && h.it !== chainDrag.slot ? h : null; }
 $('detail').addEventListener('pointerdown', function (e) {
   if (e.target.id !== 'chainLcd') return;
   var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), cx: e.clientX, cy: e.clientY };
@@ -545,9 +553,11 @@ $('detail').addEventListener('pointermove', function (e) {
   if (!down || e.target.id !== 'chainLcd' || !down.h || typeof down.h.it !== 'number') return;
   if (!chainDrag && Math.abs(e.clientX - down.cx) + Math.abs(e.clientY - down.cy) < 5) return;
   var q = LCD.at(e.target, e);
+  var was = chainDrag && chainDrag.land, h;
   chainDrag = { slot: down.h.it, x: q.x, y: q.y };
-  var h = dropHit(q);
-  chainDrag.drop = h && { h: h, right: q.x >= h.x + h.w / 2 };
+  if (!was) drawChain(patches[sel], chainMode);   // hits without the landing frame
+  h = dropHit(q);
+  chainDrag.land = h && h.it === 'land' ? was : h && landing(patches[sel], chainDrag.slot, h, q);   // over the frame: it stays put
   drawChain(patches[sel], chainMode);
 });
 $('detail').addEventListener('pointercancel', function (e) {
@@ -560,14 +570,15 @@ $('detail').addEventListener('pointerup', function (e) {
   var q = LCD.at(e.target, e), h = LCD.hit(chainHits, q), d = down, p = patches[sel];
   down = null;
   if (chainDrag) {
-    var g = chainDrag.slot, to = dropHit(q);
+    var g = chainDrag.slot, to = chainDrag.land;
     chainDrag = null;
-    if (to) dropAt(p, g, to, q);
+    if (to) moveTo(p, g, to.z, to.at);
     return drawChain(patches[sel], chainMode);
   }
   if (!h || h !== d.h) return;
   if (h.it === 'del') return removeFx();
-  focus = h.it === 'bus' || h.it === 'add' ? 'add' + h.z : h.it;
+  addAt = h.it === 'ins' ? focus + h.after : -1;      // "+" beside the chosen effect: before or after it, in its zone
+  focus = h.it === 'ins' ? 'add' + Patch.routing(p.rec).bus[focus] : h.it === 'bus' || h.it === 'add' ? 'add' + h.z : h.it;
   detail();
   if ($('pickq')) $('pickq').focus(); else refocus('#chainLcd');
 });// The effects of zone z in signal order (slot order), without slot skip
@@ -619,8 +630,10 @@ function pickOpts(q) {
   Object.keys(EFFECT_GROUPS).forEach(function (g) { grp(GROUP_NAMES[g], EFFECT_GROUPS[g]); });
   return h;
 }
+var addAt = -1;   // the slot a new effect goes in, -1: the output end of its zone
 function pickHtml(z) {
-  return '<b>Add an effect to ' + ZONES[z] + '</b> <label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect"></label><br>'
+  var p = patches[sel], where = addAt < 0 ? 'to ' + ZONES[z] : addAt < Patch.used(p.rec) && Patch.routing(p.rec).bus[addAt] === z ? 'before ' + esc(fxName(p.rec, addAt) || 'THRU') : 'after ' + esc(fxName(p.rec, addAt - 1) || 'THRU');
+  return '<b>Add an effect ' + where + '</b> <label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect"></label><br>'
     + '<select id="pick" size="12" aria-label="Effects">' + pickOpts('') + '</select> <button id="pickadd">Add</button>'
     + '<div class="note">Stock effects your pedal does not have are listed too. If the pedal shows "DSP FULL", remove or swap an effect.</div>';
 }
@@ -629,6 +642,7 @@ function addPicked() {
   if (!p || !k) return;
   var n = Patch.used(p.rec), bus = Patch.routing(p.rec).bus, at = 0;
   for (var i = 0; i < n; i++) if (bus[i] <= z) at = i + 1;    // after the last effect of this zone or an earlier one
+  if (addAt >= 0) at = addAt;
   var was = p.rec.slice();
   if (!Patch.addEffect(p.rec, at, +k, EFFECT_PARAMS[k], z)) return;
   snap(p, was);
@@ -648,10 +662,8 @@ function slotsMoved(p) { return p.orig && [0, 1, 2, 3, 4, 5].some(function (i) {
 var clampNote = '';
 function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); }
 function fxControls(rec, i) {
-  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)], bus = Patch.routing(rec).bus[i];
+  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
   var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
-    + ' <button id="mvOut" title="Arrow left on the effect does the same">← Toward OUT</button> <button id="mvIn" title="Arrow right on the effect does the same">Toward IN →</button>'
-    + (bus === 1 ? ' <button id="mvB" title="Arrow down on the effect does the same">↓ To B</button>' : bus === 2 ? ' <button id="mvA" title="Arrow up on the effect does the same">↑ To A</button>' : '')
     + KNOB_CV;
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
@@ -1132,9 +1144,6 @@ function detail() {
     else if (ch && (ch.x + ch.w) * k > w.scrollLeft + w.clientWidth) w.scrollLeft = (ch.x + ch.w) * k - w.clientWidth + 20;
   }
   if ($('pickadd')) $('pickadd').onclick = addPicked;
-  if ($('mvOut')) { $('mvOut').onclick = function () { stepFx(focus, 1); }; $('mvIn').onclick = function () { stepFx(focus, -1); }; }
-  if ($('mvA')) $('mvA').onclick = function () { swapAB(focus, 1); };
-  if ($('mvB')) $('mvB').onclick = function () { swapAB(focus, 2); };
   if ($('undo1')) $('undo1').onclick = function () {
     var h = p.hist.pop(); p.rec = h.rec; p.mix = h.mix; p.perf = h.perf;
     if (typeof focus === 'number' && focus >= Patch.used(p.rec)) focus = null;

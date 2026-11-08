@@ -206,30 +206,27 @@ var LCD = (function () {
   }
   function cover(d, slot, l, cy) {
     var y = cy - 9, cur = d.cur === slot, c = d.c;
+    if (slot === -2) { d.hits.push({ it: 'land', x: l, y: y, w: CW, h: CH }); return clear(l, y, CW, CH, 0); }   // where it lands: an empty frame, drawn last (chain)
     d.hits.push({ it: slot, x: l, y: y, w: CW, h: CH });
-    if (c.drag && c.drag.slot === slot) { clear(l, y, CW, CH, 0); pill(l, y, 1, 1); return; }   // dragged away: a dotted outline stays
+    if (c.drag && c.drag.slot === slot) { clear(l, y, CW, CH, 0); pill(l, y, c.land ? 1 : 0, 1); return; }   // dragged away: a dotted outline stays (solid: it stays here)
     clear(l, y, CW, CH, cur);
     pill(l, y, !c.on[slot], cur && c.sel ? 1 : 2);
     label(c, slot, l, y);
-    if (cur) { mark(l, y, CW, CH, c.sel); d.delX = l; }
+    if (cur) { mark(l, y, CW, CH, c.sel); d.delX = l; d.delY = cy; }
   }
   // the dragged effect, inverted as when chosen, under the pointer; c.drag: { slot, x, y } in LCD pixels
   function floating(c) {
-    var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(H - CH - 2, g.y - (CH >> 1)));
+    var g = c.drag, l = g.x - (CW >> 1), y = Math.max(11, Math.min(64 - CH - 2, g.y - (CH >> 1)));
     fill(l - 2, y - 2, CW + 4, CH + 4, 0); pill(l, y, 0, 1); label(c, g.slot, l, y); inv(l - 2, y - 2, CW + 4, CH + 4);
   }
-  // where it would land, c.drop: { h (a click region), right }: a bar in the gap, or a box round an empty bus or "+"
-  function dropMark(c) {
-    var h = c.drop.h, right = h.it === 'out' ? 1 : h.it === 'in' ? 0 : c.drop.right;
-    if (h.it === 'bus' || h.it === 'add') return sq(h.x - 1, h.y - 1, h.w + 2, h.h + 2);
-    fill(right ? h.x + h.w + 1 : h.x - 3, h.y - 1, 2, h.h + 2, 1);
+  // a 9 x 9 square "+" or "-" (box at x, y); hit is its click region
+  var AW = 11, PAD = 14;
+  function btn(d, x, y, plus, hit) {
+    fill(x, y, 9, 9, 0); sq(x, y, 9, 9); fill(x + 2, y + 4, 5, 1, 1); if (plus) fill(x + 4, y + 2, 1, 5, 1);
+    hit.x = x - 1; hit.y = y - 1; hit.w = 11; hit.h = 11; d.hits.push(hit);
   }
-  // "+": add an effect at this zone's output end
-  var AW = 11;
-  function addBox(d, z, l, cy) {
-    fill(l + 1, cy - 4, 9, 9, 0); sq(l + 1, cy - 4, 9, 9); fill(l + 3, cy, 5, 1, 1); fill(l + 5, cy - 2, 1, 5, 1);
-    d.hits.push({ it: 'add', z: z, x: l, y: cy - 6, w: AW, h: 13 });
-  }
+  // "+": add an effect at this zone's output end (only on an empty chain)
+  function addBox(d, z, l, cy) { btn(d, l + 1, cy - 4, 1, { it: 'add', z: z }); }
   var IC_SERIAL = [2, 0, 6, 29, 6, 0], IC_SPLIT = [2, 0, 2, 29, 2, 2, 0, 10, 29, 10, 0];
   var IC_PARAL = [4, 0, 2, 11, 2, 19, 6, 29, 6, 4, 0, 10, 11, 10, 19, 6, 29, 6, 0];
   var IC_MONO = [4, 0, 6, 10, 6, 18, 2, 29, 2, 4, 0, 6, 10, 6, 18, 10, 29, 10, 0];
@@ -350,6 +347,10 @@ var LCD = (function () {
     function push(kind, e, a, b, bi) { cols.push({ kind: kind, e: e, a: a, b: b, bi: bi, jn: 0 }); }
     function cw(col) { return col.kind === K_ADD ? AW : CW; }
     if (!par && d.cur === IT_MIX) d.cur = IT_ROUTE;   // Serial has no [MIX]
+    if (c.drag && c.land) {   // c.land: { z, i } the landing frame goes before entry i of zone z
+      c = Object.assign({}, c, { z: c.z.map(function (l) { return l.slice(); }) }); d.c = c;
+      c.z[c.land.z].splice(c.land.i, 0, -2);
+    }
     push(K_IN, IT_IN, -1, -1, -1);
     c.z[PRE].forEach(function (s) { push(K_EFF, s, -1, -1, -1); });
     if (c.add) push(K_ADD, PRE, -1, -1, -1);
@@ -367,9 +368,11 @@ var LCD = (function () {
     c.z[POST].forEach(function (s) { push(K_EFF, s, -1, -1, -1); });
     if (c.add) push(K_ADD, POST, -1, -1, -1);
     push(K_OUT, IT_OUT, -1, -1, -1);
-    var gap = cols.map(function (_, j) { return j + 1 < cols.length ? (fanKind(c, cols, j) ? 7 : 4) : 0; });
+    var gap = cols.map(function (_, j) { return j + 1 < cols.length ? (fanKind(c, cols, j) ? 7 : 4) : 0; }), pc = -1;
+    if (c.del && !c.drag) cols.forEach(function (col, j) { if (col.e === d.cur && col.kind === K_EFF || col.kind === K_BUS && (col.a === d.cur || col.b === d.cur)) pc = j; });
+    if (pc >= 0) { gap[pc] += PAD; if (pc > 0) gap[pc - 1] += PAD; }   // room for the "+" on each side
     var w = 6 + cols.reduce(function (a, col) { return a + cw(col); }, 0) + gap.reduce(function (a, b) { return a + b; }, 0), X = [];
-    begin(w);
+    begin(w, 67);
     X[0] = W - 3 - CW - ((W - w) >> 1);
     for (i = 1; i < cols.length; i++) X[i] = X[i - 1] - cw(cols[i]) - gap[i - 1];
     for (j = 0; j + 1 < cols.length; j++) {   // the lines in the gap between column j and j + 1
@@ -390,19 +393,23 @@ var LCD = (function () {
         if (col.e === BUS_A && par) { addBox(d, BUS_A, l, YA); addBox(d, BUS_B, l, YB); } else addBox(d, col.e, l, YC);
       }
       else [[col.a, YA, BUS_A], [col.b, YB, BUS_B]].forEach(function (e) {
-        if (e[0] >= 0) return cover(d, e[0], l, e[1]);
+        if (e[0] >= 0 || e[0] === -2) return cover(d, e[0], l, e[1]);
         lanesBus(c, e[1]).forEach(function (y) { hline(l, y, CW, c.mute[e[2] - 1]); });
         d.hits.push({ it: 'bus', z: e[2], x: l, y: e[1] - 9, w: CW, h: CH });
       });
     });
     fill(0, 0, W, 9, 1);
     t5('EFFECT CHAIN', (W >> 1) - Math.trunc(w5('EFFECT CHAIN', 1) / 2), 1, 0, 1);
-    if (c.del && d.delX >= 0 && !c.drag) {   // "-": remove the chosen effect
-      var bx = d.delX + ((CW - 9) >> 1);
-      sq(bx, 55, 9, 9); fill(bx + 2, 59, 5, 1, 1);
-      d.hits.push({ it: 'del', x: bx - 1, y: 54, w: 11, h: 10 });
+    if (pc >= 0 && d.delX >= 0) {   // "+" before (right, nearer IN) and after the chosen effect, "-" under it
+      var l0 = d.delX, cy = d.delY, by = cy === YA ? 57 : cy + 14;
+      btn(d, l0 + CW + 4, cy - 4, 1, { it: 'ins', after: 0 });
+      btn(d, l0 - 13, cy - 4, 1, { it: 'ins', after: 1 });
+      btn(d, l0 + ((CW - 9) >> 1), by, 0, { it: 'del' });
     }
-    if (c.drag) { if (c.drop) dropMark(c); floating(c); }
+    if (c.drag) {   // the landing frame shows through the dragged effect
+      floating(c);
+      d.hits.forEach(function (h) { if (h.it === 'land') { inv(h.x + 1, h.y, CW - 2, 1); inv(h.x + 1, h.y + CH - 1, CW - 2, 1); inv(h.x, h.y + 1, 1, CH - 2); inv(h.x + CW - 1, h.y + 1, 1, CH - 2); } });
+    }
     return d.hits;
   }
 
@@ -411,7 +418,7 @@ var LCD = (function () {
   function knobPage(tabs, cur, ps) {
     var hits = [], x = 0;
     begin(Math.max(40 * ps.length + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)));
-    frame(0, 11, W, 53);
+    frame(0, 11, W, 53); line(0, 63, W - 1, 63);
     tabs.forEach(function (s, i) { var tw = tab(x, 0, i < cur ? 2 : i === cur ? 0 : 1, s); hits.push({ it: 'tab', i: i, x: x, y: 0, w: tw, h: 11 }); x += tw - 1; });
     ps.forEach(function (p, i) {
       var cx = 8 + 40 * i;
@@ -491,19 +498,25 @@ var LCD = (function () {
     }
     return { hits: hits, top: top };
   }
-  // the footswitch box under the play screen, 128 x 21: a stomp seen from above, FOOTSWITCH and its target; on: inverted
-  function ftsw(target, on) {
-    begin(128, 21);
-    rect(0, 0, 127, 20, 3); rect(1, 1, 126, 19, 3);
-    for (var y = -8; y <= 8; y++) for (var x = -8; x <= 8; x++) {
-      var r = x * x + y * y;
-      if ((r <= 72 && r >= 49) || r <= 16) px(14 + x, 10 + y);
+  // the footswitch box under the play screen, 128 x 24, drawn as a softkey: dark, white in a frame when chosen.
+  // The stomp is seen at an angle: a base ring, the cap's top face and its side.
+  function ellipse(cx, cy, rx, ry, lower) {
+    for (var a = 0; a < 360; a += 2) {
+      var t = a * Math.PI / 180, y = Math.round(cy + ry * Math.sin(t));
+      if (!lower || y >= cy) px(Math.round(cx + rx * Math.cos(t)), y);
     }
-    font7('FOOTSWITCH', 30, 2);
-    var t = String(target || 'OFF'); while (softW(t) > 94) t = t.slice(0, -1);
-    small(t, 30, 13);
-    if (on) invert(2, 2, 125, 18);
-    return [{ it: 'ftsw', x: 0, y: 0, w: 128, h: 21 }];
+  }
+  function ftsw(target, on) {
+    begin(128, 24);
+    ellipse(15, 15, 10, 4, 0);                       // base ring
+    ellipse(15, 13, 6, 2, 1);                        // the cap's lower edge
+    line(9, 8, 9, 13); line(21, 8, 21, 13);          // the cap's sides
+    ellipse(15, 8, 6, 2, 0);                         // the cap's top face
+    font7('FOOTSWITCH', 32, 3);
+    var t = String(target || 'OFF'); while (softW(t) > 90) t = t.slice(0, -1);
+    small(t, 32, 14);
+    if (on) rect(0, 0, 127, 23, 3); else invert(0, 0, 127, 23);
+    return [{ it: 'ftsw', x: 0, y: 0, w: 128, h: 24 }];
   }
 
   return {
