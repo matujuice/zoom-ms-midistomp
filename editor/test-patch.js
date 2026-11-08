@@ -110,4 +110,9 @@ assert.deepStrictEqual(P.mixer(rec, 0, [other, e]).from, 1);                    
 assert.deepStrictEqual(P.mixer(rec, 0, [other, other]), { set: defs, from: -1 });                 // none: defaults
 var bad = { hash: e.hash, set: [9].concat(e.set.slice(1)) };                                        // Mode 9 > max 3
 assert.strictEqual(P.mixer(rec, 0, [bad]).set[0], 0);
+// 03 write: 27 bytes, 7-bit clean, and its payload decodes to the same hash and settings
+var wr = P.mixerWrite(7, 0xba8022cd, ent.slice(4, 15), 9);
+assert.strictEqual(wr.length, 27);
+assert.ok(wr.slice(1, -1).every(function (b) { return b < 0x80; }));
+assert.deepStrictEqual(P.unpack7(wr.slice(8, -1)), ent.slice(0, 15));
 console.log('patch.js OK');

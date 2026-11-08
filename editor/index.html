@@ -46,7 +46,7 @@
 <body>
 <main>
   <h1>MIDISTOMP Patches</h1>
-  <div class="note">Local patch manager for MS-70CDR / MS-50G. Reads all 50 patches, shows effects and MIDISTOMP routing, renames, edits routing, backs up and restores. Close Zoom Effect Manager and other editors first.</div>
+  <div class="note">Local patch manager for MS-70CDR / MS-50G. Reads all 50 patches, shows effects and MIDISTOMP routing, renames, edits routing and MIXER settings, backs up and restores. Close Zoom Effect Manager and other editors first.</div>
   <div class="bar">
     <button class="main" id="connect">Connect</button>
     <button id="readAll" disabled>Read all patches</button>
@@ -56,7 +56,7 @@
     <input type="file" id="file" accept=".json" hidden>
     <span id="status">Not connected.</span>
   </div>
-  <div class="note">Renaming a patch, or restoring it to another number, resets its MIXER settings and PERFORM to defaults (they live outside the patch, matched by effects and name). Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is kept.</div>
+  <div class="note">MIXER settings (Mode, levels, crossfades) and PERFORM live outside the patch, matched by its effects and name. On MIDISTOMP firmware the editor keeps the MIXER settings when you rename or move a patch; PERFORM, and MIXER on older firmware, go back to defaults. Routing (bus, Input R, Master R, Output, mutes, solo) is inside the patch and is always kept.</div>
   <div class="wrap"><table>
     <thead><tr><th>#</th><th>Name</th><th>Slot 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>MIDISTOMP</th><th></th></tr></thead>
     <tbody id="rows"></tbody>
@@ -104,7 +104,8 @@ function buttons() {
   $('backup').disabled = busy || !patches.length;
   $('restore').disabled = busy;
 }
-function dirty(p) { return p && (!p.orig || p.rec.some(function (b, i) { return b !== p.orig[i]; })); }
+function recDirty(p) { return p && (!p.orig || p.rec.some(function (b, i) { return b !== p.orig[i]; })); }
+function dirty(p) { return recDirty(p) || !!(p && p.mix); }     // p.mix: MIXER settings edited here, not yet written
 
 $('connect').onclick = function () { guard(async function () {
   if (!navigator.requestMIDIAccess) throw new Error('This browser has no Web MIDI. Use Chrome or Edge.');
@@ -230,13 +231,23 @@ async function writePatch(n) {
   return same;
 }
 
+async function writeMixer(n, set) {           // SysEx 03; the pedal saves record 50 to flash, so allow time
+  var r = expect(function (m) { return mstReply(m, 0x44, 0x33) && m[7] === n; }, 3000);
+  await send(Patch.mixerWrite(n, Patch.hash(patches[n].rec), set, 0x33));
+  var m = await r;
+  return m && m[8] === 0;
+}
 $('writeChanged').onclick = function () { guard(async function () {
   var list = patches.map(function (p, n) { return dirty(p) ? n : -1; }).filter(function (n) { return n >= 0; });
   if (!confirm('Write ' + list.length + ' patch(es) to the pedal: ' + list.map(function (n) { return n + 1; }).join(', ') + '?\nThis overwrites them on the pedal.')) return;
   var was = await currentProgram(), bad = 0;
   for (var k = 0; k < list.length; k++) {
     status('Writing patch ' + (list[k] + 1) + ' (' + (k + 1) + ' / ' + list.length + ')…');
-    if (!await writePatch(list[k])) bad++;
+    var n = list[k], p = patches[n], old = p.orig && entries.length && Patch.mixer(p.orig, n, entries);
+    var keep = p.mix || (old && old.from >= 0 && Patch.hash(p.orig) !== Patch.hash(p.rec) ? old.set : null);
+    if (recDirty(p) && !await writePatch(n)) bad++;
+    else if (keep && !await writeMixer(n, keep)) { bad++; p.note = 'MIXER not saved'; }
+    else if (keep) { p.mix = null; if (!recDirty(p) && p.note !== 'written') p.note = 'written'; }
     render();
   }
   if (was >= 0) await selectPatch(was);
@@ -247,6 +258,7 @@ $('writeChanged').onclick = function () { guard(async function () {
 $('backup').onclick = function () {
   var data = { format: 'midistomp-patches', version: 1, model: model, deviceId: dev, saved: new Date().toISOString(),
     patches: patches.map(function (p) { return p ? p.rec.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('') : null; }) };
+  if (entries.length) data.mixer = patches.map(function (p, n) { return p ? p.mix || Patch.mixer(p.rec, n, entries).set : null; });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
   a.download = (model || 'zoom') + '-patches-' + data.saved.slice(0, 10) + '.json';
@@ -266,7 +278,10 @@ $('file').onchange = async function () {
       var rec = h.match(/../g).map(function (x) { return parseInt(x, 16); });
       if (rec.some(function (b, i) { return i % 18 === 17 && i < 108 && b & 0x80; })) throw new Error('Patch ' + (n + 1) + ': bad routing byte.');
       var old = patches[n];
-      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '' };
+      patches[n] = { rec: rec, orig: old ? old.orig : null, note: '', mix: null };
+      var mx = d.mixer && d.mixer[n];                 // backups from MIDISTOMP firmware carry MIXER settings too
+      if (mst && Array.isArray(mx) && mx.length === 11 && mx.every(function (v, i) { return v >= 0 && v <= Patch.MIXER[i][1]; })
+          && !(entries.length && Patch.mixer(rec, n, entries).set.every(function (v, i) { return v === mx[i]; }))) patches[n].mix = mx;
       if (dirty(patches[n])) patches[n].note = 'from backup';
     });
     render();
@@ -329,7 +344,8 @@ $('rows').addEventListener('click', function (e) {
 // As the pedal's Effect Chain screen: signal right to left, OUT ← Post ← [MIX] ← A / B ← [ROUTE] ← Pre ← IN.
 // Each zone lists its effects in signal order (row-reverse: the first one, nearest the input, on the right).
 // Drag a box onto another box or into a zone to move it; the patch's slots are then rewritten in signal order.
-function chainHtml(rec, r) {
+// mode: MIXER Mode 0-3, or -1 when not known. Serial and Mono Serial have no [MIX]: A then B in a row (chain_draw.c).
+function chainHtml(rec, r, mode) {
   function zone(z, label) {
     var h = '<div class="zone" data-z="' + z + '"' + (label ? ' data-l="' + label + '"' : '') + '>';
     for (var i = 0; i < 6; i++)
@@ -338,9 +354,13 @@ function chainHtml(rec, r) {
     return h + '</div>';
   }
   function node(it, t) { return '<span class="box node' + (focus === it ? ' cur' : '') + '" data-it="' + it + '">' + t + '</span>'; }
+  var route = node('route', 'ROUTE' + (mode >= 0 ? ' · ' + Patch.MIXER[0][3][mode] : ''));
+  if (mode === 0 || mode === 3)
+    return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
+      + zone(2, 'B') + zone(1, 'A') + route + zone(0) + '<span class="jack">← IN</span></div>';
   return '<div class="chain">' + node('out', 'OUT') + '<span class="jack">←</span>' + zone(3)
     + node('mix', 'MIX') + '<div class="ab">' + zone(1, 'A') + zone(2, 'B')
-    + '</div>' + node('route', 'ROUTE') + zone(0) + '<span class="jack">← IN</span></div>';
+    + '</div>' + route + zone(0) + '<span class="jack">← IN</span></div>';
 }
 var dragSlot = -1, focus = null;              // focus: the clicked chain item, a slot number or 'route' / 'mix' / 'out'
 $('detail').addEventListener('click', function (e) {
@@ -410,18 +430,21 @@ function detail() {
   function opts(list, v) { return list.map(function (t, i) { return '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + t + '</option>'; }).join(''); }
   function num(k, t) { return '<label>' + t + ' <input type="number" min="0" max="150" data-k="' + k + '" value="' + r[k] + '"></label>'; }
   function check(k, t) { return '<label><input type="checkbox" data-k="' + k + '"' + (r[k] ? ' checked' : '') + '> ' + t + '</label>'; }
-  var h = '<b>Patch ' + (sel + 1) + '</b> <span class="note">Click an effect, ROUTE, MIX or OUT to edit it. Drag effects to move them.</span>'
-    + chainHtml(p.rec, r) + '<div class="ctl">';
-  // MIXER settings 0-10: kept on the pedal (record 50), shown read only
-  var mx = entries.length && Patch.mixer(p.rec, sel, entries);
+  var h = '<b>Patch ' + (sel + 1) + '</b> <span class="note">Click an effect, ROUTE, MIX or OUT to edit it. Drag effects to move them.</span>';
+  // MIXER settings 0-10: kept on the pedal (record 50), edited here and written with SysEx 03
+  var mx = entries.length && Patch.mixer(p.rec, sel, entries), mset0 = p.mix || (mx && mx.set), mode = mset0 ? mset0[0] : -1;
+  if (focus === 'mix' && (mode === 0 || mode === 3)) focus = 'route';     // as the pedal: Serial has no [MIX]
+  h += chainHtml(p.rec, r, mode) + '<div class="ctl">';
   function mset(list) {
     if (!mx) return '<div class="note">' + (mst ? 'Read all patches to see this patch\'s MIXER settings.'
       : 'MIXER settings (Mode, levels, crossfades) are kept on the pedal, not in the patch. This pedal\'s firmware does not report them to the editor.') + '</div>';
-    return '<div class="note">On the pedal (set them there): ' + list.map(function (i) {
-      var m = Patch.MIXER[i], v = mx.set[i];
-      return m[0] + ' <b>' + (m[3] ? m[3][v] : v) + '</b>';
-    }).join(' · ') + (mx.from < 0 ? ' (defaults: none saved for this patch' + (dirty(p) ? ' as edited' : '') + ')'
-      : mx.from !== sel ? ' (saved with patch ' + (mx.from + 1) + ', a copy)' : '') + '</div>';
+    return '<br>' + list.map(function (i) {
+      var m = Patch.MIXER[i], v = mset0[i];
+      return '<label>' + m[0] + ' ' + (m[3] ? '<select data-mx="' + i + '">' + opts(m[3], v) + '</select>'
+        : '<input type="number" min="0" max="' + m[1] + '" data-mx="' + i + '" value="' + v + '">') + '</label>';
+    }).join('') + '<div class="note">' + (p.mix ? 'MIXER settings edited: "Write changed to pedal" sends them.'
+      : mx.from < 0 ? 'MIXER: defaults, none saved for this patch.' : mx.from !== sel ? 'MIXER: saved with patch ' + (mx.from + 1) + ', a copy.' : '')
+      + (list.indexOf(1) >= 0 || list.indexOf(5) >= 0 ? ' XFade 0-100: 50 is the middle, below is A, above is B (the pedal shows 37 as A26).' : '') + '</div>';
   }
   if (focus === 'route')
     h += '<b>ROUTE</b> ' + num('inR', 'Input R') + mset([0, 2, 1, 3, 4])
@@ -434,10 +457,10 @@ function detail() {
   else if (typeof focus === 'number' && fxName(p.rec, focus))
     h += fxControls(p.rec, focus);
   else h += '<span class="note">Nothing selected.</span>';
-  h += '</div>' + (p.orig ? '<button id="undo">Undo changes</button>' : '');
+  h += '</div>' + (p.orig || p.mix ? '<button id="undo">Undo changes</button>' : '');
   box.innerHTML = h;
   box.style.display = 'block';
-  if ($('undo')) $('undo').onclick = function () { p.rec = p.orig.slice(); p.note = ''; render(); };
+  if ($('undo')) $('undo').onclick = function () { if (p.orig) p.rec = p.orig.slice(); p.mix = null; p.note = ''; render(); };
 }
 $('detail').addEventListener('change', function (e) {
   var k = e.target.dataset.k, fx = e.target.dataset.fx, p = patches[sel];
@@ -447,6 +470,13 @@ $('detail').addEventListener('change', function (e) {
       var d = EFFECT_PARAMS[Patch.effectKey(p.rec, focus)][+fx];
       Patch.setParam(p.rec, focus, +fx, Math.max(0, Math.min(d[1], (+e.target.value | 0) - (+e.target.dataset.o || 0))));
     }
+    render();
+    return;
+  }
+  var mi = e.target.dataset.mx;
+  if (mi && p && entries.length) {
+    p.mix = (p.mix || Patch.mixer(p.rec, sel, entries).set).slice();
+    p.mix[+mi] = Math.max(0, Math.min(Patch.MIXER[+mi][1], +e.target.value | 0));
     render();
     return;
   }

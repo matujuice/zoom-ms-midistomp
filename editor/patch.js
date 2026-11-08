@@ -121,7 +121,12 @@ var Patch = (function () {
     return { set: set, from: from };          // from: the entry used, -1 = defaults
   }
 
-  return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
+  // F0 7D "MST" 03 nonce n <pack7(hash LE, settings 0-10)> F7: the pedal answers 44 nonce n status (0 = saved)
+  function mixerWrite(n, h, set, nonce) {
+    return [0xf0, 0x7d, 0x4d, 0x53, 0x54, 0x03, nonce, n].concat(pack7([h & 255, h >>> 8 & 255, h >>> 16 & 255, h >>> 24].concat(set)), [0xf7]);
+  }
+
+  return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite, param: param, setParam: setParam, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };
 })();
