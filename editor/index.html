@@ -350,7 +350,7 @@ $('writeChanged').onclick = function () { guard(async function () {
 $('backup').onclick = function () {
   var data = { format: 'midistomp-patches', version: 1, model: model, deviceId: dev, saved: new Date().toISOString(),
     patches: patches.map(function (p) { return p ? hex(p.rec) : null; }) };
-  if (entries.length) data.mixer = patches.map(function (p, n) { return p ? p.mix || Patch.mixer(p.rec, n, entries).set : null; });
+  if (entries.length) data.mixer = patches.map(function (p, n) { return p ? p.mix || mixOf(p, n).set : null; });
   if (perfs.length) data.perform = patches.map(function (p, n) {     // 208 bytes as hex, null = an empty PERFORM
     var e = p && (p.perf || Patch.perform(p.rec, n, entries, perfs));
     return e ? hex(e) : null;
@@ -423,7 +423,7 @@ function render() {
       cells += '<td class="fx">' + (nm ? '<span class="' + (Patch.on(p.rec, i) ? '' : 'off') + '">' + esc(nm) + '</span>'
         + (r.used ? '<span class="bus">' + ZONES[r.bus[i]] + '</span>' : '') : '') + '</td>';
     }
-    var mx = entries.length ? Patch.MIXER[0][3][Patch.mixer(p.rec, n, entries).set[0]] + ' · ' : '';
+    var mx = entries.length ? Patch.MIXER[0][3][(p.mix || mixOf(p, n).set)[0]] + ' · ' : '';
     var ms = mx + (r.used ? 'Input ' + r.inR + ' · Master ' + r.masterR + ' · ' + Patch.OUT[r.out]
       + (r.muteA ? ' · Mute A' : '') + (r.muteB ? ' · Mute B' : '') + (r.solo ? ' · Solo ' + Patch.SOLO[r.solo] : '') : '—');
     html += '<tr data-n="' + n + '" class="' + (dirty(p) ? 'dirty ' : '') + (n === sel ? 'sel' : '') + '"><td>' + (n + 1) + '</td>'
@@ -495,6 +495,7 @@ $('detail').addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && (e.target.id === 'pick' || e.target.id === 'pickq')) addPicked();
   var b = e.target.closest && e.target.closest('.box[data-s]');      // arrows move an effect as the chain is drawn: left is OUT
   if (b && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); stepFx(+b.dataset.s, e.key === 'ArrowLeft' ? 1 : -1); }
+  if (b && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); swapAB(+b.dataset.s, e.key === 'ArrowUp' ? 1 : 2); }
 });
 $('detail').addEventListener('dragstart', function (e) {
   var b = e.target.closest && e.target.closest('.box[data-s]');
@@ -543,6 +544,12 @@ function stepFx(s, dir) {
   moveTo(p, s, z, at);
   refocus('.box[data-s="' + focus + '"]');
 }
+// A and B are drawn one above the other: up/down moves an effect to the other one, at its output end
+function swapAB(s, z) {
+  var p = patches[sel];
+  if (Patch.routing(p.rec).bus[s] === 3 - z) moveTo(p, s, z, zoneSlots(p.rec, z, s).length);
+  refocus('.box[data-s="' + focus + '"]');
+}
 $('detail').addEventListener('dragend', function () { dragSlot = -1; });
 // Add an effect: a picker of the stock effects (g200kg's list, by category) and the pack's, filtered by name.
 // It goes at the output end of its zone (the "+" side); drag it to move it. The pedal checks DSP use itself.
@@ -577,15 +584,23 @@ function addPicked() {
   focus = at;
   render();
 }
+// MIXER settings are found by the patch's hash (effects and name), so a move or rename loses them;
+// "Write changed to pedal" keeps the old ones (moved, below), so show those too.
+function mixOf(p, n) {
+  var m = Patch.mixer(p.rec, n, entries);
+  if (m.from < 0 && p.orig && !p.restored) { var o = Patch.mixer(p.orig, n, entries); if (o.from >= 0) { o.kept = true; return o; } }
+  return m;
+}
 function slotsMoved(p) { return p.orig && [0, 1, 2, 3, 4, 5].some(function (i) { return Patch.effectId(p.orig, i) !== Patch.effectId(p.rec, i); }); }
 // Parameters from g200kg's table and the pack's manifests; effects neither knows show raw P1-P9, up to each field's width.
 // A value cut to fit (typed too high, stored above the table's max, or a max wider than the field) gets a note, not silence.
 var clampNote = '';
 function fxMax(d, p) { return Math.min(d ? d[1] : Infinity, Patch.paramMax(p)); }
 function fxControls(rec, i) {
-  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)];
+  var defs = EFFECT_PARAMS[Patch.effectKey(rec, i)], bus = Patch.routing(rec).bus[i];
   var h = '<b>' + esc(fxName(rec, i) || 'THRU') + '</b> <label><input type="checkbox" data-fx="on"' + (Patch.on(rec, i) ? ' checked' : '') + '> On</label>'
     + ' <button id="mvOut" title="Arrow left on the effect does the same">← Toward OUT</button> <button id="mvIn" title="Arrow right on the effect does the same">Toward IN →</button>'
+    + (bus === 1 ? ' <button id="mvB" title="Arrow down on the effect does the same">↓ To B</button>' : bus === 2 ? ' <button id="mvA" title="Arrow up on the effect does the same">↑ To A</button>' : '')
     + ' <button id="remove" aria-label="Remove ' + esc(fxName(rec, i) || 'THRU') + '">Remove</button><br>';
   var notes = clampNote ? [clampNote] : [];
   clampNote = '';
@@ -719,9 +734,9 @@ function detail() {
   function opts(list, v) { return list.map(function (t, i) { return '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + t + '</option>'; }).join(''); }
   function num(k, t) { return '<label>' + t + ' <input type="number" min="0" max="150" data-k="' + k + '" value="' + r[k] + '"></label>'; }
   function check(k, t) { return '<label><input type="checkbox" data-k="' + k + '"' + (r[k] ? ' checked' : '') + '> ' + t + '</label>'; }
-  var h = '<b>Patch ' + (sel + 1) + '</b> <span class="note">Click an effect, ROUTE, MIX or OUT to edit it. Drag effects to move them.</span>';
+  var h = '<b>Patch ' + (sel + 1) + '</b> <span class="note">Click an effect, ROUTE, MIX or OUT to edit it. Drag effects to move them, or use the arrow keys (up and down switch A and B).</span>';
   // MIXER settings 0-10: kept on the pedal (record 50), edited here and written with SysEx 03
-  var mx = entries.length && Patch.mixer(p.rec, sel, entries), mset0 = p.mix || (mx && mx.set), mode = mset0 ? mset0[0] : -1;
+  var mx = entries.length && mixOf(p, sel), mset0 = p.mix || (mx && mx.set), mode = mset0 ? mset0[0] : -1;
   if (focus === 'mix' && (mode === 0 || mode === 3)) focus = 'route';     // as the pedal: Serial has no [MIX]
   var po = perfs.length && slotsMoved(p) && perfObj(p);
   if (po && po.target.concat(po.loopTarget).some(function (t) { return isFtsw(t) || t >= 14 && t <= 73; }))
@@ -735,7 +750,7 @@ function detail() {
       return '<label>' + m[0] + ' ' + (m[3] ? '<select data-mx="' + i + '">' + opts(m[3], v) + '</select>'
         : '<input type="number" min="0" max="' + m[1] + '" data-mx="' + i + '" value="' + v + '">') + '</label>';
     }).join('') + '<div class="note">' + (p.perf ? 'PERFORM from the backup: "Write changed to pedal" sends it. ' : '') + (p.mix ? 'MIXER settings edited: "Write changed to pedal" sends them.'
-      : mx.from < 0 ? 'MIXER: defaults, none saved for this patch.' : mx.from !== sel ? 'MIXER: saved with patch ' + (mx.from + 1) + ', a copy.' : '')
+      : mx.kept ? 'MIXER: kept from before the effects or name changed.' : mx.from < 0 ? 'MIXER: defaults, none saved for this patch.' : mx.from !== sel ? 'MIXER: saved with patch ' + (mx.from + 1) + ', a copy.' : '')
       + (list.indexOf(1) >= 0 || list.indexOf(5) >= 0 ? ' XFade 0-100: 50 is the middle, below is A, above is B (the pedal shows 37 as A26).' : '') + '</div>';
   }
   if (focus === 'route')
@@ -762,6 +777,8 @@ function detail() {
   if ($('pickadd')) $('pickadd').onclick = addPicked;
   if ($('remove')) $('remove').onclick = function () { snap(p); Patch.removeEffect(p.rec, focus); focus = null; render(); };
   if ($('mvOut')) { $('mvOut').onclick = function () { stepFx(focus, 1); }; $('mvIn').onclick = function () { stepFx(focus, -1); }; }
+  if ($('mvA')) $('mvA').onclick = function () { swapAB(focus, 1); };
+  if ($('mvB')) $('mvB').onclick = function () { swapAB(focus, 2); };
   if ($('undo1')) $('undo1').onclick = function () {
     var h = p.hist.pop(); p.rec = h.rec; p.mix = h.mix; p.perf = h.perf;
     if (typeof focus === 'number' && focus >= Patch.used(p.rec)) focus = null;
@@ -791,7 +808,7 @@ $('detail').addEventListener('change', function (e) {
   if (e.target.dataset.pf && p) { perfChange(p, e.target); render(); return; }
   var mi = e.target.dataset.mx;
   if (mi && p && entries.length) {
-    p.mix = (p.mix || Patch.mixer(p.rec, sel, entries).set).slice();
+    p.mix = (p.mix || mixOf(p, sel).set).slice();
     p.mix[+mi] = Math.max(0, Math.min(Patch.MIXER[+mi][1], +e.target.value | 0));
     var rm = Patch.routing(p.rec), v = p.mix[+mi];        // as the knobs and CCs (pages.c pages_key)
     if (mi === '2' && p.mix[0] !== 2 && rm.inR !== v) { rm.inR = v; Patch.setRouting(p.rec, rm); }
