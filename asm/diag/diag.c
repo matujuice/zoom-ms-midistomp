@@ -104,9 +104,76 @@ void diag_mwake(void)
     if (m_on) m_t = now(&m_aud);
 }
 
+/* ---- MIDISTOMP SysEx (docs/dev/modwerk-research.md section 1, step B) ------------------
+ * F0 7D 'M' 'S' 'T' cmd nonce [arg] F7, watched byte by byte from diag_mend. It only reads:
+ * the stock parser drops F0 7D messages by itself. Replies go out through the stock send,
+ * from Task_MIDI, as the identity reply does.
+ *   01 hello            -> 41 version (major minor patch), 42 status (f0 f1 f2 state)
+ *   02 n: settings of n -> 43 n + record 50 entry n (hash, settings 0-10, pad), 7-bit packed
+ * ponytail: state is 0x7F (unknown) until the editor mode and looper flags are mapped. */
+#define MIDI_BYTE (*(volatile unsigned char *)(B14 + 226))       /* the byte just taken */
+#define MIDI_SEND FN(0xC00AD664, void, (const unsigned char *, int))
+#define TRANSPORT_MAGIC (*(volatile unsigned *)0x1181FF00u)       /* midi-clock.yaml */
+#define SERVICES_MAGIC (*(volatile unsigned *)0xC00F3000u)        /* looper services block */
+#define R50_ENT(n) ((const volatile unsigned char *)0xC0116000u + 24 + 16 * (n))   /* mixer pages.c */
+/* in every build with this code: CC, MIDI settings, tempo-hold, mixer, PERFORM, MASTER, KALEIDO, diag, DSP 300 */
+#define FEATURES (1u | 1u << 2 | 1u << 3 | 1u << 5 | 1u << 6 | 1u << 7 | 1u << 8 | 1u << 9 | 1u << 10)
+
+static unsigned char sx[8];     /* the bytes after F0 */
+static int sx_n;                /* 1 + bytes in sx while in a message, 0 otherwise */
+
+static void sx_reply(int cmd, const unsigned char *d, int n)
+{
+    unsigned char m[32];
+    int i;
+    m[0] = 0xF0; m[1] = 0x7D; m[2] = 'M'; m[3] = 'S'; m[4] = 'T'; m[5] = cmd; m[6] = sx[5];
+    for (i = 0; i < n; i++) m[7 + i] = d[i];
+    m[7 + n] = 0xF7;
+    MIDI_SEND(m, 8 + n);
+}
+
+static void sx_done(int n)
+{
+    unsigned char d[20];
+    unsigned f;
+    int i, j, h;
+    if (sx[4] == 1 && n == 6) {
+        const char *s = STAMP(0);               /* "V2.0.1" */
+        d[0] = d[1] = d[2] = 0;
+        for (i = j = 0; i < 16 && s[i] && j < 3; i++)
+            if (s[i] >= '0' && s[i] <= '9') d[j] = d[j] * 10 + s[i] - '0';
+            else if (s[i] == '.') j++;
+        sx_reply(0x41, d, 3);
+        f = FEATURES | (TRANSPORT_MAGIC == 0x5A4D5401u) << 1 | (SERVICES_MAGIC == 0x5A4C5301u) << 4;
+        d[0] = f & 127; d[1] = f >> 7 & 127; d[2] = f >> 14 & 127; d[3] = 0x7F;
+        sx_reply(0x42, d, 4);
+    } else if (sx[4] == 2 && n == 7 && sx[6] < 50) {
+        const volatile unsigned char *e = R50_ENT(sx[6]);
+        d[0] = sx[6];
+        for (i = 0, j = 1, h = 0; i < 16; i++, j++) {   /* groups of 7, led by their high bits */
+            if (i == 7 || i == 14 || i == 0) { h = j++; d[h] = 0; }
+            if (e[i] & 0x80) d[h] |= 0x40 >> (j - h - 1);
+            d[j] = e[i] & 0x7F;
+        }
+        sx_reply(0x43, d, j);
+    }
+}
+
+static void sx_byte(unsigned b)
+{
+    if (b >= 0xF8) return;                      /* realtime bytes may come inside a message */
+    if (b == 0xF0) { sx_n = 1; return; }
+    if (b == 0xF7) { if (sx_n >= 7) sx_done(sx_n - 1); sx_n = 0; return; }
+    if (b & 0x80 || sx_n > 7) { sx_n = 0; return; }
+    sx[sx_n - 1] = b;
+    if (sx_n <= 4 && b != (unsigned char)"\x7DMST"[sx_n - 1]) { sx_n = 0; return; }
+    sx_n++;
+}
+
 void diag_mend(void)
 {
-    unsigned a, t, d;
+    unsigned b = MIDI_BYTE, a, t, d;
+    if (sx_n || b == 0xF0) sx_byte(b);
     if (!MAGIC) { m_on = 0; return; }
     t = now(&a);
     d = t - m_t - (a - m_aud);
