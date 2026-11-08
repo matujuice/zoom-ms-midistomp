@@ -469,7 +469,7 @@ $('rows').addEventListener('click', function (e) {
 // Drag a box onto another box or into a zone to move it; the patch's slots are then rewritten in signal order.
 // mode: MIXER Mode 0-3, or -1 when not known. Serial and Mono Serial have no [MIX]: A then B in a row (chain_draw.c).
 function chainHtml(rec) {
-  return '<div class="lcdwrap"><canvas id="chainLcd" class="lcd" tabindex="0" aria-label="Effect chain. Click an item to edit it, + to add an effect, - to remove the chosen one, drag an effect to move it. With an effect chosen: arrow keys move it (up and down switch A and B), Delete removes it (Enter confirms, Escape cancels), + adds one next to it. Adding: arrow keys choose a category, then an effect, Enter opens and adds, Escape goes back."></canvas></div>'
+  return '<div class="lcdwrap"><canvas id="chainLcd" class="lcd" tabindex="0" aria-label="Effect chain. Click an item to edit it, + to add an effect, - to remove the chosen one, drag an effect to move it. With an effect chosen: arrow keys move it (up and down switch A and B), Delete removes it (Enter confirms, Escape cancels), + adds one next to it."></canvas></div>'
     + (Patch.used(rec) >= 6 ? '<div class="note">6 effects: the chain is full.</div>' : '');
 }
 // PEDAL INPUT is the pedal's own setting, which the editor cannot read: the user sets it here, as on the pedal
@@ -483,7 +483,6 @@ function drawChain(p, mode) {
   var cv = $('chainLcd'), rec = p.rec, r = Patch.routing(rec), m = effMode(mode < 0 ? 1 : mode), c = { name: [], on: [] };
   chainMode = mode;
   if (!cv) return;
-  if (/^add\d$/.test(focus)) return drawAdd(p);
   for (var i = 0; i < 6; i++) { c.name.push(i < Patch.used(rec) ? fxName(rec, i) || 'THRU' : ''); c.on.push(Patch.on(rec, i) ? 1 : 0); }
   c.mode = m; c.stereo = pedalStereo; c.out = r.out; c.mute = [r.muteA, r.muteB]; c.sel = 1;
   c.add = !Patch.used(rec); c.ins = Patch.used(rec) < 6; c.del = typeof focus === 'number' && focus < Patch.used(rec);
@@ -492,6 +491,10 @@ function drawChain(p, mode) {
     c.drag = chainDrag;
     var L = chainDrag.land, l = L && zoneSlots(rec, L.z, chainDrag.slot);
     c.land = L && { z: L.z, i: L.at < l.length ? c.z[L.z].indexOf(l[L.at]) : c.z[L.z].length };
+  } else if (/^add\d$/.test(focus)) {   // adding: the frame the new effect will take
+    var az = +focus[3], at = addSlot(p, az);
+    c.land = { z: az, i: c.z[az].filter(function (s) { return s < at; }).length };
+    c.ins = c.del = c.add = false;
   }
   c.cur = typeof focus === 'number' ? focus : ({ route: LCD.IT_ROUTE, mix: LCD.IT_MIX, 'in': LCD.IT_IN, out: LCD.IT_OUT })[focus];
   if (c.cur === undefined) c.cur = -1;
@@ -529,12 +532,12 @@ $('detail').addEventListener('click', function (e) {
 });
 $('detail').addEventListener('input', function (e) {
   if (e.target.id !== 'pickq') return;
-  add.q = e.target.value.trim(); add.cat = add.q ? -2 : -1; add.cur = -1; add.off = 0; add.pick = null;
+  add.q = e.target.value.trim(); add.cat = add.q ? -2 : -1; add.cur = add.q ? 0 : -1;
   drawAdd(patches[sel]);
 });
 $('detail').addEventListener('keydown', function (e) {
-  if (e.target.id === 'pickq' && (e.key === 'Enter' || e.key === 'ArrowDown') && add.q) { e.preventDefault(); add.cur = 0; drawAdd(patches[sel]); refocus('#chainLcd'); return; }
-  if (e.target.id === 'chainLcd' && /^add\d$/.test(focus)) return addKey(e);
+  if (e.target.id === 'pickq' && (e.key === 'Enter' || e.key === 'ArrowDown') && add.q) { e.preventDefault(); refocus('#addLcd'); return; }
+  if (e.target.id === 'addLcd' && /^add\d$/.test(focus)) return addKey(e);
   if (e.target.id === 'chainLcd' && askDel) {
     e.preventDefault();
     if (e.key === 'Enter' || e.key === 'y') removeFx();
@@ -545,7 +548,7 @@ $('detail').addEventListener('keydown', function (e) {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepFx(focus, e.key === 'ArrowLeft' ? 1 : -1); }
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); swapAB(focus, e.key === 'ArrowUp' ? 1 : 2); }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); askDel = true; drawChain(patches[sel], chainMode); }
-  if (e.key === '+' && Patch.used(patches[sel].rec) < 6) { addAt = focus + 1; focus = 'add' + Patch.routing(patches[sel].rec).bus[focus]; addReset(); detail(); refocus('#chainLcd'); }
+  if (e.key === '+' && Patch.used(patches[sel].rec) < 6) { addAt = focus + 1; focus = 'add' + Patch.routing(patches[sel].rec).bus[focus]; addReset(); detail(); refocus('#addLcd'); }
 });
 var askDel = false;   // "DELETE <effect>?" over the chain
 function removeFx() { var p = patches[sel]; askDel = false; snap(p); Patch.removeEffect(p.rec, focus); focus = null; render(); refocus('#chainLcd'); }
@@ -553,23 +556,35 @@ function removeFx() { var p = patches[sel]; askDel = false; snap(p); Patch.remov
 var down = null;
 function dropHit(q) { var h = LCD.hit(chainHits, q); return h && h.it !== 'del' && h.it !== 'ins' && h.it !== chainDrag.slot ? h : null; }
 $('detail').addEventListener('pointerdown', function (e) {
-  if (e.target.id !== 'chainLcd') return;
-  var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), cx: e.clientX, cy: e.clientY, qx: q.x, off: add.off };
-  if ((down.h && typeof down.h.it === 'number') || addRow()) try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
+  if (e.target.id !== 'chainLcd' || /^add\d$/.test(focus)) return;   // while adding the chain only shows where it goes
+  var q = LCD.at(e.target, e); down = { h: LCD.hit(chainHits, q), cx: e.clientX, cy: e.clientY };
+  if (down.h && typeof down.h.it === 'number') try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
 });
-// the add screen's row of effects: dragged sideways or turned with the wheel, as the menus scroll
-function addRow() { return /^add\d$/.test(focus) && add.cat !== -1 && add.pick == null; }
+// the add screen: a click picks; on the picker a sideways drag or the wheel turns the effects past the middle
+var addDown = null;
+function addRow() { return /^add\d$/.test(focus) && add.cat !== -1; }
+function addTurn(c) { add.cur = Math.max(0, Math.min(addKeys().length - 1, c)); drawAdd(patches[sel]); }
+$('detail').addEventListener('pointerdown', function (e) {
+  if (e.target.id !== 'addLcd') return;
+  var q = LCD.at(e.target, e); addDown = { h: LCD.hit(addHits, q), cx: e.clientX, qx: q.x, cur: add.cur };
+  if (addRow()) try { e.target.setPointerCapture(e.pointerId); } catch (x) {}
+});
 $('detail').addEventListener('pointermove', function (e) {
-  if (!down || e.target.id !== 'chainLcd' || !addRow()) return;
-  if (!down.drag && Math.abs(e.clientX - down.cx) < 5) return;
-  down.drag = true; add.cur = -1; add.off = down.off - (LCD.at(e.target, e).x - down.qx);
-  drawAdd(patches[sel]);
+  if (!addDown || e.target.id !== 'addLcd' || !addRow()) return;
+  if (!addDown.drag && Math.abs(e.clientX - addDown.cx) < 5) return;
+  addDown.drag = true; addTurn(addDown.cur - Math.round((LCD.at(e.target, e).x - addDown.qx) / 46));   // a pill's pitch per step
 });
+$('detail').addEventListener('pointerup', function (e) {
+  if (e.target.id !== 'addLcd' || !addDown) return;
+  var h = LCD.hit(addHits, LCD.at(e.target, e)), d = addDown;
+  addDown = null;
+  if (!d.drag && h && d.h && h.it === d.h.it && h.i === d.h.i) addClick(h);   // redrawn as it turns: same item, not same object
+});
+$('detail').addEventListener('pointercancel', function (e) { if (e.target.id === 'addLcd') addDown = null; });
 $('detail').addEventListener('wheel', function (e) {
-  if (e.target.id !== 'chainLcd' || !addRow()) return;
+  if (e.target.id !== 'addLcd' || !addRow()) return;
   e.preventDefault();
-  add.cur = -1; add.off += ((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) < 0 ? -1 : 1) * 23;   // half a pill a notch
-  drawAdd(patches[sel]);
+  addTurn(add.cur + ((Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) < 0 ? -1 : 1));
 }, { passive: false });
 $('detail').addEventListener('pointermove', function (e) {
   if (!down || e.target.id !== 'chainLcd' || !down.h || typeof down.h.it !== 'number') return;
@@ -597,7 +612,6 @@ $('detail').addEventListener('pointerup', function (e) {
     if (to) moveTo(p, g, to.z, to.at);
     return drawChain(patches[sel], chainMode);
   }
-  if (/^add\d$/.test(focus)) { if (!d.drag && h && d.h && h.it === d.h.it && h.i === d.h.i) addClick(h); return; }   // a drag scrolls, it picks nothing
   if (askDel) { askDel = false; if (h && h === d.h && h.it === 'yes') return removeFx(); return drawChain(p, chainMode); }
   if (!h || h !== d.h) return;
   if (h.it === 'del') { askDel = true; return drawChain(p, chainMode); }
@@ -607,7 +621,7 @@ $('detail').addEventListener('pointerup', function (e) {
   focus = byFx ? 'add' + Patch.routing(p.rec).bus[focus] : ins || h.it === 'bus' || h.it === 'add' ? 'add' + h.z : h.it;
   addReset();
   detail();
-  refocus('#chainLcd');
+  refocus(/^add\d$/.test(focus) ? '#addLcd' : '#chainLcd');
 });
 // The effects of zone z in signal order (slot order), without slot skip
 function zoneSlots(rec, z, skip) {
@@ -641,8 +655,8 @@ function swapAB(s, z) {
   if (Patch.routing(p.rec).bus[s] === 3 - z) moveTo(p, s, z, zoneSlots(p.rec, z, s).length);
   refocus('#chainLcd');
 }
-// Add an effect, on the chain's screen as on the pedal: the categories (stock effects by g200kg's list, and the pack's),
-// then the category's effects scrolling by, then the chosen one big with ADD. Find: effects by name, from every category.
+// Add an effect, as on the pedal: the categories (stock effects by g200kg's list, and the pack's),
+// on the bottom screen, then the category's effects with the chosen one big in the middle and ADD. Find: effects by name, from every category.
 // It goes at the output end of its zone (the "+" side); drag it to move it. The pedal checks DSP use itself.
 var ZONES = ['BEFORE ROUTE', 'BUS A', 'BUS B', 'AFTER MIX'];
 var GROUP_NAMES = { COMP: 'DYNAMICS', FILTER: 'FILTER', DRIVE: 'DRIVE', AMP: 'AMP', MOD: 'MODULATION', SFX: 'SFX', DELAY: 'DELAY', REVERB: 'REVERB' };
@@ -652,37 +666,37 @@ var ADD_CATS = Object.keys(EFFECT_GROUPS).map(function (g) { return { name: GROU
 ADD_CATS.forEach(function (c) { c.n = c.keys.length; });
 var FIND_KEYS = byName([].concat.apply([], ADD_CATS.map(function (c) { return c.keys; })));
 var addAt = -1;   // the slot a new effect goes in, -1: the output end of its zone
-// cat: -1 the categories, -2 Find, else the category; cur: the keyboard's box or pill (-1: none); pick: the chosen effect's key
-var add = { cat: -1, cur: -1, off: 0, pick: null, q: '' };
-function addReset() { add.cat = -1; add.cur = -1; add.off = 0; add.pick = null; add.q = ''; }
+// cat: -1 the categories, -2 Find, else the category; cur: the keyboard's box (-1: none), on the picker the effect in the middle
+var add = { cat: -1, cur: -1, q: '' }, addHits = [];
+function addReset() { add.cat = -1; add.cur = -1; add.q = ''; }
 function addKeys() {
   if (add.cat !== -2) return ADD_CATS[add.cat].keys;
   var q = add.q.toLowerCase();
   return FIND_KEYS.filter(function (k) { return EFFECT_NAMES[k].toLowerCase().indexOf(q) >= 0; });
 }
-function addWhere(p, z) {
-  return addAt < 0 ? (z === 1 || z === 2 ? 'TO ' : '') + ZONES[z] : addAt < Patch.used(p.rec) && Patch.routing(p.rec).bus[addAt] === z ? 'BEFORE ' + (fxName(p.rec, addAt) || 'THRU') : 'AFTER ' + (fxName(p.rec, addAt - 1) || 'THRU');
+// the slot the new effect goes in: addAt, else after the last effect of zone z or an earlier one
+function addSlot(p, z) {
+  var n = Patch.used(p.rec), bus = Patch.routing(p.rec).bus, at = 0;
+  for (var i = 0; i < n; i++) if (bus[i] <= z) at = i + 1;
+  return addAt >= 0 ? addAt : at;
 }
 function drawAdd(p) {
-  var cv = $('chainLcd'), z = +focus[3], tt = 'ADD EFFECT ' + addWhere(p, z);
+  var cv = $('addLcd');
   if (!cv) return;
-  if (add.pick != null) chainHits = LCD.chosen(tt, EFFECT_NAMES[add.pick]);
-  else if (add.cat === -1) chainHits = LCD.categories(tt, ADD_CATS, add.cur);
+  if (add.cat === -1) addHits = LCD.categories('ADD EFFECT', ADD_CATS, add.cur);
   else {
-    var ks = addKeys(), r = LCD.carousel(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.off, add.cur);
-    chainHits = r.hits; add.off = r.off;
+    var ks = addKeys();
+    add.cur = Math.max(0, Math.min(ks.length - 1, add.cur));
+    addHits = LCD.picker(add.cat === -2 ? 'FIND ' + add.q.toUpperCase().slice(0, 20) : ADD_CATS[add.cat].name, ks.map(function (k) { return EFFECT_NAMES[k]; }), add.cur);
   }
   LCD.present(cv);
 }
 function addClick(h) {
-  if (h.it === 'exit') { focus = null; detail(); return refocus('#chainLcd'); }
-  if (h.it === 'cat') { add.cat = h.i; add.cur = -1; add.off = 0; }
-  else if (h.it === 'fx') add.pick = addKeys()[h.i];
-  else if (h.it === 'ok' || h.it === 'cover') return addPicked(add.pick);
-  else if (h.it === 'back') {
-    if (add.pick != null) add.pick = null;
-    else { add.cur = add.cat >= 0 ? add.cat : -1; add.cat = -1; add.q = ''; if ($('pickq')) $('pickq').value = ''; }
-  }
+  if (h.it === 'exit') { focus = null; detail(); return refocus('#chainLcd'); }   // back to the chain
+  if (h.it === 'cat') { add.cat = h.i; add.cur = 0; }
+  else if (h.it === 'fx') add.cur = h.i;
+  else if (h.it === 'ok') return addPicked(addKeys()[add.cur]);
+  else if (h.it === 'back') { add.cur = add.cat >= 0 ? add.cat : -1; add.cat = -1; add.q = ''; if ($('pickq')) $('pickq').value = ''; }
   drawAdd(patches[sel]);
 }
 // keys on the add screen: arrows move the cursor, Enter opens or adds, Escape goes back (from the categories: out)
@@ -690,8 +704,7 @@ function addKey(e) {
   var k = e.key, n, a = add;
   if (!/^(Arrow|Enter|Escape|Backspace)/.test(k)) return;
   e.preventDefault();
-  if (a.pick != null) { if (k === 'Enter') return addPicked(a.pick); if (k === 'Escape' || k === 'Backspace') a.pick = null; }
-  else if (a.cat === -1) {
+  if (a.cat === -1) {
     n = ADD_CATS.length + 1;
     if (k === 'Escape') return addClick({ it: 'exit' });
     if (k === 'Enter' && a.cur >= 0) return addClick(a.cur < n - 1 ? { it: 'cat', i: a.cur } : { it: 'exit' });
@@ -700,22 +713,20 @@ function addKey(e) {
   } else {
     n = addKeys().length;
     if (k === 'Escape' || k === 'Backspace') return addClick({ it: 'back' });
-    if (k === 'Enter' && a.cur >= 0 && n) a.pick = addKeys()[a.cur];
-    if ((k === 'ArrowLeft' || k === 'ArrowRight') && n) a.cur = a.cur < 0 ? 0 : (a.cur + (k === 'ArrowRight' ? 1 : -1) + n) % n;
+    if (k === 'Enter' && n) return addClick({ it: 'ok' });
+    if (k === 'ArrowLeft' || k === 'ArrowRight') a.cur += k === 'ArrowRight' ? 1 : -1;
   }
   drawAdd(patches[sel]);
 }
 function pickHtml() {
-  return '<label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect by name" value="' + esc(add.q) + '"></label>'
+  return '<div class="lcdwrap"><canvas id="addLcd" class="lcd knobs" tabindex="0" aria-label="Add an effect: arrow keys choose a category, Enter opens it; then left and right turn the effects past the middle (or drag, or the mouse wheel), Enter adds the middle one, Escape goes back."></canvas></div>'
+    + '<label>Find <input type="search" id="pickq" placeholder="Name" aria-label="Find an effect by name" value="' + esc(add.q) + '"></label>'
     + '<div class="note">Stock effects your pedal does not have are listed too. If the pedal shows "DSP FULL", remove or swap an effect.</div>';
 }
 function addPicked(k) {
   var p = patches[sel], z = +String(focus).slice(3);
   if (!p || !k) return;
-  var n = Patch.used(p.rec), bus = Patch.routing(p.rec).bus, at = 0;
-  for (var i = 0; i < n; i++) if (bus[i] <= z) at = i + 1;    // after the last effect of this zone or an earlier one
-  if (addAt >= 0) at = addAt;
-  var was = p.rec.slice();
+  var at = addSlot(p, z), was = p.rec.slice();
   if (!Patch.addEffect(p.rec, at, +k, EFFECT_PARAMS[k], z)) return;
   snap(p, was);
   focus = at;
@@ -1203,6 +1214,7 @@ function detail() {
   box.style.display = 'block';
   refocus(f);
   drawChain(p, mode);
+  if (/^add\d$/.test(focus)) drawAdd(p);
   drawKnobs(p);
   drawPerf(p);
   if ($('undo1')) $('undo1').onclick = function () {

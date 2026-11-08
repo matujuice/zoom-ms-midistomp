@@ -359,7 +359,7 @@ var LCD = (function () {
     function push(kind, e, a, b, bi) { cols.push({ kind: kind, e: e, a: a, b: b, bi: bi, jn: 0 }); }
     function cw(col) { return col.kind === K_ADD ? AW : CW; }
     if (!par && d.cur === IT_MIX) d.cur = IT_ROUTE;   // Serial has no [MIX]
-    if (c.drag && c.land) {   // c.land: { z, i } the landing frame goes before entry i of zone z
+    if (c.land) {   // c.land: { z, i } the landing frame goes before entry i of zone z (dragged or added effect)
       c = Object.assign({}, c, { z: c.z.map(function (l) { return l.slice(); }) }); d.c = c;
       c.z[c.land.z].splice(c.land.i, 0, -2);
     }
@@ -430,8 +430,8 @@ var LCD = (function () {
       else if (e === IT_ROUTE) { one(pc - 1, YC, PRE, 1); if (par) { one(pc, YA, BUS_A, 0); one(pc, YB, BUS_B, 0); } else one(pc, YC, BUS_A, 0); }
       else { one(pc - 1, YA, BUS_A, 1); one(pc - 1, YB, BUS_B, 1); one(pc, YC, POST, 0); }
     }
-    if (c.drag) {   // the landing frame shows through the dragged effect
-      floating(c);
+    if (c.drag) floating(c);   // the landing frame shows through the dragged effect
+    if (c.land) {
       d.hits.forEach(function (h) { if (h.it === 'land') { inv(h.x + 1, h.y, CW - 2, 1); inv(h.x + 1, h.y + CH - 1, CW - 2, 1); inv(h.x, h.y + 1, 1, CH - 2); inv(h.x + CW - 1, h.y + 1, 1, CH - 2); } });
     }
     if (c.ask != null) return ask('DELETE', c.ask + '?', 'NO', 'YES');
@@ -459,7 +459,7 @@ var LCD = (function () {
     return [{ it: 'no', x: 0, y: 0, w: W, h: H }, skey('no', no, cx - 6 - kw, by + bh - 14, 0), skey('yes', yes, cx + 6, by + bh - 14, 1)];
   }
 
-  // ---- the add screen: categories, then their effects scrolling by, then the chosen one big ----------
+  // ---- the add screen: categories, then the picker (the chosen effect big, the others beside it) ----
   // cats: [{ name, n }], 5 to a row; the last box is EXIT. cur: the cursor (-1: none). SW x 67, as the chain
   function categories(tt, cats, cur) {
     var hits = [], G = 3, n = cats.length + 1, cols = 5, bw = Math.floor((SW - 2 * G - (cols - 1) * 3) / cols), bh = 25;
@@ -483,46 +483,31 @@ var LCD = (function () {
     }
     return hits;
   }
-  // names in one row of pills, scrolled off pixels to the left (centered when they all fit);
-  // cur: the keyboard's pill (-1: none), kept in view. Returns { hits, off } with off clamped
-  function carousel(tt, names, off, cur) {
-    var hits = [], P = CW + 8, tot = names.length * P - 8, y = 22;
-    begin(SW, 67);
-    var room = W - 12, max = Math.max(0, tot - room), x0;
+  // the chosen effect in the middle (its 128 x 64 picture, else its pill twice as big), the others in pills
+  // left and right of it in list order; BACK and ADD under the pills, a scrollbar along the bottom. SW x 80
+  function picker(tt, names, cur, pic) {
+    var hits = [], P = CW + 8, n = names.length, cw = pic ? 128 : 2 * CW, cx0, y = 33, k;
+    begin(SW, 80);
+    cx0 = (W - cw) >> 1;
     fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
-    if (max && cur >= 0) {   // the cursor in view, 10 pixels in from the edges
-      var cx = 6 + cur * P - off;
-      if (cx > W - CW - 10) off += cx - (W - CW - 10); else if (cx < 10) off -= 10 - cx;
+    if (pic) for (k = 0; k < 8; k++) blit(cx0, 10 + 8 * k, 128, 8, Array.prototype.slice.call(pic, 128 * k, 128 * k + 128), true);
+    else if (n) {
+      begin(CW, CH); pill(0, 0, 0, 2); name2(names[cur], 0, 0);
+      var g = grab();
+      begin(SW, 80); fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
+      for (var r = 0; r < g.h; r++) for (var c = 0; c < g.w; c++) if (g.fb[r * g.w + c]) fill(cx0 + 2 * c, 23 + 2 * r, 2, 2, 1);
     }
-    off = Math.max(0, Math.min(max, off | 0)); x0 = max ? 6 - off : (W - tot) >> 1;
-    names.forEach(function (nm, i) {
-      var l = x0 + i * P;
-      if (l <= -CW || l >= W) return;
-      pill(l, y, 0, 2); name2(nm, l, y);
-      if (i === cur) mark(l, y, CW, CH, 1);
-      hits.push({ it: 'fx', i: i, x: l, y: y, w: CW, h: CH });
-    });
-    if (max) hscrollbar(off, tot + 12, W, 24, 46, W - 48, 5);
-    hits.push(skey('back', 'BACK', 3, 56, 0));
-    var tip = names.length + ' EFFECTS'; small(tip, W - 3 - softW(tip), 58);
-    return { hits: hits, off: off };
-  }
-  // the chosen effect, twice as big, with ADD and BACK under it; pic: its play-screen picture (1024 column bytes)
-  function chosen(tt, nm, pic) {
-    if (pic) {
-      begin(SW, 67);
-      var px0 = (W - 128) >> 1, kb = softW('BACK') + 9;
-      for (var p = 0; p < 8; p++) blit(px0, 2 + 8 * p, 128, 8, Array.prototype.slice.call(pic, 128 * p, 128 * p + 128), true);
-      t5(nm, 3, 3, 1, 1); t5(tt, 3, 13, 1, 0);
-      return [{ it: 'cover', x: px0, y: 2, w: 128, h: 64 }, skey('back', 'BACK', 3, 56, 0), skey('ok', 'ADD', W - 3 - (softW('ADD') + 9), 56, 1)];
+    for (k = 1; cx0 - 8 - CW - (k - 1) * P > -CW || cx0 + cw + 8 + (k - 1) * P < W; k++) {
+      [[cur - k, cx0 - 8 - CW - (k - 1) * P], [cur + k, cx0 + cw + 8 + (k - 1) * P]].forEach(function (e) {
+        if (e[0] < 0 || e[0] >= n || e[1] <= -CW || e[1] >= W) return;
+        pill(e[1], y, 0, 2); name2(names[e[0]], e[1], y);
+        hits.push({ it: 'fx', i: e[0], x: e[1], y: y, w: CW, h: CH });
+      });
     }
-    begin(CW, CH); pill(0, 0, 0, 2); name2(nm, 0, 0);
-    var g = grab(), l = (SW - 2 * CW) >> 1, y = 12;
-    begin(SW, 67);
-    fill(0, 0, W, 9, 1); t5(tt, (W >> 1) - Math.trunc(w5(tt, 1) / 2), 1, 0, 1);
-    for (var j = 0; j < g.h; j++) for (var i = 0; i < g.w; i++) if (g.fb[j * g.w + i]) fill(l + 2 * i, y + 2 * j, 2, 2, 1);
-    var cx = W >> 1, ka = softW('BACK') + 9;
-    return [{ it: 'cover', x: l, y: y, w: 2 * CW, h: 2 * CH }, skey('back', 'BACK', cx - 6 - ka, 55, 0), skey('ok', 'ADD', cx + 6, 55, 1)];
+    if (n > 1) hscrollbar(cur, n, 1, 24, 75, W - 48, 5);
+    hits.push(skey('back', 'BACK', 3, 63, 0));
+    if (n) hits.push(skey('ok', 'ADD', W - 3 - (softW('ADD') + 9), 63, 1));
+    return hits;
   }
 
   // ---- a stock knob page, as wide as its parameters: tabs, frame, one column per parameter ----
@@ -679,7 +664,7 @@ var LCD = (function () {
     font7: font7, font7r: font7r, font7c: font7c, os6: os6, small: small, softText: softText, softW: softW,
     statusBar: statusBar, widthP: widthP, toggle: toggle, fader: fader, knob: knob, tab: tab, frame: frame,
     softkey40: softkey40, softkey42: softkey42, title: title, cursor: cursor, turnArrows: turnArrows, scrollbar: scrollbar,
-    chain: chain, categories: categories, carousel: carousel, chosen: chosen, knobPage: knobPage, IT_ROUTE: IT_ROUTE, IT_MIX: IT_MIX, IT_IN: IT_IN, IT_OUT: IT_OUT,
+    chain: chain, categories: categories, picker: picker, knobPage: knobPage, IT_ROUTE: IT_ROUTE, IT_MIX: IT_MIX, IT_IN: IT_IN, IT_OUT: IT_OUT,
     width: function () { return W; }
   };
 })();
