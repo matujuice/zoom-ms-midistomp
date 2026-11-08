@@ -8,7 +8,7 @@ Frozen into MIDISTOMP-builder-Windows.exe and MIDISTOMP-builder-Mac-* by
 The MS-50G build is frozen at tag v1.1; v1.2 and v2.0 are built from the MS-70CDR 2.10 OS.
 
 Also takes Zoom's Mac updater (ZOOM MS-70CDR v2.10 Updater.app) and then writes
-MIDISTOMP V2.0.1 Updater.app, same as `zoomms build-mac`. On a Mac it then signs
+MIDISTOMP V2.0 Updater.app, same as `zoomms build-mac`. On a Mac it then signs
 that app for this Mac (xattr + ad-hoc codesign), so it opens with a double-click.
 Started with no file (a double-click on the Mac), it asks for the path: the user
 drags the app into the Terminal window.
@@ -27,11 +27,11 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V2.0.1"
-BASE = ["version-2.0.1", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
+NAME = "MIDISTOMP V2.0.2"
+BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
-OUT_NAME = "MIDISTOMP V2.0.1 Updater.exe"
-OUT_NAME_MAC = "MIDISTOMP V2.0.1 Updater.app"
+OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
+OUT_NAME_MAC = "MIDISTOMP V2.0 Updater.app"
 
 
 def identity_tag(name: str = NAME) -> str:
@@ -43,7 +43,8 @@ def identity_tag(name: str = NAME) -> str:
 
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:
-    argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out)]
+    argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out),
+            "--stamp", f"version={NAME.split()[-1]}"]   # SYSTEM page shows the full V2.0.2; boot and menu stay V2.0
     with tempfile.TemporaryDirectory() as tmp:
         for p in PATCHES:
             path = ROOT / "patches" / f"{p}.yaml"
