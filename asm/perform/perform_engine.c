@@ -531,12 +531,7 @@ void perf_poll16(void)
         RINT;
         dirty = 1;                  /* the knob column shows the new state */
         for (s = 0; s < COUNT && s < 6; s++)
-            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) {
-                int clean = FX_SAVED(s)[0] == FX_REC(s)[0];
-                FX_TOGGLE(s);
-                FX_EDITED();
-                if (clean) FX_SAVED(s)[0] = FX_REC(s)[0];
-            }
+            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }   /* a Footsw toggle marks the patch edited */
     }
     if (dirty) {
         dirty = 0;
