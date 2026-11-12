@@ -42,11 +42,12 @@ def identity_tag(name: str = NAME) -> str:
     return "M" + digits
 
 
-def build(updater: Path, out: Path, mac: bool = False) -> int:
+def build(updater: Path, out: Path, mac: bool = False, cpu: str | None = None) -> int:
+    """cpu: an overclock patch (e.g. "360f" -> patches/cpu-360f.yaml); None keeps stock 300 MHz."""
     argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out),
             "--stamp", f"version={NAME.split()[-1]}"]   # SYSTEM page shows the full V2.0.3; boot and menu stay V2.0
     with tempfile.TemporaryDirectory() as tmp:
-        for p in PATCHES:
+        for p in PATCHES + ([f"cpu-{cpu}"] if cpu else []):
             path = ROOT / "patches" / f"{p}.yaml"
             if p == "identity-tag":  # the tag follows NAME, so it never goes stale
                 text = path.read_text(encoding="utf-8")
