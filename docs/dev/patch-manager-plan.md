@@ -30,7 +30,10 @@ One versioned JSON file per patch. The stock bytes and MIDISTOMP's settings are 
     "firmware": "2.0.x",
     "mixer": [11 numbers],
     "perform": "<208 bytes as hex>"
-  }
+  },
+  "pack": [
+    { "id": "<the effect's id, as in the stock record>", "name": "WASHOUT", "version": "<the ZDL build's version>" }
+  ]
 }
 ```
 
@@ -38,6 +41,7 @@ One versioned JSON file per patch. The stock bytes and MIDISTOMP's settings are 
 - `stock.record` is the only part a stock pedal ever receives.
 - `mixer` and `perform` keep the layout the pedal uses (record 50 entry; `asm/perform/perform.h`), so the file needs no conversion code of its own.
 - The name and effect list are not stored twice: they are read from `stock.record`. A sharing page can show them by decoding the record with `patch.js`.
+- `pack` is optional: one entry for each pack effect the patch uses, giving its id and version. Modwerk can then warn when the effect is missing on the pedal or is a different version. A stock-only patch leaves it out.
 - `version` goes up only when an existing field changes meaning. New optional keys do not bump it. A reader refuses versions newer than it knows.
 - On load, the manager checks the whole file (hex lengths, routing bytes, value ranges, `PT_OK` in `perform`) before it changes anything. It already does this for backups.
 
@@ -46,6 +50,3 @@ This is today's editor backup (`format: "midistomp-patches"`, version 1: 50 reco
 - `midi`: record 51 (MIDI settings) as hex.
 
 Version 1 backups without `midi` still load.
-
-## Open
-- Whether a single-patch file should also carry the effect pack's versions (which ZDL build made the effect), so a shared patch can warn about a missing or older effect.
