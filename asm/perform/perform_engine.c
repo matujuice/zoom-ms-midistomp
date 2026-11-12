@@ -42,6 +42,8 @@
 #define FX_SET_PARAM FN(0xC00BB600, int, (int slot, int param, int value, int b6, int a8))
 #define FX_DESC FN(0xC00B056C, const int *, (int slot, int param))
 #define MAXES ((const volatile unsigned char *)(MIXER_BASE + 296))
+#define SAVED ((volatile unsigned char *)(MIXER_BASE + 248))   /* mixer settings as last saved */
+#define FX_SAVED(s) ((volatile int *)(0xC009C07C + 44 * (s)))  /* stock patch as last saved (IS_DIRTY) */
 
 extern __cregister volatile unsigned int CSR;
 #define DINT unsigned csr_ = CSR; CSR = csr_ & ~1u
@@ -195,15 +197,24 @@ static int now(const Tgt *t)
 static short fxw[6][11];        /* effect value waiting for the poll, -1 none */
 static int dirty;               /* redraw at the next poll */
 
+/* A Perform move never marks the patch edited: a value that was saved moves its
+ * saved copy too, so the dirty checks (stock IS_DIRTY, mixer.S dirty) still match.
+ * A value the player had already edited stays edited. */
+static void live_set(int a, int v)
+{
+    if (SAVED[a] == LIVE[a]) SAVED[a] = v;
+    LIVE[a] = v;
+}
+
 static void put(const Tgt *t, int v)
 {
     if (v < 0) v = 0;
     if (v > t->max) v = t->max;
     if (t->k == K_MIX) {
         if (LIVE[t->a] != v) dirty = 1;
-        LIVE[t->a] = v;                         /* mirrors as mixer.S cc */
-        if (t->a == S_IN && eff_mode() != 2) LIVE[S_INR] = v;
-        if (t->a == S_MASTER && LIVE[S_OUT] != 2) LIVE[S_MR] = v;
+        live_set(t->a, v);                      /* mirrors as mixer.S cc */
+        if (t->a == S_IN && eff_mode() != 2) live_set(S_INR, v);
+        if (t->a == S_MASTER && LIVE[S_OUT] != 2) live_set(S_MR, v);
     } else if (t->k == K_FX && FX_REC(t->a)[t->b] != v)
         fxw[t->a][t->b] = v;
 }
@@ -219,7 +230,11 @@ static void fx_flush(void)
             if (p == 1 || s >= COUNT || FX_REC(s)[p] == v) { fxw[s][p] = -1; continue; }   /* never the effect type */
             if (LOADING || FX_TABLE[s] == FX_MUTE) continue;
             SEM_PEND(SEM_FX, -1);
-            FX_SET_PARAM(s, p, v, 0, 1);
+            {
+                int clean = FX_SAVED(s)[p] == FX_REC(s)[p];
+                FX_SET_PARAM(s, p, v, 0, 1);
+                if (clean) FX_SAVED(s)[p] = FX_REC(s)[p];
+            }
             SEM_POST(SEM_FX);
             dirty = 1;
             {
@@ -520,7 +535,12 @@ void perf_poll16(void)
         RINT;
         dirty = 1;                  /* the knob column shows the new state */
         for (s = 0; s < COUNT && s < 6; s++)
-            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }
+            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) {
+                int clean = FX_SAVED(s)[0] == FX_REC(s)[0];
+                FX_TOGGLE(s);
+                FX_EDITED();
+                if (clean) FX_SAVED(s)[0] = FX_REC(s)[0];
+            }
     }
     if (dirty) {
         dirty = 0;
