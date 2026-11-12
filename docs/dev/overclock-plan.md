@@ -38,8 +38,8 @@ The tester app is not built yet. Goal: "just a boost", that is more DSP time per
   - CPU 360 MHz
   - SDRAM 120 MHz, from SYSCLK5
   - refresh count 0x74F
-  - DSP Full limit 300 -> 340. This is the 360/300 ratio with about 5% kept spare, and it is not yet
-    confirmed by Luca. It is written after `dsp-limit`.
+  - DSP Full limit 300 -> 340. This is the 360/300 ratio with about 5% kept spare (confirmed by Luca
+    2026-11-12). It is written after `dsp-limit`.
 - **`midistomp_builder.build(..., cpu="360f")`** adds that patch. Without it the build stays at stock 300 MHz,
   and the release is unchanged.
 - **Checked with the stock 2.10 updater:** only MAIN's four words and the DSP limit word change.
@@ -67,4 +67,4 @@ The tester app is not built yet. Goal: "just a boost", that is more DSP time per
 
 - Function 5's third argument is 0x2 in MAIN and 0x4 in the bootloader. Its meaning is unknown.
 - How much do heat and a weak USB power supply lower the safe speed?
-- Which value the DSP Full limit should have at each speed (340 at 360F for now).
+- Which value the DSP Full limit should have at other speeds (same rule: ratio x 0.95).
