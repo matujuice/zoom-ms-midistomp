@@ -15,7 +15,7 @@ body:
     attributes:
       label: MIDISTOMP version
       description: MENU > SYSTEM, first page (version and label), or the updater's file name for a test build.
-      placeholder: V2.0.1
+      placeholder: V2.0.2
     validations:
       required: true
   - type: dropdown

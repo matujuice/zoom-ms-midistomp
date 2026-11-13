@@ -106,7 +106,7 @@ def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], bu
     return new_os, (bytes(d133) if d133 != stock_133 else None), img
 
 
-WIN_TITLE = "MIDISTOMP V2.0.1 Updater"  # Windows window title
+WIN_TITLE = "MIDISTOMP V2.0.2 Updater"  # Windows window title
 
 
 def cmd_build(args) -> int:
