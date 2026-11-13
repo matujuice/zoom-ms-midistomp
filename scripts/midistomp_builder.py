@@ -27,7 +27,7 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V2.0.2"
+NAME = "MIDISTOMP V2.0.3"
 BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
@@ -44,7 +44,7 @@ def identity_tag(name: str = NAME) -> str:
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:
     argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out),
-            "--stamp", f"version={NAME.split()[-1]}"]   # SYSTEM page shows the full V2.0.2; boot and menu stay V2.0
+            "--stamp", f"version={NAME.split()[-1]}"]   # SYSTEM page shows the full V2.0.3; boot and menu stay V2.0
     with tempfile.TemporaryDirectory() as tmp:
         for p in PATCHES:
             path = ROOT / "patches" / f"{p}.yaml"
