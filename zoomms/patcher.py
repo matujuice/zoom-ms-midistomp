@@ -17,9 +17,11 @@ Patch kinds supported so far:
         commit, date, label: see `zoomms build --stamp`).
     boot:      - model: ms70cdr-2.10  function: 5  expect: [...]  data: [...]
                - model: ms70cdr-2.10  set: 0x01C14188  expect: 5  data: 0
-        Change the arguments of an AIS boot command (ROM function N, or the SET
-        of a register), e.g. the PLL and SDRAM setup. `expect` is the full stock
-        argument list (or value); exactly one command must match.
+               - model: ms70cdr-2.10  jump: 0x...  expect: 0xC00DD800
+        Change the arguments of an AIS boot command (ROM function N, the SET
+        of a register, or the final jump address). `expect` is the full stock
+        argument list (or value); exactly one command must match. Note: Zoom's
+        bootloader skips function and SET commands in MAIN; only the jump runs.
     bin133:    - model: ms50g-3.10  offset: 0  expect_sha256: "..."  data: "hex"
         Overwrite bytes of updater part BIN/133 (the boot logo), not the OS.
         `expect_sha256` is the hash of the stock bytes being replaced, so no
@@ -124,6 +126,9 @@ def _apply_boot(img: ais.AisImage, b: dict, name: str) -> str:
         head = struct.pack("<I", len(expect) << 16 | b["function"])
         old, new = head + struct.pack(f"<{len(expect)}I", *expect), head + struct.pack(f"<{len(data)}I", *data)
         op, what = ais.FUNCTION_EXECUTE, f"function {b['function']}"
+    elif "jump" in b:  # the entry address the bootloader jumps to
+        old, new = struct.pack("<I", b["expect"]), struct.pack("<I", b["jump"])
+        op, what = ais.JUMP_CLOSE, "jump"
     else:  # SET: type, addr, value, delay; only the value changes
         op, what = ais.SET, f"set 0x{b['set']:08X}"
         old = new = None

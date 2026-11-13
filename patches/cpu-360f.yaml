@@ -1,21 +1,20 @@
 name: cpu-360f
-description: CPU 300 -> 360 MHz, SDRAM 120 MHz; DSP Full limit 300 -> 340 (comes after dsp-limit)
+description: CPU 300 -> 360 MHz, SDRAM 120 MHz (run-time PLL switch); DSP Full limit 300 -> 340 (comes after dsp-limit)
 builds: [ms70cdr-2.10]
-# Boot-time clock in MAIN's AIS script (docs/dev/overclock-plan.md). The bootloader keeps
-# 300 MHz, so update mode (Up + Down while plugging in USB) still recovers a pedal that hangs.
+# Zoom's bootloader skips MAIN's AIS PLL/SDRAM commands, so the clock is switched by code that
+# runs before the OS: MAIN's AIS jumps to it in L2 and it jumps on to c_int00
+# (asm/overclock/pll.inc, docs/dev/overclock-plan.md). Update mode (Up + Down while plugging
+# in USB) never runs it, so a pedal that hangs still recovers.
 boot:
   - model: ms70cdr-2.10
-    function: 5              # PLL: PLLM 14, POSTDIV /1 -> 24 x 15 = 360 MHz
-    expect: [0x18010202, 0x000501B9, 0x2]
-    data:   [0x0E000302, 0x000701B9, 0x2]
+    jump: 0x11816000         # pll_boot, then c_int00
+    expect: 0xC00DD800
+section:
+  # L2 just below MAIN's own L2 sections (0x11817000); free at boot, the OS reuses it after.
   - model: ms70cdr-2.10
-    set: 0x01C14188          # CFGCHIP3: EMIFB clock from SYSCLK5 (120 MHz) instead of stock 5
-    expect: 5
-    data: 0
-  - model: ms70cdr-2.10
-    function: 2              # SDRAM: SDCR, SDTIM1, SDTIM2 unchanged; refresh 120 x 15.6 - 1
-    expect: [0x0001C620, 0x10913208, 0x30080006, 0x81F]
-    data:   [0x0001C620, 0x10913208, 0x30080006, 0x74F]
+    addr: 0x11816000
+    data: "2a008000a2030402a203840028800802e8e00002281ca002e8e08002aa890502eaf34102760214022af078026ad24a027622140228be2003e8e000036402180100600000c8840801740218016402900000600000c8a5840074029000c8008400740290002a3200006a0000005ae00300920100200080000028c42003e8e000036402180100600000c8000801c842080174021801c8638400740290002a0700026a000002768210022a0040026a0000027642110264e2110100600000582f080190feffaf00800000aa0140026a000002760211022a0140026a00000276221302aa0340026a00000276621302aa0000026a00000276c2110264e2110100600000582f080110ffffaf008000002a3200006a0000005ae00300920200200080000088638400740290002aa00f006a0000005ae003001202002000800000880084007402900028060003680058036402180100600000c80c0801a8a78301f84f0c01740218012a006c00ea0660006203000000800000000000000000000000000000"
+    source: asm/overclock/pll360f.S
 write:
   - model: ms70cdr-2.10
     addr: 0xC00BB52C         # mvkh imm of the DSP Full limit float: 300.0 -> 340.0 (~1.2 x 0.95)

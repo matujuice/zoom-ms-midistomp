@@ -72,3 +72,9 @@ def test_boot_wrong_stock_args_fail():
     with pytest.raises(patcher.PatchError):
         patcher.apply(ais.parse(make_ais()), {"name": "t", "boot": [
             {"model": "m", "function": 5, "expect": [0x11, 0x99], "data": [0x33, 0x44]}]}, "m")
+
+
+def test_boot_changes_jump():
+    img = ais.parse(make_ais())
+    patcher.apply(img, {"name": "t", "boot": [{"model": "m", "jump": 0x11816000, "expect": 0x11800000}]}, "m")
+    assert ais.parse(ais.build(img)).entry == 0x11816000
