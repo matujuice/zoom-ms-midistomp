@@ -77,4 +77,4 @@ def test_boot_wrong_stock_args_fail():
 def test_boot_changes_jump():
     img = ais.parse(make_ais())
     patcher.apply(img, {"name": "t", "boot": [{"model": "m", "jump": 0x11816000, "expect": 0x11800000}]}, "m")
-    assert ais.parse(ais.build(img)).entry == 0x11816000
+    assert img.entry == ais.parse(ais.build(img)).entry == 0x11816000

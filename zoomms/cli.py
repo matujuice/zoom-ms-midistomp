@@ -127,7 +127,7 @@ def cmd_build(args) -> int:
     # Re-read what we are about to write and check it.
     check = ais.parse(exe[os_part.offset:os_part.offset + os_part.size])
     assert [s.addr for s in check.sections] == [s.addr for s in img.sections]
-    assert check.entry == ais.parse(original).entry
+    assert check.entry == img.entry
     assert exe[os_part.offset + os_part.size - 32:os_part.offset + os_part.size] == original[-32:]
     outside = [i for i in range(min(len(stock), len(exe))) if stock[i] != exe[i]
                and not os_part.offset <= i < os_part.offset + os_part.size

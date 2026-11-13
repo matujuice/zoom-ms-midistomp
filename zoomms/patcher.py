@@ -145,6 +145,8 @@ def _apply_boot(img: ais.AisImage, b: dict, name: str) -> str:
     if len(hits) != 1:
         raise PatchError(f"{name}: boot {what} with the stock arguments found {len(hits)} times, expected 1")
     img.ops[hits[0]] = (op, new)
+    if op == ais.JUMP_CLOSE:
+        img.entry = b["jump"]
     return f"boot {what} changed"
 
 
