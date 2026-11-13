@@ -203,7 +203,7 @@ def cmd_build_mac(args) -> int:
 
         check = ais.parse((macapp.resources(app_out) / "Main.bin").read_bytes())
         assert [s.addr for s in check.sections] == sections
-        assert check.entry == ais.parse(original).entry
+        assert check.entry == ais.parse(new_os).entry
         if as_zip:
             macapp.zip_app(app_out, out)  # out was checked not to exist above
     changed_os = sum(1 for a, b in zip(original, new_os) if a != b)
