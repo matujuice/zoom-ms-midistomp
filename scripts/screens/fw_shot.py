@@ -253,7 +253,7 @@ SCREENS = {
     "hold_for": ("release", hold_for),  # v2 changes HOLD FOR in the list (pedal_in.c), no choice screen
     "tempo_turn_tap": ("release", tempo(False)),
     "tempo_clock": ("release", tempo(True)),
-    "boot": ("release", boot_screen("v2.0.1")),
+    "boot": ("release", boot_screen("v2.0")),   # the boot screen is generic (patches/version-2.0.1.yaml); exact x.y.z only on SYSTEM > VERSION
     **{f"mixer_{n}": ("v2", mixer_page(pg)) for n, pg in [("in", 0), ("route", 1), ("mix_1", 3), ("mix_2", 4), ("mix_3", 5), ("out", 6)]},
     **{f"system_{n}": ("v2", system(i)) for i, n in enumerate(["version", "load", "effects", "mods"])},
 }

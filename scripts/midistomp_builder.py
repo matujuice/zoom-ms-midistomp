@@ -27,11 +27,12 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V2.0.1"
+NAME = "MIDISTOMP V2.0.1"   # exact x.y.z: identity tag and the SYSTEM > VERSION stamp. A bugfix release bumps only this.
+DISPLAY = "MIDISTOMP V2.0"  # generic: the output file name (and the boot screen, patches/version-2.0.1.yaml). Stays put across bugfix releases.
 BASE = ["version-2.0.1", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
-OUT_NAME = "MIDISTOMP V2.0.1 Updater.exe"
-OUT_NAME_MAC = "MIDISTOMP V2.0.1 Updater.app"
+OUT_NAME = f"{DISPLAY} Updater.exe"
+OUT_NAME_MAC = f"{DISPLAY} Updater.app"
 
 
 def identity_tag(name: str = NAME) -> str:
@@ -43,7 +44,8 @@ def identity_tag(name: str = NAME) -> str:
 
 
 def build(updater: Path, out: Path, mac: bool = False) -> int:
-    argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out)]
+    argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out),
+            "--stamp", f"version={NAME.rsplit(' ', 1)[-1]}"]   # the exact x.y.z, independent of DISPLAY/the patch file's own name
     with tempfile.TemporaryDirectory() as tmp:
         for p in PATCHES:
             path = ROOT / "patches" / f"{p}.yaml"
