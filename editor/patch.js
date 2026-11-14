@@ -201,10 +201,11 @@ var Patch = (function () {
     setTail(rec, mask & (1 << s) - 1 | (mask >> s + 1) << s, Math.max(1, n - 1));
     return true;
   }
-  function mv(v, next, lag) { return (v | next << 16 | lag << 21) >>> 0; }
+  function mv(v, next, lag, even) { return (v | next << 16 | lag << 21 | (even ? 1 : 0) << 25) >>> 0; }
+  function mvEven(w) { return w >>> 25 & 1; }
 
   return { MIXER: MIXER, hash: hash, mixerEntry: mixerEntry, mixer: mixer, mixerWrite: mixerWrite,
-           perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, used: used, addEffect: addEffect, removeEffect: removeEffect, mv: mv, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
+           perfDecode: perfDecode, perfEncode: perfEncode, perfEmpty: perfEmpty, count: count, used: used, addEffect: addEffect, removeEffect: removeEffect, mv: mv, mvEven: mvEven, MV_UNUSED: MV_UNUSED, T_NONE: T_NONE, T_FTSW: T_FTSW,
            PERF_LEN: PERF_LEN, PERF_OK: PERF_OK, performRead: performRead, performWrite: performWrite, performChunk: performChunk, perform: perform, param: param, setParam: setParam, paramMax: paramMax, setOn: setOn, reorder: reorder, fromDump: fromDump, toDump: toDump, unpack7: unpack7, pack7: pack7, effectKey: effectKey,
            effectId: effectId, on: function (rec, i) { return rec[18 * i] & 1; }, name: name, setName: setName,
            routing: routing, setRouting: setRouting, BUS: BUS, OUT: OUT, SOLO: SOLO };

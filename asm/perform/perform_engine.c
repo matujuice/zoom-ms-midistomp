@@ -247,7 +247,7 @@ static void fx_flush(void)
 #define F_LAG 2                 /* ramps from -> to */
 
 typedef struct {
-    unsigned char st, ctl, t, lag, tf;   /* tf: a Turn's Follow */
+    unsigned char st, ctl, t, lag, tf, even;   /* tf: a Turn's Follow; even: MV_EVEN(mv) */
     unsigned mv, fol;           /* fol: the Follow scheduled when this lands */
     int due;
     Tgt x;                      /* the target, from land: no descriptor call a block while it lags */
@@ -313,9 +313,30 @@ static void land(Slot *s)
         if (sl[i].st == F_LAG && sl[i].t == s->t) sl[i].st = F_FREE;
     v = MV_VALUE(s->mv);
     s->lag = MV_LAG(s->mv);
+    s->even = MV_EVEN(s->mv);
     if (t.k == K_NONE || s->lag == LG_OFF) { follow(s, s->due); put(&t, v); s->st = F_FREE; return; }
     s->x = t;
     s->st = F_LAG; s->from = (float)now(&t); s->to = (float)v; s->pos = 0.0f;
+}
+
+/* EVEN: split the ramp into exactly as many equal-width slices as there are steps from `from`
+ * to `to`, so every step (the first and the last included) is held for the same share of the
+ * Lag, instead of the usual round-to-nearest ramp (where the two end steps get only half the
+ * middle ones' time). The slice for `from` itself is never held: as soon as pos leaves 0 the
+ * value is already the first step on from `to`, so a build started from OFF reaches its first
+ * active step (almost) at once. */
+static int ramp_value(Slot *s)
+{
+    float d, ad, pn; int dir, steps, k;
+    if (!s->even) return (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
+    d = s->to - s->from; ad = d < 0 ? -d : d; dir = d < 0 ? -1 : 1;
+    steps = (int)(ad + 0.5f);
+    if (!steps) return (int)s->from;
+    pn = s->pos * steps;
+    k = (int)pn;
+    if (pn > (float)k) k++;                     /* ceil: `from`'s own slice has zero width */
+    if (k > steps) k = steps;
+    return (int)s->from + dir * k;
 }
 
 static void tick(void)
@@ -328,7 +349,7 @@ static void tick(void)
         if (s->st != F_LAG) continue;
         s->pos += s->lag < 6 ? LAGK[s->lag] : LAGK[s->lag] * g.du;
         if (s->pos >= 1.0f) s->pos = 1.0f;
-        n = (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
+        n = ramp_value(s);
         put(&s->x, n);                          /* every block: Perform wins over a CC */
         if (s->pos >= 1.0f) { follow(s, g.gu); s->st = F_FREE; }   /* the lag done: the action completed */
     }

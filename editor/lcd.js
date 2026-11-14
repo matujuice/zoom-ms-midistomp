@@ -156,6 +156,23 @@ var LCD = (function () {
       for (y = 0; y < H; y++) if (fb[y * W + x]) g.fillRect(BZ + MG + x * CELLW, BZ + MG + y * CELLH, CELLW - 1, CELLH - 1);
     }
   }
+  // Two screens drawn already (grab() after each), stacked into one canvas with a 1px blank row,
+  // a 1px line and another 1px blank row between them. Returns the dy to shift the bottom one's hits by.
+  function stack(cv, top, bottom) {
+    var w = Math.max(top.w, bottom.w), dy = top.h + 5;
+    begin(w, dy + bottom.h);
+    paste(top, 0, 0);
+    line(0, top.h + 2, w - 1, top.h + 2);
+    paste(bottom, 0, dy);
+    present(cv);
+    return dy;
+  }
+  // One screen already drawn (grab()), presented alone: the other half of stack()'s either/or.
+  function show(cv, g) {
+    begin(g.w, g.h);
+    paste(g, 0, 0);
+    present(cv);
+  }
   // a click on the canvas, in LCD pixels
   function at(cv, e) {
     var r = cv.getBoundingClientRect(), s = cv.width / r.width;
@@ -233,12 +250,12 @@ var LCD = (function () {
   }
   // a "+" or "-" box (at x, y), 13 x 9 pixels: square on the 6 x 9 cells; hit is its click region
   var AW = 13, PAD = 15;
-  function btn(d, x, y, plus, hit) {
+  function btn(hits, x, y, plus, hit) {
     fill(x, y, 13, 9, 0); sq(x, y, 13, 9); fill(x + 3, y + 4, 7, 1, 1); if (plus) fill(x + 6, y + 2, 1, 5, 1);
-    hit.x = x - 1; hit.y = y - 1; hit.w = 15; hit.h = 11; d.hits.push(hit);
+    hit.x = x - 1; hit.y = y - 1; hit.w = 15; hit.h = 11; hits.push(hit);
   }
   // "+": add an effect at this zone's output end (only on an empty chain)
-  function addBox(d, z, l, cy) { btn(d, l + 1, cy - 4, 1, { it: 'add', z: z }); }
+  function addBox(d, z, l, cy) { btn(d.hits, l + 1, cy - 4, 1, { it: 'add', z: z }); }
   var IC_SERIAL = [2, 0, 6, 29, 6, 0], IC_SPLIT = [2, 0, 2, 29, 2, 2, 0, 10, 29, 10, 0];
   var IC_PARAL = [4, 0, 2, 11, 2, 19, 6, 29, 6, 4, 0, 10, 11, 10, 19, 6, 29, 6, 0];
   var IC_MONO = [4, 0, 6, 10, 6, 18, 2, 29, 2, 4, 0, 6, 10, 6, 18, 10, 29, 10, 0];
@@ -418,12 +435,12 @@ var LCD = (function () {
       var g = X[j + 1] + cw(cols[j + 1]), gw = X[j] - g, f = fanKind(c, cols, j);
       return f === 1 ? g + gw - AW - 3 : f ? g + 3 : g + ((gw - AW) >> 1);
     }
-    function one(j, y, z, end) { btn(d, boxX(j), y - 4, 1, { it: 'ins', z: z, end: end }); }
+    function one(j, y, z, end) { btn(d.hits, boxX(j), y - 4, 1, { it: 'ins', z: z, end: end }); }
     var k = pc >= 0 ? cols[pc].kind : -1;
     if (pc >= 0 && d.delX >= 0) {   // "+" before (right, nearer IN) and after the chosen effect, "-" under it
       var l0 = d.delX, cy = d.delY, by = cy === YA ? YB + 14 : cy + 14;
-      if (plus) { btn(d, boxX(pc - 1), cy - 4, 1, { it: 'ins', after: 0 }); btn(d, boxX(pc), cy - 4, 1, { it: 'ins', after: 1 }); }
-      if (c.del) btn(d, l0 + ((CW - AW) >> 1), by, 0, { it: 'del' });
+      if (plus) { btn(d.hits, boxX(pc - 1), cy - 4, 1, { it: 'ins', after: 0 }); btn(d.hits, boxX(pc), cy - 4, 1, { it: 'ins', after: 1 }); }
+      if (c.del) btn(d.hits, l0 + ((CW - AW) >> 1), by, 0, { it: 'del' });
     } else if (plus && k !== K_EFF && k !== K_BUS) {   // beside IN, ROUTE, MIX or OUT: the start or end of the zones next to it
       var e = cols[pc].e;
       if (e === IT_IN) one(0, YC, PRE, 0);
@@ -519,10 +536,18 @@ var LCD = (function () {
   function knobPage(tabs, cur, ps, w, on, pic) {   // w (default SW) wide; each row centered, each knob in a column up to 60 wide
     var hits = [], x = 0, n = ps.length, rows = 48 * n > (w || SW) - 8 ? 2 : 1, per = Math.ceil(n / rows), cell, x0, y0;
     if (pic) {
-      hits = knobPage(tabs, cur, ps, (w || SW) - 131, on); var g = grab();
+      var sub = knobPage(tabs, cur, ps, (w || SW) - 131, null); var g = grab();
       begin(w || SW, BH); paste(g, 131, 0);
       for (x = 0; x < 8; x++) blit(0, ((BH - 64) >> 1) + 8 * x, 128, 8, Array.prototype.slice.call(pic, 128 * x, 128 * x + 128), true);
-      return shift(hits, 131, 0);
+      hits = shift(sub, 131, 0);
+      if (on != null) {   // ON/OFF and delete, under the cover (not top right: there is no frame to flush against there)
+        var s = on ? 'ON' : 'OFF', bw = 7 * 3 + 9, gap = 6, dx = (128 - (bw + gap + 13)) >> 1, oy = 85;
+        fill(dx, oy, bw, 9, 0); font7(s, dx + ((bw - (7 * s.length - 1)) >> 1), oy + 1);
+        if (on) inv(dx, oy, bw, 9); else sq(dx, oy, bw, 9);
+        hits.push({ it: 'onoff', x: dx - 1, y: oy - 1, w: bw + 2, h: 11 });
+        btn(hits, dx + bw + gap, oy, 0, { it: 'del' });
+      }
+      return hits;
     }
     begin(w || Math.max(SW, 40 * per + 8, tabs.reduce(function (a, s) { return a + 7 * s.length + 6; }, 1)), BH);
     cell = Math.min(60, Math.floor((W - 8) / Math.max(1, per)));
@@ -673,7 +698,7 @@ var LCD = (function () {
 
   return {
     play: play, list: list, lists: lists, control: control, ftsw: ftsw, perform: perform, SW: SW,
-    begin: begin, present: present, at: at, hit: hit, px: px, line: line, rect: rect, invert: invert, blit: blit,
+    begin: begin, present: present, stack: stack, show: show, grab: grab, shift: shift, at: at, hit: hit, px: px, line: line, rect: rect, invert: invert, blit: blit,
     font7: font7, font7r: font7r, font7c: font7c, os6: os6, small: small, softText: softText, softW: softW,
     statusBar: statusBar, widthP: widthP, toggle: toggle, fader: fader, knob: knob, tab: tab, frame: frame,
     softkey40: softkey40, softkey42: softkey42, title: title, cursor: cursor, turnArrows: turnArrows, scrollbar: scrollbar,
