@@ -547,10 +547,10 @@ static void list(const char *name, int n, int cur, int turn3)   /* stock list: t
     invert(86, 57, 125, 63);
 }
 
-static void move(void)                           /* a stock knob page: frame, tabs, Value in the target's own control, Next, Lag */
+static void move(void)                           /* a stock knob page: frame, tabs, Value, Next, and Lag (knob 3 press: a 2nd page swaps Lag for Even, only while Lag is set) */
 {
     unsigned m = *pd_move();
-    int t = *pd_tgt(), un = MV_NEXT(m) == NX_UNUSED, x = 0, k;
+    int t = *pd_tgt(), un = MV_NEXT(m) == NX_UNUSED, x = 0, k, lg = un ? 0 : MV_LAG(m), pg = pu_pos[SC_MOVE] && lg;
     char a[24], b[24];
     Par p;
     KP_BOX(0, 0, 11, 128, 53);
@@ -565,8 +565,8 @@ static void move(void)                           /* a stock knob page: frame, ta
     font7r(a, 8 + 30, 48);
     k = un ? 0 : MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1;
     font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k], 48 + 30, 48);
-    k = un ? 0 : MV_LAG(m);
-    font7("Lag", 88, 16); KP_KNOB(0, KP_DIVD(k, LG_N - 1), 88, 24); font7r(LAG[k], 88 + 30, 48);
+    if (pg) { font7("Even", 88, 16); KP_TOGGLE(0, MV_EVEN(m), 88, 24); font7r(MV_EVEN(m) ? "ON" : "OFF", 88 + 30, 48); }
+    else { font7("Lag", 88, 16); KP_KNOB(0, KP_DIVD(lg, LG_N - 1), 88, 24); font7r(LAG[lg], 88 + 30, 48); }
     invert(5, 57, 41, 63);                       /* softkey40: nothing, EXIT, nothing */
     softtext("EXIT", 45 + 18 - 8); invert(45, 57, 81, 63);
     invert(85, 57, 121, 63);

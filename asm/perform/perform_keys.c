@@ -114,16 +114,22 @@ static const unsigned char CYCV[7] = { 0, 1, 2, 4, 8, 16, 32 };
 
 static void quit(void) { perf_leave(); }        /* Cursor up while playing; STORE saves (pages.c mix_put) */
 
-static void move_key(int ev, int a)              /* a move's knob page: the three knobs edit Value, Next and Lag */
+static void move_key(int ev, int a)              /* a move's knob page: K1 turn Value, K2 turn Next; K3 turn Lag, K3 press steps to a 2nd page (only while Lag is set) where K3 turn flips Even instead */
 {
     unsigned *m = pd_move(), w = *m;
-    int v = MV_VALUE(w), nx = MV_NEXT(w), lg = MV_LAG(w), un = nx == NX_UNUSED;
+    int v = MV_VALUE(w), nx = MV_NEXT(w), lg = MV_LAG(w), ev_bit = MV_EVEN(w), un = nx == NX_UNUSED;
+    int *pg = &pu_pos[SC_MOVE];
     if (ev == 65) { pu_scr = pu_ev >= 0 ? SC_CTL : SC_GES; return; }
+    if (ev == 67) { if (!un && lg) *pg = !*pg; return; }
     if (ev == 160) {
         v = pd_step(*pd_tgt(), un ? -1 : v, a);
-        *m = v < 0 ? MV_UNUSED : MV(v, un ? NX_NOW : nx, un ? LG_OFF : lg);
-    } else if (!un && ev == 161) *m = MV(v, clamp(nx + a, 0, NX_N - 1), lg);
-    else if (!un && ev == 162) *m = MV(v, nx, clamp(lg + a, 0, LG_N - 1));
+        *pg = 0;
+        *m = v < 0 ? MV_UNUSED : MV_E(v, un ? NX_NOW : nx, un ? LG_OFF : lg, un ? 0 : ev_bit);
+    } else if (!un && ev == 161) *m = MV_E(v, clamp(nx + a, 0, NX_N - 1), lg, ev_bit);
+    else if (!un && ev == 162) {
+        if (*pg) *m = MV_E(v, nx, lg, clamp(ev_bit + a, 0, 1));
+        else *m = MV_E(v, nx, clamp(lg + a, 0, LG_N - 1), ev_bit);
+    }
 }
 
 /* The same keys on every list: knob 1 turn scrolls, knob 1 press opens (perf_key passes it
@@ -151,7 +157,7 @@ static void setup_key(int ev, int a)
     case SC_CTL:
         n = *pd_tgt();
         if (open && !*pos) { pu_pos[SC_PMOD] = pd_mod_of(n); pu_scr = SC_PMOD; }
-        else if (open && pu_ev >= 0) { pu_mv = 0; pu_scr = SC_MOVE; }
+        else if (open && pu_ev >= 0) { pu_mv = 0; pu_pos[SC_MOVE] = 0; pu_scr = SC_MOVE; }
         else if (open) { pu_ges = pu_ctl < 3 ? *pos - 1 : *pos; pu_pos[SC_GES] = 0; pu_scr = SC_GES; }
         else if (back) pu_scr = pu_ev >= 0 ? SC_LOOP : SC_TOP;
         break;
@@ -178,7 +184,7 @@ static void setup_key(int ev, int a)
         break;
     case SC_GES:
         g = pu_ges;
-        if (open) { pu_mv = g == 0 ? M_TURN_F : (g == 1 ? M_PRESS_A : M_HOLD_A) + *pos; pu_scr = SC_MOVE; }
+        if (open) { pu_mv = g == 0 ? M_TURN_F : (g == 1 ? M_PRESS_A : M_HOLD_A) + *pos; pu_pos[SC_MOVE] = 0; pu_scr = SC_MOVE; }
         else if (back) pu_scr = SC_CTL;
         break;
     }
@@ -191,7 +197,7 @@ void perf_key(int ev, int steps)
     sync();
     if ((ev | 1) == 33) V_PDOWN = ZMT_FTSW = !(ev & 1);   /* footswitch down: RISER's word 6, the poll keeps it on this screen */
     if ((ev | 1) == 69) { if (ev == 69 && perf_on == 1) quit(); return; }   /* Cursor up leaves the play screen only, on release: the press would reach the effect screen */
-    if (perf_on != 1) {                          /* lists: knob 1 press opens, as stock; knob 3 press does nothing */
+    if (perf_on != 1 && pu_scr != SC_MOVE) {      /* lists: knob 1 press opens, as stock; knob 3 press does nothing. The move screen keeps native knob 3 press (67) for its own 2nd page */
         if (ev == 67 || ev == 35) return;
         if (ev == 34) ev = 67;
     }
