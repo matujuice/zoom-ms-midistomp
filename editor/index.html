@@ -942,7 +942,7 @@ $('detail').addEventListener('pointerdown', function (e) {
   if (e.target.id !== 'chainLcd') return;
   var h = LCD.hit(knobHits, LCD.at(e.target, e)), p = patches[sel];
   if (h && h.it === 'onoff') { snap(p); Patch.setOn(p.rec, focus, !Patch.on(p.rec, focus)); render(); refocus('#chainLcd'); return; }
-  if (h && h.it === 'del') { askDel = true; drawChain(p, chainMode); return; }
+  if (h && h.it === 'del') { askDel = true; down = null; drawChain(p, chainMode); return; }   // down = null: this click's release must not answer the question
   if (!h || h.it !== 'param') return;
   var k = knobParams(p)[h.i];
   snap(p);
