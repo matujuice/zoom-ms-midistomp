@@ -73,16 +73,85 @@ Reply 2, status (13 bytes), sent right after:
 - An unknown command with the `7D "MST"` header is ignored; the nonce comes back unchanged so
   replies can be matched.
 
+Command 02, MIXER settings of patch n (n 0..49), read-only:
+
+    F0 7D 4D 53 54 02 <nonce> <n> F7
+    F0 7D 4D 53 54 43 <nonce> <n> <19 bytes> F7      28 bytes in all
+
+The 19 bytes are the 16-byte record 50 entry for patch n (`0xC0116000 + 24 + 16n`: 4-byte
+FNV-1a hash, settings 0-10, pad), packed 7-bit the Zoom way (groups of 7, each led by a byte of
+high bits, first byte's bit = `0x40`). The hash tells whether the entry belongs to the patch now
+stored at n: FNV-1a over the six effect ids (`b0&FE b1 b2 b3&1F`) and name bytes 111-121.
+n >= 50 gets no reply.
+
+Command 03, write the MIXER settings of entry n:
+
+    F0 7D 4D 53 54 03 <nonce> <n> <18 bytes> F7      27 bytes in all
+    F0 7D 4D 53 54 44 <nonce> <n> <status> F7        status 0 = saved, 1 = a value over its max
+
+The 18 bytes pack the hash (4 bytes LE) and settings 0-10. Any value over its max (`0xC00F6128`)
+writes nothing. Otherwise the entry is written and record 50 is saved to flash
+(`0xC00BA3E4`, as the stock MIXER store, also from Task_MIDI). If n is the patch played
+(`B14+324`), the live and saved copies (`0xC00F60E0`, `0xC00F60F8`) change too and the UI is
+redrawn (event 64). The editor uses it to edit settings and to keep them on a rename or move
+(write the old settings under the new hash). For a patch with its own entry n it sends 03 before
+the patch dump (28) and store (32): loading the patch then finds entry n and the PERFORM entry n,
+and the store saves both; sent after, the store would save PERFORM defaults. A restored backup
+patch is not slot n's, so it gets 03 after the store and PERFORM defaults. The editor mirrors
+Input→Input R and Master→Master R itself, as the knobs and CCs do. ponytail: 03 has no
+PEDAL-mono Mode limit.
+
+Commands 04 and 05, read and write patch n's PERFORM entry (208 bytes, record 50 + 828 + 208n,
+`asm/perform/perform_store.c`) 14 bytes at a time, chunk k 0..14 (chunk 14 holds bytes 196-207 and
+two bytes of 0):
+
+    F0 7D 4D 53 54 04 <nonce> <n> <k> F7                             10 bytes
+    F0 7D 4D 53 54 45 <nonce> <n> <k> <ok> <16 bytes> F7            27 bytes, ok 1 = the table exists
+    F0 7D 4D 53 54 05 <nonce> <n> <k> <16 bytes> F7                  26 bytes
+    F0 7D 4D 53 54 46 <nonce> <n> <k> <status> F7                    status 0 = written, 1 = no table
+
+n >= 50 or k >= 15 gets no reply. 05 writes RAM only; chunk 14 saves record 50 to flash. The entry
+has no hash: it belongs to the patch whose hash is in mixer entry n, and is valid when byte 15 is
+0xA5 (STORE writes it). The pedal loads PERFORM only on a patch change, and a STORE of the patch
+played saves the PERFORM in RAM over entry n, so the editor writes it while another patch plays.
+Backups carry each patch's PERFORM entry (as perform_store.c find chooses it) and restore it.
+
 **Firmware work for step B** (1 session plus a hardware test):
 1. Find the 70CDR transmit routine used by the identity reply and the SysEx executor
-   (`0xC00AE880`-equivalent). Not done.
+   (`0xC00AE880`-equivalent). **Done** for the 70CDR, see the map below.
 2. Receive: a small state machine in the existing Task_MIDI hook (`clock.S` / `diag_me`
    chain). Fast path stays one compare (byte `F0` or "in sequence"); zero extra cost otherwise
-   (CPU rule). Check what the stock state table does with `F0 7D`: it must ignore it.
-   **Not checked on hardware.**
+   (CPU rule). The stock state table ignores `F0 7D`: checked in code and on the pedal (map below).
 3. Transmit from Task_MIDI's context (as the identity reply), not from the audio path.
 4. Version bytes: from `version-2.0.yaml` (release) or the DIAG stamp.
 5. Test: `tests/` host test for the parser, then a pedal test with and without Effect Manager.
+
+**MS-70CDR 2.10 map (2026-11-08, from the stock disassembly, B14 = `0xC00EF748`):**
+- SysEx header parser: in Task_MIDI's byte loop, status `F0` at `B14+224`, data count at
+  `B14+227`, first data byte at `B14+225`. Count 0-4 jumps through the table at `0xC00EF2D0`
+  (`0xC00AED40`). Count 0 (`0xC00AEE06`) accepts only `52` or `7E`; any other byte clears
+  status and count, so the rest of an `F0 7D ...` message is dropped.
+- `F7` (`0xC00AEECC`) clears the status and calls the executor `0xC00AE6A4` (50G
+  `0xC00AE880`), which switches on the command word `B14+208` and sets it back to 0 when done
+  (`0xC00AECA8`). After a foreign message the word is 0, so the executor does nothing.
+- Send: `0xC00AD664(A4 = buffer, B4 = length)`. It takes the semaphore at `B14+804`, calls the
+  driver's `0xC00BF488(0, buffer, length)`, then releases the semaphore. The identity reply
+  (`0xC00AD6A4` onward, template `0xC00ECB68`) builds 15 bytes on the stack and calls it.
+  There are 26 callers, all in Task_MIDI's context.
+- Pedal test (2026-11-08, Luca's 70CDR with M201): `F0 7D` hello, reply-shaped and
+  `7D 52 00 61 29` messages got no answer. The identity reply and the current patch (`29`, in
+  editor mode) were the same before and after, also with the read sent right after a hello.
+
+- **Built** (2026-11-08): the receiver is in `asm/diag/diag.c` (`sx_byte`, `sx_done`), called
+  from `diag_mend` with the byte at `B14+226`; the fast path is one test (`sx_n || b == F0`).
+  Version from the DIAG stamp; feature bits 1 and 4 from the transport and services magic, the
+  rest constant. `state` is `0x7F` for now (editor-mode and looper flags not mapped yet). Host
+  test: `tests/test_diag_sysex.py`. Pedal test on Luca's 70CDR: hello gave 2.0.1 and bits 0-10,
+  all 50 `02` replies came back, the current patch's hash matched its entry (49), identity reply
+  unchanged. Effect Manager on the same OS: Luca found it OK. In the first run right after
+  closing it, identity replies and a `52 00 61 00 0B` turned up among the `43` replies (which
+  were all right); the next run was clean. A host must match replies by header and nonce and
+  skip anything else.
 
 Open: is `7D` acceptable to their side and to Windows MIDI stacks (some drop unknown
 SysEx)? Does the hello also work through `zoomms`? (We can add `zoomms hello`, small.)

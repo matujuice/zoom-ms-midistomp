@@ -118,7 +118,10 @@ class Pedal:
 def flash(updater: Path, bad: int | None) -> int:
     image = os_image(updater)
     pedal = Pedal()
-    ident, _ = pedal.send(bytes([0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7]), 2)
+    for _ in range(3):  # the first request after opening the ports sometimes gets no answer
+        ident, _ = pedal.send(bytes([0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7]), 2)
+        if ident:
+            break
     version = ident[10:14].decode("ascii", "replace") if ident else None
     print("identity:", version)
     if version != "1.10":
