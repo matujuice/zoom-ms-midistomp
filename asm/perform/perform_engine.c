@@ -57,6 +57,7 @@ static struct {
     unsigned clk, starts;
     float sub, bpm, gf, du;
     int wraps, run, gu, anchor, was_on, patch;
+    unsigned rc, rr;            /* the clock count rr / wraps were worked out for: the turns loop once a clock, not a block */
 } g = { 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1 };
 
 static int imod(int u, int m)   /* u mod m, u >= 0, by shifted subtraction */
@@ -111,7 +112,7 @@ static void grid(void)
     g.du = g.bpm * DU_BPM;
     if (start) {                                        /* MIDI Start: the downbeat is bar 1 */
         perf_reset();
-        g.wraps = 0; g.gu = -1; g.gf = 0.999f; g.anchor = 0;
+        g.wraps = 0; g.rc = 0; g.gu = -1; g.gf = 0.999f; g.anchor = 0;
     }
     if (g.run) {
         if (clocks == 0) { g.clk = 0; g.sub = 0.0f; g.du = 0.0f; g.gf = 0.999f; }  /* waiting for clock 1 */
@@ -119,9 +120,12 @@ static void grid(void)
             if (clocks != g.clk || start) g.sub = 0.0f;
             else if ((g.sub += g.bpm * 7.2562358e-5f) > 0.999f) g.sub = 0.999f;
             g.clk = clocks;
-            r = clocks - 1;             /* r = that mod 2304, wraps = the 96-beat turns: right after the grid sat out */
-            for (k = 20, g.wraps = 0; k-- > 0;)
-                for (mk = 2304u << k; r >= mk; g.wraps += 1 << k) r -= mk;
+            if (clocks != g.rc || start) {
+                r = clocks - 1;         /* r = that mod 2304, wraps = the 96-beat turns: right after the grid sat out */
+                for (k = 20, g.wraps = 0; k-- > 0;)
+                    for (mk = 2304u << k; r >= mk; g.wraps += 1 << k) r -= mk;
+                g.rc = clocks; g.rr = r;
+            } else r = g.rr;
             beats = ((float)(int)r + g.sub) * 0.041666668f;
             err = beats * 8.0f - ((float)(g.gu - 768 * g.wraps) + g.gf);
             if (err >= 4.0f || err <= -4.0f) {          /* entered mid-song, a jump */
@@ -465,7 +469,7 @@ void perf_block(void)
         return;
     }
     grid();
-    tick();
+    if (busy) tick();           /* nothing waits or lags: no slot loop (wait sets busy) */
     led();
 }
 
