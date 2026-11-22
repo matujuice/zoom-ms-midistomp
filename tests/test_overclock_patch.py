@@ -5,7 +5,7 @@ import pytest
 from zoomms import asm, patcher
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEEDS = ["360f", "408f"]
+SPEEDS = ["360f"]  # 408F failed on both test pedals (51ba9bb)
 
 
 @pytest.mark.skipif(not asm.available(), reason="tic6x binutils not installed")
