@@ -33,20 +33,20 @@ def _words(code, i, n):
     return [int.from_bytes(code[k:k + 4], "little") for k in range(i, i + 4 * n, 4)]
 
 
-def test_data_is_the_ms50g_screen():
+def test_data_is_the_3x2_screen():
     code = _data(SEC["data"])
     assert code[156] & 1 == 0                                         # no p-bit chains data into draw
-    assert _words(code, 0, 6) == [1, 3, 4, 6, 8, 0]                   # tbl, as MS-50G 0xC00ECF80; [5] EXIT
-    assert _words(code, 24, 6) == [1, 43, 85, 1, 43, 85]              # xs, as MS-50G 0xC00ECE50
-    assert _words(code, 48, 6) == [10, 10, 10, 36, 36, 36]            # ys, as MS-50G 0xC00ECE68
+    assert _words(code, 0, 6) == [1, 3, 4, 6, 8, 0]                   # tbl: gid per spot, [5] EXIT
+    assert _words(code, 24, 6) == [1, 43, 85, 1, 43, 85]              # xs: 3 columns
+    assert _words(code, 48, 6) == [10, 10, 10, 36, 36, 36]            # ys: 2 rows
     nxt, prv = _words(code, 72, 6), _words(code, 96, 6)
     assert [prv[n] for n in nxt] == list(range(6))                    # prev undoes next
     c, seen = 0, []
     for _ in range(6):
         seen.append(c)
         c = nxt[c]
-    assert seen == [0, 3, 1, 4, 2, 5]                                 # column-wise, as the MS-50G
-    assert code[120:160] == b"OD/ DIST\0AMP\0MOD/SFX \0DLY/REV \0DYN/FLTR\0"  # MS-50G 0xC00E967E strings
+    assert seen == [0, 3, 1, 4, 2, 5]                                 # column-wise
+    assert code[120:160] == b"OD/ DIST\0AMP\0MOD/SFX \0DLY/REV \0DYN/FLTR\0"  # the group names
 
 
 def test_writes_point_at_the_section():
@@ -73,7 +73,7 @@ def test_writes_point_at_the_section():
     for x in (0xC00A90D4, 0xC00A90E0) + tuple(a for p in pairs for a in p[:2]):
         old, new = _word(W[x]["expect"]), _word(W[x]["data"])     # only the constant changes
         assert old & ~(0x1FFFFF << 7) == new & ~(0x1FFFFF << 7)
-    assert W[0xC00A7A50]["data"] == "27c6" and W[0xC00A7A56]["data"] == "40c4"  # mod 6, MS-50G bytes
+    assert W[0xC00A7A50]["data"] == "27c6" and W[0xC00A7A56]["data"] == "40c4"  # mod 6
 
 
 def test_section_fits_its_gap():

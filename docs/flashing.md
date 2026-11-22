@@ -64,11 +64,11 @@ zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" 
   --patch patches/scroll.yaml \
   --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.1.exe   # MIDISTOMP V1.1 (frozen, tag v1.1)
 zoomms build "firmware/MS-70CDR_v2.10_Win_E/ZOOM MS-70CDR v2.10 Updater.exe" \
-  --patch patches/version-2.0.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/version-2.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
   --patch patches/scroll.yaml --patch patches/looper.yaml --patch patches/mixer-m2.yaml \
   --patch patches/diag.yaml --patch patches/dsp-limit.yaml --patch patches/fx-category.yaml \
-  --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V2.0.1 Updater.exe"   # MIDISTOMP V2.0.1, all pedals
+  --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V2.0 Updater.exe"   # MIDISTOMP V2.0, all pedals
 ```
 
 The patch list is `PATCHES` in `scripts/midistomp_builder.py`. A test build adds
@@ -125,7 +125,7 @@ Value" sends CCs).
 ## Mac updater
 
 `zoomms build-mac` does the same for Zoom's Mac updater app, see
-`zoomms/macapp.py`. v1.2, v2.0 and v2.0.1 are built from `MS-70CDR_v2.10_Mac_E`; v1.1 was built
+`zoomms/macapp.py`. v1.2 and every v2.0.x are built from `MS-70CDR_v2.10_Mac_E`; v1.1 was built
 from `MS-50G_v3.10_Mac_E` (command below, needs tag `v1.1`). In both, the
 `Resources/Main.bin`, `Preset.bin`, `boot.bin` and `FS.bin` are byte-identical
 to BIN/129, 133, 136 and 137, and `_RomProcedure` in the executable is the
@@ -149,11 +149,11 @@ the Mac (`xattr -cr` then `codesign --force --deep --sign -`).
 
 ```sh
 zoomms build-mac "firmware/MS-70CDR_v2.10_Mac_E/ZOOM MS-70CDR v2.10 Updater.app" \
-  --patch patches/version-2.0.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
+  --patch patches/version-2.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
   --patch patches/scroll.yaml --patch patches/looper.yaml --patch patches/mixer-m2.yaml \
   --patch patches/diag.yaml --patch patches/dsp-limit.yaml --patch patches/fx-category.yaml \
-  --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V2.0.1 Updater.app"
+  --build-id ms70cdr-2.10 --out "build/out/MIDISTOMP V2.0 Updater.app"
 zoomms build-mac "firmware/MS-50G_v3.10_Mac_E/ZOOM MS-50G v3.10 Updater.app" \
   --patch patches/version-1.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \

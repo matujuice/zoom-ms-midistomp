@@ -325,6 +325,17 @@ Key loop (Task key handler) callp sequence, one to one in both OSes: this is how
 | LED path (comment) | LED set helper 0xC00CE054(0, 1-bit) | `0xC00CE054` | `0xC00CD3B4` | 2 aligned call sites vote; similarity 0.77. Only in a comment, looper.S writes GPIO via GPIO_BANK01 | medium |
 | block.S regions | big buffer regions 3,2,1 (DDR) | `0xC0636980`+0x199680, `0xC01ADAD4`+0x5252C, `0xC0102000`+0x96000 | unchanged, not verified | not OS addresses; see "Our code areas"; boundaries come from the RAM test (T5) | medium |
 
+## Fonts (asm/common/fonts.h; draw.h, chain_draw.c, perform_draw.c)
+
+Read from the OS at run time, like FONT7 above. Host builds use the same bytes from
+`tests/host_fonts.h`; `tests/test_mixer_patch.py` checks they match the stock image.
+
+| Name | What it is | MS-50G | MS-70CDR | How found | Conf. |
+|---|---|---|---|---|---|
+| F7 | FONT7 from ASCII 32, 7 columns a character, 665 B | not mapped | `0xC00E88B8` | FONT7 + 32 x 7; whole table equal, one hit | high |
+| OS6 | 6 x 8 OS font from ASCII 32, 570 B | not mapped | `0xC00E8DA8` | whole table equal, one hit | high |
+| SOFT | 5-px softkey font, 4 columns a glyph (46/47 = left/right arrow), 192 B | not mapped | `0xC00EA9B0` | whole table equal, one hit; mixer-m2's write at 0xC00EA9A8 ends right before it | high |
+
 ## ram-test.yaml (asm/ram_test)
 
 | Name | What it is | MS-50G | MS-70CDR | How found | Conf. |
@@ -376,3 +387,13 @@ Our code is not an OS address, but it must not overlap anything the 70CDR OS use
 - The alignment alone put several sites on a neighbouring call (e.g. the menu-keys stub, the key-loop calls); those were corrected by hand using the function pairing above.
 - Caves: 16 aligned zero bytes after a `bnop .S2 b3,5` return, no branch/call target or image word pointing into the zero run, and the fetch packet header slot of every packet touched is not 0xE... (plain packet). The same scan accepts all 21 50G caves. `tuner_label_trampoline.S` hand-encodes its branch relative to the fetch packet: the new cave 0xC00DAA30 is at the same packet offset (+0x10), only the packet base (0xC00DAA20) changes.
 - Throwaway scripts live in the session scratchpad, not in the repo.
+
+## SysEx send (patch manager plan, step 1; 2026-11-06, TI dis6x of the stock 2.10 OS)
+
+MS-70CDR only; MS-50G / MS-60B not mapped yet.
+
+| Name | What it is | MS-70CDR | How found | Conf. |
+|---|---|---|---|---|
+| SYSEX_SEND | `send(A4 = buffer, B4 = length)`: sends one whole message, `F0`..`F7` included. Pends the semaphore `B14[201]`, calls `0xC00BF488(0, buf, len)`, posts it | `0xC00AD664` | the identity reply (`0xC00AD694`: copies the 15-byte template `0xC00ECB68`, model byte `B14[212]` at +6, version from `0xC00AD36C` at +10) ends in `callp 0xC00AD664` with A4 = the stack copy, B4 = 15; 26 callers, the editor replies among them | high |
+| SYSEX_ACK | `ack(A4 = status)`: sends the 7-byte ack (`F0 52 00 <model> .. .. F7`, as in `flash-protocol.md`) from template `0xC00ECD80` | `0xC00AD970` | calls SYSEX_SEND with B4 = 7 | medium |
+| VERSION_TEXT | returns A4 = `0xC00ECCE8` ("2.10", identity-tag patches it) | `0xC00AD36C` | 4 callers | high |
