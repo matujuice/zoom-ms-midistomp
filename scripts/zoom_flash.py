@@ -26,6 +26,7 @@ from zoomms import parts  # noqa: E402
 HEAD = bytes([0xF0, 0x52, 0x00, 0x61])
 ACK = HEAD + bytes([0x00, 0x00, 0xF7])
 OS_ADDR, OS_LEN, TRAILER, CHUNK = 0x040000, 0xB0000, 0x0EF000, 0x800
+TAG_OFF = 0x541C8   # OS image offset of the identity text 0xC00ECCE8 (patches/identity-tag.yaml)
 
 
 def num(value: int, n: int) -> bytes:
@@ -157,7 +158,7 @@ def flash(updater: Path, bad: int | None) -> int:
             return 1
     if not step("finish", finish()):
         return 1
-    print("done: restart the pedal; the identity should read M201")
+    print("done: restart the pedal; the identity should read", image[TAG_OFF:TAG_OFF + 4].decode("ascii", "replace"))
     return 0
 
 
