@@ -123,8 +123,10 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    Use it for every pedal, also the MS-50G and MS-60B.
 2. Download **MIDISTOMP-builder-Windows.exe** from the [releases](https://github.com/matujuice/zoom-ms-midistomp/releases).
    In File Explorer, drag Zoom's updater (`ZOOM MS-70CDR v2.10 Updater.exe`) and drop it on the builder's icon.
-   The builder writes **MIDISTOMP V2.0 Updater.exe** in the same folder.
-3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater.
+   The builder writes two files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock, the one to use) and
+   **MIDISTOMP V2.0 Updater (360MHz OC).exe**, an opt-in overclock build for pedals already tested at 360 MHz
+   (MS-70CDR, MS-60B so far) — see [Overclock](docs/user-guide.md#overclock-opt-in-360-mhz).
+3. Hold the up and down keys while you plug in USB, then run the MIDISTOMP updater you chose.
 4. On the pedal, go to MENU > SETTINGS > **INPUT** and choose your input: **STEREO** on an MS-70CDR (needed for the
    Split routing modes), **MONO** on the MS-50G and MS-60B.
 
@@ -193,8 +195,11 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - [Zoom-Firmware-Editor](https://github.com/Barsik-Barbosik/Zoom-Firmware-Editor) by Barsik-Barbosik: the updater
   flash layout.
 - [zoom-zt2](https://github.com/mungewell/zoom-zt2) by mungewell: SysEx file transfer.
-- Alexander Lim. The live screens and the zvis kit, the pedal's file-size cap and DSP limit, and linker pitfalls.
+- Alexander Lim (leemuzkho). The live screens and the zvis kit, the pedal's DSP limit, and the write-up on the
+  MS-series' DSP power sag under input-impedance load that's behind the 360 MHz overclock.
 - Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
+- Issue reports and ideas behind this release: [Andrhodes](https://github.com/Andrhodes) (Program Change reload, #68)
+  and Roman Rusinov (themanro) again for the SysEx slot-routing report (#72).
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 
