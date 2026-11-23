@@ -51,3 +51,11 @@ def test_identity_tag_follows_the_version():
     assert builder.identity_tag("MIDISTOMP V2.1.0") == "M210"
     with pytest.raises(ValueError):
         builder.identity_tag("MIDISTOMP V2.1")
+
+
+def test_feature_dependencies_json_matches_release():
+    import json
+    d = json.loads((builder.ROOT / "docs" / "dev" / "feature-dependencies.json").read_text())
+    assert d["order"] == builder.PATCHES == list(d["patches"])
+    for p, v in d["patches"].items():   # every need is applied earlier
+        assert all(d["order"].index(n) < d["order"].index(p) for n in v["needs"] + v["optional"]), p

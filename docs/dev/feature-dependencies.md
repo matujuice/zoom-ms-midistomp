@@ -9,7 +9,7 @@ sections. Every patch has its own fixed addresses, so none overlap; only the ord
 
 | Patch | Needs | Why |
 |-------|-------|-----|
-| version-2.0.1 | - | |
+| version-2.0 | - | |
 | boot-logo | - | BIN/133 only |
 | midi-cc | - | owns the CC handler (0xC00F2800) and its step (0xC00F2020) |
 | midi-clock | - | owns the transport block (0x1181FF00, `transport.inc`) and the poll hook (0x1181E800) |
@@ -18,10 +18,15 @@ sections. Every patch has its own fixed addresses, so none overlap; only the ord
 | scroll | - | |
 | dsp-limit | - | one write |
 | fx-category | - | |
+| pc-force-reload | - | one write (Program Change reloads the saved patch) |
 | identity-tag | - | one write; the tag follows the release version |
 | looper | midi-cc, midi-clock, tempo-hold | takes over midi-clock's poll trampoline, calls the CC handler and tempo-hold's hold/toggle hooks, uses transport word 6 |
 | mixer-m2 (Mixer + Perform mode) | midi-cc, midi-clock, midi-settings; looper optional | poll trampoline at 0xC00C82D0 accepts midi-clock's or looper's bytes; relinks midi-cc's step; adds to the midi-settings menu |
 | diag | midi-clock, midi-settings | reads clock vars; its page sits in the settings menu |
+
+The same list, for code: [`feature-dependencies.json`](feature-dependencies.json) (`order` is
+the apply order; `needs` and `optional` name patches applied earlier; `tests/test_builder.py`
+keeps it equal to the release list).
 
 Apply order: the order of `PATCHES` in `scripts/midistomp_builder.py` (BASE first, then
 looper, mixer-m2, diag, ...). looper must come before mixer-m2.
@@ -31,7 +36,7 @@ looper, mixer-m2, diag, ...). looper must come before mixer-m2.
 - **Base (always on):** midi-cc, midi-clock, midi-settings. Almost everything else hooks into
   them; the transport block is how effects see MIDI clock and transport, so it belongs here.
 - **Free-standing extras:** boot-logo, version string, identity-tag, tempo-hold, scroll,
-  dsp-limit, fx-category. Any subset works on top of stock or the base.
+  dsp-limit, fx-category, pc-force-reload. Any subset works on top of stock or the base.
 - **Needs the base:** diag; looper (also tempo-hold); mixer-m2, which is Mixer and Perform mode in one patch (looper optional).
 
 Not checked here: whether every free-standing patch also builds without the base (each one's
