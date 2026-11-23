@@ -91,6 +91,9 @@ knob:
         mv      .L1     a11, a4
         mv      .L2X    a10, b4
         FARCALL FX_PARAM_DESC               ; a4 = descriptor
+        mv      .L1     a4, a1              ; 0: empty slot or no such knob, and
+  [!a1] b       .S1     done                ; a load through it freezes the pedal
+        nop     5
         ldw     .D1T1   *+a4(12), a0        ; parameter maximum
         nop     4
         mpy32   .M1     a13, a0, a1         ; value * max
@@ -119,6 +122,7 @@ apply:
         mvk     .S2     64, b4
         FARCALL EVENT_POST
 
+done:
         ldw     .D2T2   *+b15(8), b3
         ldw     .D2T1   *+b15(12), a10
         ldw     .D2T1   *+b15(16), a11
