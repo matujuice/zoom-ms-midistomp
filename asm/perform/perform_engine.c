@@ -196,7 +196,7 @@ static int now(const Tgt *t)
 
 static short fxw[6][11];        /* effect value waiting for the poll, -1 none */
 static int dirty;               /* redraw at the next poll */
-static int since = 2;           /* polls since that redraw, capped at 2 */
+static int since = 4;           /* polls since that redraw, capped at 4 */
 
 /* A Perform move never marks the patch edited: a value that was saved moves its
  * saved copy too, so the dirty checks (stock IS_DIRTY, mixer.S dirty) still match.
@@ -344,10 +344,14 @@ static int ramp_value(Slot *s)
     return (int)s->from + dir * k;
 }
 
+#define FX_LAG_BLKS 265             /* a lag writes an effect knob every 48 ms (stock edit maths each time); mixer targets every block */
+
 static void tick(void)
 {
-    int i, n, b = 0;
+    static int fxblk;
+    int i, n, b = 0, fxnow = ++fxblk >= FX_LAG_BLKS;
     Slot *s;
+    if (fxnow) fxblk = 0;
     for (i = 0; i < NSLOT; i++) {
         s = &sl[i];
         if (s->st == F_WAIT && g.gu >= s->due) land(s);
@@ -355,7 +359,7 @@ static void tick(void)
         s->pos += s->lag < 6 ? LAGK[s->lag] : LAGK[s->lag] * g.du;
         if (s->pos >= 1.0f) s->pos = 1.0f;
         n = ramp_value(s);
-        put(&s->x, n);                          /* every block: Perform wins over a CC */
+        if (fxnow || s->x.k != K_FX || s->pos >= 1.0f) put(&s->x, n);   /* Perform wins over a CC; the last value always lands */
         if (s->pos >= 1.0f) { follow(s, g.gu); s->st = F_FREE; }   /* the lag done: the action completed */
     }
     for (i = 0; i < NSLOT; i++) b |= sl[i].st;  /* after the loop: a Follow may sit below i */
@@ -559,8 +563,9 @@ void perf_poll16(void)
         for (s = 0; s < COUNT && s < 6; s++)
             if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }   /* a Footsw toggle marks the patch edited */
     }
-    if (since < 2) since++;
-    if (dirty && since >= 2) {      /* at most one redraw per 32 ms: a turn or a lag writes every poll */
+    if (since < 4) since++;
+    if (perf_on == 1) dirty = 0;    /* the play screen: its own 64 ms redraw (perf_poll) shows the new values */
+    else if (dirty && since >= 4) { /* elsewhere at most one redraw per 64 ms: a turn or a lag writes every poll */
         dirty = 0;
         since = 0;
         EVENT_POST(MAILBOX, 0x40);
