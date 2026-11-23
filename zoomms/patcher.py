@@ -15,6 +15,13 @@ Patch kinds supported so far:
         tests check the bytes still match it. Optional `stamp: {key: offset}`:
         16-byte "<key>" placeholders the build fills with text (version,
         commit, date, label: see `zoomms build --stamp`).
+    boot:      - model: ms70cdr-2.10  function: 5  expect: [...]  data: [...]
+               - model: ms70cdr-2.10  set: 0x01C14188  expect: 5  data: 0
+               - model: ms70cdr-2.10  jump: 0x...  expect: 0xC00DD800
+        Change the arguments of an AIS boot command (ROM function N, the SET
+        of a register, or the final jump address). `expect` is the full stock
+        argument list (or value); exactly one command must match. Note: Zoom's
+        bootloader skips function and SET commands in MAIN; only the jump runs.
     bin133:    - model: ms50g-3.10  offset: 0  expect_sha256: "..."  data: "hex"
         Overwrite bytes of updater part BIN/133 (the boot logo), not the OS.
         `expect_sha256` is the hash of the stock bytes being replaced, so no
@@ -27,6 +34,7 @@ with a clear message instead of silently doing nothing.
 from __future__ import annotations
 
 import hashlib
+import struct
 from pathlib import Path
 
 import yaml
@@ -100,9 +108,46 @@ def apply(img: ais.AisImage, patch: dict, build_id: str, stamp: dict | None = No
         except ais.AisError as e:
             raise PatchError(f"{patch['name']}: {e}") from e
         log.append(f"section 0x{sec['addr']:08X} {len(data)} B")
+    for b in patch.get("boot", []):
+        if b["model"] != build_id:
+            continue
+        log.append(_apply_boot(img, b, patch["name"]))
     if not log and not any(b["model"] == build_id for b in patch.get("bin133", [])):
         raise PatchError(f"{patch['name']}: nothing applied for {build_id}")
     return log
+
+
+def _apply_boot(img: ais.AisImage, b: dict, name: str) -> str:
+    """Rewrite the arguments of one AIS command in img.ops (what ais.build emits)."""
+    if "function" in b:
+        expect, data = list(b["expect"]), list(b["data"])
+        if len(expect) != len(data):
+            raise PatchError(f"{name}: boot function {b['function']}: expect and data differ in length")
+        head = struct.pack("<I", len(expect) << 16 | b["function"])
+        old, new = head + struct.pack(f"<{len(expect)}I", *expect), head + struct.pack(f"<{len(data)}I", *data)
+        op, what = ais.FUNCTION_EXECUTE, f"function {b['function']}"
+    elif "jump" in b:  # the entry address the bootloader jumps to
+        old, new = struct.pack("<I", b["expect"]), struct.pack("<I", b["jump"])
+        op, what = ais.JUMP_CLOSE, "jump"
+    else:  # SET: type, addr, value, delay; only the value changes
+        op, what = ais.SET, f"set 0x{b['set']:08X}"
+        old = new = None
+    hits = []
+    for i, (code, arg) in enumerate(img.ops):
+        if code != op:
+            continue
+        if old is not None and arg == old:
+            hits.append(i)
+        elif old is None and struct.unpack_from("<4I", arg)[1:3] == (b["set"], b["expect"]):
+            hits.append(i)
+            t, a, _, d = struct.unpack_from("<4I", arg)
+            new = struct.pack("<4I", t, a, b["data"], d)
+    if len(hits) != 1:
+        raise PatchError(f"{name}: boot {what} with the stock arguments found {len(hits)} times, expected 1")
+    img.ops[hits[0]] = (op, new)
+    if op == ais.JUMP_CLOSE:
+        img.entry = b["jump"]
+    return f"boot {what} changed"
 
 
 def apply_bin133(part: bytearray, patch: dict, build_id: str) -> list[str]:
