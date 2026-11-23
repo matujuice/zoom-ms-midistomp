@@ -196,6 +196,7 @@ static int now(const Tgt *t)
 
 static short fxw[6][11];        /* effect value waiting for the poll, -1 none */
 static int dirty;               /* redraw at the next poll */
+static int since = 2;           /* polls since that redraw, capped at 2 */
 
 /* A Perform move never marks the patch edited: a value that was saved moves its
  * saved copy too, so the dirty checks (stock IS_DIRTY, mixer.S dirty) still match.
@@ -558,8 +559,10 @@ void perf_poll16(void)
         for (s = 0; s < COUNT && s < 6; s++)
             if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }   /* a Footsw toggle marks the patch edited */
     }
-    if (dirty) {
+    if (since < 2) since++;
+    if (dirty && since >= 2) {      /* at most one redraw per 32 ms: a turn or a lag writes every poll */
         dirty = 0;
+        since = 0;
         EVENT_POST(MAILBOX, 0x40);
     }
     if (SCREEN == 11 && MODE == 11) perf_poll();
