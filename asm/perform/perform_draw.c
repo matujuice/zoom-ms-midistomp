@@ -14,6 +14,9 @@
 #define SVC(i) (*(volatile int *)(0xC00F3000u + 4 * (i)))   /* looper services block (docs/dev/looper-services.md) */
 #endif
 #define P ((volatile unsigned char *)LCD0)
+#ifndef FB_DIRTY
+#define FB_DIRTY (*(volatile unsigned char *)0xC00EEBB0)  /* bit = 8-row page to send */
+#endif
 /* fxid 497 as the patch stores it (effects pack extract_effect_db.py patch_id), gid bits masked */
 #define PEND_MS(t) ((int)udiv((unsigned)(t) * 75000u, perf_grid.bpm_x10 > 0 ? perf_grid.bpm_x10 : 1200))   /* perf_pending() is in 1/8 beat */
 #define SOFT_AWAY 0             /* 1: a cursor softkey is filled only while its target is away from default (the mockup's text); 0: always filled (its code) */
@@ -594,11 +597,25 @@ static void setup(void)
     }
 }
 
+/* Redraws every 64 ms (perform_keys.c), but sends the LCD only the 8-pixel rows that changed:
+ * a full send each time was the main cost of this screen. One hash a row (no room for a copy). */
+static unsigned rowhash(int r)
+{
+    unsigned h = 0x811C9DC5u;
+    int i;
+    for (i = r << 5; i < (r + 1) << 5; i++) h = (h ^ LCD0[i]) * 0x01000193u;
+    return h;
+}
+
 void perf_draw(void)
 {
+    static unsigned last[8];                     /* each row's hash as drawn last time */
+    unsigned pend = FB_DIRTY, ch = 0, h;         /* rows still waiting to be sent */
     int i;
+    for (i = 0; i < 8; i++) if (rowhash(i) != last[i]) ch |= 1u << i;   /* something else drew there */
     for (i = 0; i < 256; i++) LCD0[i] = 0;
     if (!perf_on) pu_scr = SC_MENU;
     if (perf_on != 1) setup(); else play();
-    LCD_DIRTY(0);
+    for (i = 0; i < 8; i++) if ((h = rowhash(i)) != last[i]) { ch |= 1u << i; last[i] = h; }
+    FB_DIRTY = (unsigned char)(pend | ch);       /* drop the primitives' marks for rows that came out the same */
 }

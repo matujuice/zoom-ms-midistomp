@@ -96,6 +96,7 @@ def states():
 HOST_H = r'''#ifndef PERF_HOST_H
 #define PERF_HOST_H
 extern unsigned char host_lcd[1024];
+unsigned char host_dirty;
 extern int host_count, host_posts, host_fx[6][2], host_svc[32], host_screen;
 extern const char *host_names[6];
 const char *host_desc(int, int);
@@ -106,6 +107,8 @@ int host_tab(int, int, int, int, const char *);
 void host_box(int, int, int, int, int);
 #define LCD0 ((volatile unsigned *)host_lcd)
 #define LCD_DIRTY(f) ((void)(f))
+extern unsigned char host_dirty;
+#define FB_DIRTY host_dirty
 #define COUNT host_count
 #define FX_REC(s) host_fx[s]
 #define DSP_OFF 0
