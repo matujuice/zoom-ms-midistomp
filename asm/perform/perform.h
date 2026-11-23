@@ -54,11 +54,17 @@
 /* ---- A move: four bytes ---------------------------------------------- *
  * bits 0-15  VALUE in the target's own units (an effect knob's own steps, a mixer level)
  * bits 16-20 NEXT 0-10 (table below), 31 = unused move (VALUE "-")
- * bits 21-24 LAG 0-15 (table below) */
+ * bits 21-24 LAG 0-15 (table below)
+ * bit  25    EVEN: 0 the usual ramp (round to the nearest step; the start and end steps each
+ *            get half the time of the steps in between); 1 equal time per step, including the
+ *            first and last, so the move's target value is reached and held for its own full
+ *            share rather than appearing only in the ramp's last instant. Bits 26-31 unused. */
 #define MV_VALUE(m) ((m) & 0xFFFF)
 #define MV_NEXT(m) ((m) >> 16 & 31)
 #define MV_LAG(m) ((m) >> 21 & 15)
+#define MV_EVEN(m) ((m) >> 25 & 1)
 #define MV(v, n, l) ((unsigned)((v) | (n) << 16 | (l) << 21))
+#define MV_E(v, n, l, e) ((unsigned)((v) | (n) << 16 | (l) << 21 | (e) << 25))
 #define MV_UNUSED MV(0, NX_UNUSED, 0)
 
 /* NEXT: 0 NOW; 1-4 = 1,2,4,8 BEAT; 5-10 = 1,2,4,8,16,32 BAR (v2.0 saved 11-16 = CYC: now 32 BAR).

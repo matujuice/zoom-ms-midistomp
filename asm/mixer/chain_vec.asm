@@ -6,7 +6,7 @@
         .global chain_key, chain_draw_h, chain_poll, s33_keys
         .global settings_key, settings_draw, settings_pack, settings_unpack
         .global engine_run, mix_get, mix_put, pages_key, pages_draw_h, ab_tag
-        .global r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw, idle_ev
+        .global perf_on, r50_load, r50_save, perf_poll16, perf_key, perf_draw, midi_key, midi_draw, idle_ev
         B       .S2     keys_e          ; +0  screen 3 key table entry
         NOP     5
         B       .S2     draw_e          ; +8  screen 3 draw table entry
@@ -104,12 +104,16 @@ perf_keys_e:                            ; perf_key is void: return through perf_
         B       .S1     ms_or
         MVKH    .S1     0xC010A010, A0
         NOP     4
-perf_kret:
+perf_kret:                              ; redraw = 0 on the play screen (its 64 ms poll redraws: a redraw per knob detent crackles), else 1
+        MVKL    .S1     perf_on, A1
+        MVKH    .S1     perf_on, A1
+        LDW     .D1T1   *A1, A1
         MVKL    .S2     0xC00A83C0, B3
         MVKH    .S2     0xC00A83C0, B3
         B       .S2     B3
-        MVK     .S1     1, A4
-        NOP     4
+        NOP     3
+        CMPEQ   .L1     1, A1, A4
+        XOR     .L1     1, A4, A4
 perf_draw_e:
         MVKL    .S2     0xC00A9404, B3
         MVKH    .S2     0xC00A9404, B3

@@ -86,6 +86,7 @@ def states():
     add("setup_gestures", screen="ges", ctl=1, ges=1, pos=1)
     add("setup_move", screen="move", ctl=1, ges=1, mv=1)
     add("setup_move_lag", screen="move", ctl=3, ges=1, mv=2)
+    add("setup_move_even", screen="move", ctl=3, ges=1, mv=2, pos=1)
     add("setup_module", screen="pmod", ctl=1, pos=2)
     add("setup_param", screen="ppar", ctl=0, pm=7, pos=0)
     return out
@@ -95,6 +96,7 @@ def states():
 HOST_H = r'''#ifndef PERF_HOST_H
 #define PERF_HOST_H
 extern unsigned char host_lcd[1024];
+unsigned char host_dirty;
 extern int host_count, host_posts, host_fx[6][2], host_svc[32], host_screen;
 extern const char *host_names[6];
 const char *host_desc(int, int);
@@ -105,6 +107,8 @@ int host_tab(int, int, int, int, const char *);
 void host_box(int, int, int, int, int);
 #define LCD0 ((volatile unsigned *)host_lcd)
 #define LCD_DIRTY(f) ((void)(f))
+extern unsigned char host_dirty;
+#define FB_DIRTY host_dirty
 #define COUNT host_count
 #define FX_REC(s) host_fx[s]
 #define DSP_OFF 0
@@ -305,6 +309,11 @@ static int keys(void)
     k(160, 1); op(); check("a move opens its knob page", pu_scr == 6 && pu_mv == M_PRESS_F);
     k(160, 1); m = perf_patch.move[1][M_PRESS_F]; check("knob 1 edits Value (unused -> 0)", MV_VALUE(m) == 0 && MV_NEXT(m) == NX_NOW);
     k(161, 2); k(162, 3); m = perf_patch.move[1][M_PRESS_F]; check("knobs 2 and 3 edit Next and Lag", MV_NEXT(m) == 2 && MV_LAG(m) == 3);
+    k(67, 1); check("knob 3 press steps to the Even page while Lag is set", pu_pos[6] == 1);
+    k(162, 1); m = perf_patch.move[1][M_PRESS_F]; check("knob 3 turn flips Even on that page, Lag unchanged", MV_EVEN(m) == 1 && MV_LAG(m) == 3);
+    k(67, 1); check("knob 3 press steps back to the Lag page", pu_pos[6] == 0);
+    k(162, -10); m = perf_patch.move[1][M_PRESS_F]; check("knob 3 turn edits Lag again there and keeps Even", MV_LAG(m) == 0 && MV_EVEN(m) == 1);
+    k(67, 1); check("knob 3 press does nothing once Lag is OFF", pu_pos[6] == 0);
     k(160, -1); m = perf_patch.move[1][M_PRESS_F]; check("Value back to -", MV_NEXT(m) == NX_UNUSED);
     k(65, 1); check("knob 2 goes back", pu_scr == 5);
     k(65, 1); k(65, 1); check("back to the top list", pu_scr == 0);

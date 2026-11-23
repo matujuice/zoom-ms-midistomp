@@ -14,6 +14,9 @@
 #define SVC(i) (*(volatile int *)(0xC00F3000u + 4 * (i)))   /* looper services block (docs/dev/looper-services.md) */
 #endif
 #define P ((volatile unsigned char *)LCD0)
+#ifndef FB_DIRTY
+#define FB_DIRTY (*(volatile unsigned char *)0xC00EEBB0)  /* bit = 8-row page to send */
+#endif
 /* fxid 497 as the patch stores it (effects pack extract_effect_db.py patch_id), gid bits masked */
 #define PEND_MS(t) ((int)udiv((unsigned)(t) * 75000u, perf_grid.bpm_x10 > 0 ? perf_grid.bpm_x10 : 1200))   /* perf_pending() is in 1/8 beat */
 #define SOFT_AWAY 0             /* 1: a cursor softkey is filled only while its target is away from default (the mockup's text); 0: always filled (its code) */
@@ -399,7 +402,7 @@ static void play(void)
         ctl(t, n, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
         nat_text(t, n, v); upper(v);
         small(v, 42 * i + 22 - ((softw(v) - 1) >> 1), 50);
-        if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 55);   /* a waiting move: the column fills when the loop bar fills */
+        if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 24);   /* a waiting move: its title blinks with the loop bar, a 1 px frame round the text (rows 12-24: 3 LCD pages to send, not 6) */
     }
     for (i = 0; i < 3; i++) {                    /* the cursor buttons: their arrow over a stock menu softkey (42 px pitch) with the target's name */
         t = perf_patch.target[3 + i];
@@ -547,10 +550,10 @@ static void list(const char *name, int n, int cur, int turn3)   /* stock list: t
     invert(86, 57, 125, 63);
 }
 
-static void move(void)                           /* a stock knob page: frame, tabs, Value in the target's own control, Next, Lag */
+static void move(void)                           /* a stock knob page: frame, tabs, Value, Next, and Lag (knob 3 press: a 2nd page swaps Lag for Even, only while Lag is set) */
 {
     unsigned m = *pd_move();
-    int t = *pd_tgt(), un = MV_NEXT(m) == NX_UNUSED, x = 0, k;
+    int t = *pd_tgt(), un = MV_NEXT(m) == NX_UNUSED, x = 0, k, lg = un ? 0 : MV_LAG(m), pg = pu_pos[SC_MOVE] && lg;
     char a[24], b[24];
     Par p;
     KP_BOX(0, 0, 11, 128, 53);
@@ -565,8 +568,8 @@ static void move(void)                           /* a stock knob page: frame, ta
     font7r(a, 8 + 30, 48);
     k = un ? 0 : MV_NEXT(m) < NX_N ? MV_NEXT(m) : NX_N - 1;
     font7("Next", 48, 16); KP_KNOB(0, KP_DIVD(k, NX_N - 1), 48, 24); font7r(WHEN[k], 48 + 30, 48);
-    k = un ? 0 : MV_LAG(m);
-    font7("Lag", 88, 16); KP_KNOB(0, KP_DIVD(k, LG_N - 1), 88, 24); font7r(LAG[k], 88 + 30, 48);
+    if (pg) { font7("Even", 88, 16); KP_TOGGLE(0, MV_EVEN(m), 88, 24); font7r(MV_EVEN(m) ? "ON" : "OFF", 88 + 30, 48); }
+    else { font7("Lag", 88, 16); KP_KNOB(0, KP_DIVD(lg, LG_N - 1), 88, 24); font7r(LAG[lg], 88 + 30, 48); }
     invert(5, 57, 41, 63);                       /* softkey40: nothing, EXIT, nothing */
     softtext("EXIT", 45 + 18 - 8); invert(45, 57, 81, 63);
     invert(85, 57, 121, 63);
@@ -594,11 +597,25 @@ static void setup(void)
     }
 }
 
+/* Redraws every 64 ms (perform_keys.c), but sends the LCD only the 8-pixel rows that changed:
+ * a full send each time was the main cost of this screen. One hash a row (no room for a copy). */
+static unsigned rowhash(int r)
+{
+    unsigned h = 0x811C9DC5u;
+    int i;
+    for (i = r << 5; i < (r + 1) << 5; i++) h = (h ^ LCD0[i]) * 0x01000193u;
+    return h;
+}
+
 void perf_draw(void)
 {
+    static unsigned last[8];                     /* each row's hash as drawn last time */
+    unsigned pend = FB_DIRTY, ch = 0, h;         /* rows still waiting to be sent */
     int i;
+    for (i = 0; i < 8; i++) if (rowhash(i) != last[i]) ch |= 1u << i;   /* something else drew there */
     for (i = 0; i < 256; i++) LCD0[i] = 0;
     if (!perf_on) pu_scr = SC_MENU;
     if (perf_on != 1) setup(); else play();
-    LCD_DIRTY(0);
+    for (i = 0; i < 8; i++) if ((h = rowhash(i)) != last[i]) { ch |= 1u << i; last[i] = h; }
+    FB_DIRTY = (unsigned char)(pend | ch);       /* drop the primitives' marks for rows that came out the same */
 }

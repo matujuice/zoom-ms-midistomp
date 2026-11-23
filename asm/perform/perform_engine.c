@@ -42,6 +42,8 @@
 #define FX_SET_PARAM FN(0xC00BB600, int, (int slot, int param, int value, int b6, int a8))
 #define FX_DESC FN(0xC00B056C, const int *, (int slot, int param))
 #define MAXES ((const volatile unsigned char *)(MIXER_BASE + 296))
+#define SAVED ((volatile unsigned char *)(MIXER_BASE + 248))   /* mixer settings as last saved */
+#define FX_SAVED(s) ((volatile int *)(0xC009C07C + 44 * (s)))  /* stock patch as last saved (IS_DIRTY) */
 
 extern __cregister volatile unsigned int CSR;
 #define DINT unsigned csr_ = CSR; CSR = csr_ & ~1u
@@ -86,7 +88,7 @@ static int len(int n)           /* NEXT in units; 0 = NOW */
     return 32 << ((n < NX_N ? n : NX_N - 1) - NX_BAR);   /* a v2.0 CYC value: 32 bars */
 }
 
-static void grid(void)
+static void grid(float n)       /* n: the blocks since the last call */
 {
     volatile const unsigned *w = ZT;
     unsigned t, q, ok = 0, rn = 0, starts = 0, clocks = 0, r, mk, k;
@@ -118,7 +120,7 @@ static void grid(void)
         if (clocks == 0) { g.clk = 0; g.sub = 0.0f; g.du = 0.0f; g.gf = 0.999f; }  /* waiting for clock 1 */
         else {
             if (clocks != g.clk || start) g.sub = 0.0f;
-            else if ((g.sub += g.bpm * 7.2562358e-5f) > 0.999f) g.sub = 0.999f;
+            else if ((g.sub += g.bpm * 7.2562358e-5f * n) > 0.999f) g.sub = 0.999f;
             g.clk = clocks;
             if (clocks != g.rc || start) {
                 r = clocks - 1;         /* r = that mod 2304, wraps = the 96-beat turns: right after the grid sat out */
@@ -139,7 +141,7 @@ static void grid(void)
         g.gu = 0; g.gf = 0.0f; g.anchor = 1;            /* then the first footswitch press */
     }
     g.was_on = perf_on != 0;
-    g.gf += g.du;
+    g.gf += g.du * n;
     while (g.gf >= 1.0f) { g.gf -= 1.0f; g.gu++; }
     perf_grid.beat = g.gu < 0 ? -1 : g.gu >> 3;
     perf_grid.frac = g.gu < 0 ? 0 : (int)(((float)(g.gu & 7) + g.gf) * 8191.875f);
@@ -194,6 +196,16 @@ static int now(const Tgt *t)
 
 static short fxw[6][11];        /* effect value waiting for the poll, -1 none */
 static int dirty;               /* redraw at the next poll */
+static int since = 4;           /* polls since that redraw, capped at 4 */
+
+/* A Perform move never marks the patch edited: a value that was saved moves its
+ * saved copy too, so the dirty checks (stock IS_DIRTY, mixer.S dirty) still match.
+ * A value the player had already edited stays edited. */
+static void live_set(int a, int v)
+{
+    if (SAVED[a] == LIVE[a]) SAVED[a] = v;
+    LIVE[a] = v;
+}
 
 static void put(const Tgt *t, int v)
 {
@@ -201,25 +213,36 @@ static void put(const Tgt *t, int v)
     if (v > t->max) v = t->max;
     if (t->k == K_MIX) {
         if (LIVE[t->a] != v) dirty = 1;
-        LIVE[t->a] = v;                         /* mirrors as mixer.S cc */
-        if (t->a == S_IN && eff_mode() != 2) LIVE[S_INR] = v;
-        if (t->a == S_MASTER && LIVE[S_OUT] != 2) LIVE[S_MR] = v;
+        live_set(t->a, v);                      /* mirrors as mixer.S cc */
+        if (t->a == S_IN && eff_mode() != 2) live_set(S_INR, v);
+        if (t->a == S_MASTER && LIVE[S_OUT] != 2) live_set(S_MR, v);
     } else if (t->k == K_FX && FX_REC(t->a)[t->b] != v)
         fxw[t->a][t->b] = v;
 }
 
 /* The waiting effect writes, from the 16 ms poll with interrupts on, under the
- * effect-edit lock as midi_cc handler.S. A load or swap running: next poll. */
+ * effect-edit lock as midi_cc handler.S. A load or swap running: next poll.
+ * Knobs of one effect slot per poll, round robin (on / off always at once): lags
+ * on several effects all wait in the same poll, and written together their
+ * coefficient maths (DJFilter, Washout) lands in the same audio block every 48 ms,
+ * which crackled a full chain. 16 ms apart, the busy blocks no longer stack. */
 static void fx_flush(void)
 {
-    int s, p, v;
-    for (s = 0; s < 6; s++)
-        for (p = 0; p < 11; p++) {
+    static int rr;
+    int i, s, p, v, done = -1;
+    for (i = 0; i < 6; i++)
+        for (s = rr + i < 6 ? rr + i : rr + i - 6, p = 0; p < 11; p++) {
             if ((v = fxw[s][p]) < 0) continue;
             if (p == 1 || s >= COUNT || FX_REC(s)[p] == v) { fxw[s][p] = -1; continue; }   /* never the effect type */
             if (LOADING || FX_TABLE[s] == FX_MUTE) continue;
+            if (p && done >= 0 && done != s) continue;
+            if (p) done = s;
             SEM_PEND(SEM_FX, -1);
-            FX_SET_PARAM(s, p, v, 0, 1);
+            {
+                int clean = FX_SAVED(s)[p] == FX_REC(s)[p];
+                FX_SET_PARAM(s, p, v, 0, 1);
+                if (clean) FX_SAVED(s)[p] = FX_REC(s)[p];
+            }
             SEM_POST(SEM_FX);
             dirty = 1;
             {
@@ -228,6 +251,7 @@ static void fx_flush(void)
                 RINT;
             }
         }
+    if (done >= 0) rr = done < 5 ? done + 1 : 0;
 }
 
 /* ---- Moves -------------------------------------------------------------- */
@@ -236,7 +260,7 @@ static void fx_flush(void)
 #define F_LAG 2                 /* ramps from -> to */
 
 typedef struct {
-    unsigned char st, ctl, t, lag, tf;   /* tf: a Turn's Follow */
+    unsigned char st, ctl, t, lag, tf, even;   /* tf: a Turn's Follow; even: MV_EVEN(mv) */
     unsigned mv, fol;           /* fol: the Follow scheduled when this lands */
     int due;
     Tgt x;                      /* the target, from land: no descriptor call a block while it lags */
@@ -245,6 +269,8 @@ typedef struct {
 
 static Slot sl[NSLOT];
 static volatile int busy;       /* a move waits or lags (wait sets it, tick clears it) */
+static volatile int land_in;    /* blocks until the block checks the waits again, 0 = it does not */
+static int w_near;              /* perf_poll16: 8 while a wait is due within the next grid step, else 0 */
 
 static const float LAGK[LG_N] = {           /* per block: 1 / blocks (ms), 1 / units (beats, bars) */
     0, 1 / (5 * BLK_MS), 1 / (50 * BLK_MS), 1 / (100 * BLK_MS), 1 / (500 * BLK_MS), 1 / (1000 * BLK_MS),
@@ -265,7 +291,8 @@ static Slot *wait(int ctl, int t, unsigned mv, unsigned fol, int due)
     Slot *s;
     if (MV_NEXT(mv) == NX_UNUSED || !(s = slot_new())) return 0;
     s->st = F_WAIT; s->ctl = ctl; s->t = t; s->mv = mv; s->fol = fol; s->due = due; s->tf = 0;
-    busy = 1;
+    busy |= F_WAIT;
+    land_in = 1;                /* the next block checks it (a NOW move lands); later, perf_poll16 arms it near its step */
     return s;
 }
 
@@ -302,23 +329,48 @@ static void land(Slot *s)
         if (sl[i].st == F_LAG && sl[i].t == s->t) sl[i].st = F_FREE;
     v = MV_VALUE(s->mv);
     s->lag = MV_LAG(s->mv);
+    s->even = MV_EVEN(s->mv);
     if (t.k == K_NONE || s->lag == LG_OFF) { follow(s, s->due); put(&t, v); s->st = F_FREE; return; }
     s->x = t;
     s->st = F_LAG; s->from = (float)now(&t); s->to = (float)v; s->pos = 0.0f;
 }
 
+/* EVEN: split the ramp into exactly as many equal-width slices as there are steps from `from`
+ * to `to`, so every step (the first and the last included) is held for the same share of the
+ * Lag, instead of the usual round-to-nearest ramp (where the two end steps get only half the
+ * middle ones' time). The slice for `from` itself is never held: as soon as pos leaves 0 the
+ * value is already the first step on from `to`, so a build started from OFF reaches its first
+ * active step (almost) at once. */
+static int ramp_value(Slot *s)
+{
+    float d, ad, pn; int dir, steps, k;
+    if (!s->even) return (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
+    d = s->to - s->from; ad = d < 0 ? -d : d; dir = d < 0 ? -1 : 1;
+    steps = (int)(ad + 0.5f);
+    if (!steps) return (int)s->from;
+    pn = s->pos * steps;
+    k = (int)pn;
+    if (pn > (float)k) k++;                     /* ceil: `from`'s own slice has zero width */
+    if (k > steps) k = steps;
+    return (int)s->from + dir * k;
+}
+
+#define FX_LAG_BLKS 265             /* a lag writes an effect knob every 48 ms (stock edit maths each time); mixer targets every block */
+
 static void tick(void)
 {
-    int i, n, b = 0;
+    static int fxblk;
+    int i, n, b = 0, fxnow = ++fxblk >= FX_LAG_BLKS;
     Slot *s;
+    if (fxnow) fxblk = 0;
     for (i = 0; i < NSLOT; i++) {
         s = &sl[i];
         if (s->st == F_WAIT && g.gu >= s->due) land(s);
         if (s->st != F_LAG) continue;
         s->pos += s->lag < 6 ? LAGK[s->lag] : LAGK[s->lag] * g.du;
         if (s->pos >= 1.0f) s->pos = 1.0f;
-        n = (int)(s->from + (s->to - s->from) * s->pos + 0.5f);
-        put(&s->x, n);                          /* every block: Perform wins over a CC */
+        n = ramp_value(s);
+        if (fxnow || s->x.k != K_FX || s->pos >= 1.0f) put(&s->x, n);   /* Perform wins over a CC; the last value always lands */
         if (s->pos >= 1.0f) { follow(s, g.gu); s->st = F_FREE; }   /* the lag done: the action completed */
     }
     for (i = 0; i < NSLOT; i++) b |= sl[i].st;  /* after the loop: a Follow may sit below i */
@@ -456,6 +508,8 @@ static void led(void)
 /* ---- Audio block and poll ------------------------------------------------ */
 static int need_load = 1;
 
+static int nb;                  /* blocks since the last grid() */
+
 void perf_block(void)
 {
     int p = CUR_PATCH;
@@ -468,8 +522,12 @@ void perf_block(void)
         g.was_on = 0;
         return;
     }
-    grid();
-    if (busy) tick();           /* nothing waits or lags: no slot loop (wait sets busy) */
+    nb++;                       /* no lag: perf_poll16 runs the grid and arms land_in near a wait */
+    if (busy & F_LAG || (land_in && !--land_in)) {
+        if (nb >= 8 || !(busy & F_LAG)) { grid((float)nb); nb = 0; }   /* a lag: the grid every 8th block (1.5 ms) */
+        tick();
+        land_in = w_near;       /* near a wait's step: every 8th block (lands up to 1.5 ms late) until the next poll */
+    }
     led();
 }
 
@@ -512,6 +570,15 @@ void perf_poll16(void)
         led_x = x;
         RINT;
     }
+    if ((perf_on || busy) && !(busy & F_LAG)) {   /* the grid out of the audio block: its code missing the cache there crackled a full chain */
+        DINT;
+        grid((float)nb);
+        nb = 0;
+        w_near = 0;
+        for (s = 0; s < NSLOT; s++)     /* ponytail: "near" is up to 2 grid steps (1/4 beat) of every-8th-block checks; count blocks if that still crackles */
+            if (sl[s].st == F_WAIT && sl[s].due - g.gu <= 1) w_near = 8, land_in = 1;
+        RINT;
+    }
     fx_flush();
     if (ftsw_q) {               /* Footsw on a regular effect: the stock footswitch press, in this task */
         DINT;
@@ -520,10 +587,13 @@ void perf_poll16(void)
         RINT;
         dirty = 1;                  /* the knob column shows the new state */
         for (s = 0; s < COUNT && s < 6; s++)
-            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }
+            if (pass >> s & 1 && !(DSP_OFF >> s & 1)) { FX_TOGGLE(s); FX_EDITED(); }   /* a Footsw toggle marks the patch edited */
     }
-    if (dirty) {
+    if (since < 4) since++;
+    if (perf_on == 1) dirty = 0;    /* the play screen: its own 64 ms redraw (perf_poll) shows the new values */
+    else if (dirty && since >= 4) { /* elsewhere at most one redraw per 64 ms: a turn or a lag writes every poll */
         dirty = 0;
+        since = 0;
         EVENT_POST(MAILBOX, 0x40);
     }
     if (SCREEN == 11 && MODE == 11) perf_poll();
