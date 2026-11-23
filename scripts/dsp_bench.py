@@ -213,14 +213,17 @@ class Log:
 
 
 def watch(pedal, log, seconds, test="watch"):
+    """one reading every 3 s: polling 4x a second adds ~22% late blocks; the timing stops 4 s after the last 06"""
     end = time.monotonic() + seconds
+    r = pedal.window(1)
     while True:
-        r = pedal.window(1)
         log.add(test, "chain", "", "", "", r)
         if r:
             print("    audio %5d max %5d late %d late total %d" % (r["ch"], r["chmax"], r["late"], r["late_total"]))
         if pedal.dry or time.monotonic() > end:
             return
+        time.sleep(3)
+        r = pedal.bench()
 
 
 def main(argv=None):
