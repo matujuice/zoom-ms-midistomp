@@ -27,7 +27,7 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V2.0.4"
+NAME = "MIDISTOMP V2.0.4.1"
 BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "pc-force-reload", "sysex-fx-slots", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
@@ -37,11 +37,12 @@ OUT_NAME_OC_MAC = "MIDISTOMP V2.0 Updater (360MHz OC).app"
 
 
 def identity_tag(name: str = NAME) -> str:
-    """The identity reply's 4 version bytes: "M" + the version digits ("V2.0.1" -> "M201")."""
+    """The identity reply's 4 version bytes: "M" + the version digits ("V2.0.1" -> "M201").
+    A 4th fix number (V2.0.4.1) keeps x.y.z's tag: a fix changes nothing editors read."""
     digits = "".join(re.findall(r"\d", name.rsplit("V", 1)[-1]))
-    if len(digits) != 3:
+    if len(digits) not in (3, 4):
         raise ValueError(f"{name}: the identity tag needs a 3-digit version (x.y.z, one digit each)")
-    return "M" + digits
+    return "M" + digits[:3]
 
 
 def build(updater: Path, out: Path, mac: bool = False, cpu: str | None = None) -> int:
