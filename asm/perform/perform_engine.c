@@ -269,6 +269,8 @@ typedef struct {
 
 static Slot sl[NSLOT];
 static volatile int busy;       /* a move waits or lags (wait sets it, tick clears it) */
+static volatile int land_in;    /* blocks until the block checks the waits again, 0 = it does not */
+static int w_near;              /* perf_poll16: 8 while a wait is due within the next grid step, else 0 */
 
 static const float LAGK[LG_N] = {           /* per block: 1 / blocks (ms), 1 / units (beats, bars) */
     0, 1 / (5 * BLK_MS), 1 / (50 * BLK_MS), 1 / (100 * BLK_MS), 1 / (500 * BLK_MS), 1 / (1000 * BLK_MS),
@@ -289,7 +291,8 @@ static Slot *wait(int ctl, int t, unsigned mv, unsigned fol, int due)
     Slot *s;
     if (MV_NEXT(mv) == NX_UNUSED || !(s = slot_new())) return 0;
     s->st = F_WAIT; s->ctl = ctl; s->t = t; s->mv = mv; s->fol = fol; s->due = due; s->tf = 0;
-    busy = 1;
+    busy |= F_WAIT;
+    land_in = 1;                /* the next block checks it (a NOW move lands); later, perf_poll16 arms it near its step */
     return s;
 }
 
@@ -519,12 +522,12 @@ void perf_block(void)
         g.was_on = 0;
         return;
     }
-    nb++;
-    if (busy) {                 /* nothing waits or lags: the grid only feeds the screen, perf_poll16 runs it */
-        grid((float)nb);
-        nb = 0;
+    nb++;                       /* no lag: perf_poll16 runs the grid and arms land_in near a wait */
+    if (busy & F_LAG || (land_in && !--land_in)) {
+        if (nb >= 8 || !(busy & F_LAG)) { grid((float)nb); nb = 0; }   /* a lag: the grid every 8th block (1.5 ms) */
+        tick();
+        land_in = w_near;       /* near a wait's step: every 8th block (lands up to 1.5 ms late) until the next poll */
     }
-    if (busy) tick();           /* nothing waits or lags: no slot loop (wait sets busy) */
     led();
 }
 
@@ -567,10 +570,13 @@ void perf_poll16(void)
         led_x = x;
         RINT;
     }
-    if (perf_on && !busy) {     /* the grid for the screen, out of the audio block: its code missing the cache each block crackled a full chain */
+    if ((perf_on || busy) && !(busy & F_LAG)) {   /* the grid out of the audio block: its code missing the cache there crackled a full chain */
         DINT;
-        grid((float)nb);        /* busy set meanwhile: the next block runs it with n 0, harmless */
+        grid((float)nb);
         nb = 0;
+        w_near = 0;
+        for (s = 0; s < NSLOT; s++)     /* ponytail: "near" is up to 2 grid steps (1/4 beat) of every-8th-block checks; count blocks if that still crackles */
+            if (sl[s].st == F_WAIT && sl[s].due - g.gu <= 1) w_near = 8, land_in = 1;
         RINT;
     }
     fx_flush();
