@@ -12,7 +12,7 @@ MS-70CDR product shots.</sub>
 New to MIDISTOMP? Read 1 to 3 in order, then jump to what you want to play with.
 
 1. [Overview](#1-overview): what 2.0 adds and which pedals it runs on
-2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [On Linux](#on-linux) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
+2. [Install and recovery](#2-install-and-recovery): [Windows](#2-install-and-recovery) · [On a Mac](#on-a-mac) · [On Linux](#on-linux) · [Overclock, opt-in: 360 MHz](#overclock-opt-in-360-mhz) · [Recovery and going back to stock](#recovery-and-going-back-to-stock)
 3. [Getting around](#3-getting-around): [The keys](#the-keys) · [Button combos and scrolling](#button-combos-and-scrolling) · [The MENU](#the-menu)
 4. [EFFECT CHAIN ROUTING](#4-effect-chain-routing): [Moving around](#moving-around) · [Routing modes](#routing-modes) · [Node knob pages](#node-knob-pages) · [Safety limiter](#safety-limiter) · [Saving](#saving)
 5. [PERFORM MODE](#5-perform-mode): [Getting in and out](#getting-in-and-out) · [The screen](#the-screen) · [Gestures](#gestures) · [Value, Next, Lag](#every-move-value-next-lag) · [SETUP](#setup) · [LOOPER menu](#the-looper-menu) · [Example](#example-a-transition)
@@ -74,8 +74,9 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
 3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
    and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
-   window for a moment and writes a new file, **MIDISTOMP V2.0 Updater.exe**, in the same folder. It refuses any
-   other file, so a wrong download can't produce a broken updater.
+   window for a moment and writes two new files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock —
+   use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).exe** (see [Overclock](#overclock-opt-in-360-mhz)). It
+   refuses any file that is not Zoom's original, so a wrong download can't produce a broken updater.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
    power jack): the pedal shows the update screen.
@@ -109,8 +110,9 @@ flashed to an MS-50G from an Apple Silicon Mac.
 3. Double-click **MIDISTOMP-builder-Mac-…**. It is not notarized, so the first time macOS refuses it: open System
    Settings > Privacy & Security, click **Open Anyway** next to it, and double-click it again.
 4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
-   Enter. It writes **MIDISTOMP V2.0 Updater.app** next to Zoom's app and signs it for your Mac. It refuses anything
-   that is not Zoom's original.
+   Enter. It writes two apps next to Zoom's app and signs them for your Mac: **MIDISTOMP V2.0 Updater.app** (stock
+   clock — use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).app** (see [Overclock](#overclock-opt-in-360-mhz)).
+   It refuses anything that is not Zoom's original.
 5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0 Updater.app**. It is
    an Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to install it). Its window reads
    **MIDISTOMP V2.0 Updater**; click Execute.
@@ -124,8 +126,8 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
 ```
 
-It writes and signs **MIDISTOMP V2.0 Updater.app** the same way. If signing fails, it prints the two Terminal lines
-(`xattr -cr` and `codesign --force --deep --sign -`) to run on the app yourself.
+It writes and signs both updater apps the same way. If signing fails, it prints the two Terminal lines
+(`xattr -cr` and `codesign --force --deep --sign -`) to run on each app yourself.
 
 After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
 Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover
@@ -142,8 +144,16 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
 ```
 
-It writes **MIDISTOMP V2.0 Updater.exe** next to Zoom's updater. Running the updaters under Wine, or in a virtual
-machine with USB passed through, is not tested.
+It writes both **MIDISTOMP V2.0 Updater.exe** and **MIDISTOMP V2.0 Updater (360MHz OC).exe** next to Zoom's updater.
+Running the updaters under Wine, or in a virtual machine with USB passed through, is not tested.
+
+### Overclock, opt-in: 360 MHz
+
+The builder also writes a second updater that runs the pedal's DSP at 360 MHz instead of the stock 300 MHz, for more
+headroom in a heavy chain. It's off by default and not for every pedal: flash it only on a pedal you've tested at
+that clock, or are willing to test yourself. So far it's been run on an MS-70CDR and an MS-60B with no issues.
+Everything else about the two updaters is identical — same patches, same effects, same recovery steps. If a pedal
+doesn't boot at 360 MHz, enter update mode and run the stock-clock updater (or Zoom's original) instead.
 
 ### Recovery and going back to stock
 
@@ -585,7 +595,7 @@ SETTINGS > **MIDI** (the last row):
 Settings are kept after power-off. Clock, Start and Stop have no channel, so MIDI CHANNEL never filters them.
 
 **Program Change** loads a patch: with START NO. 1, PC 1 = patch 1 … PC 50 = patch 50. With START NO. 0, PC 0 =
-patch 1.
+patch 1. Resending the current patch's number always reloads it exactly as saved, dropping any unsaved knob tweaks.
 
 **Control Change** turns effects on and off and moves knobs and routing controls (chart below). The screen follows.
 
