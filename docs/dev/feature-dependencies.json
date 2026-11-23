@@ -1,0 +1,24 @@
+{
+  "firmware": "ms70cdr-2.10",
+  "release": "MIDISTOMP V2.0.3",
+  "doc": "docs/dev/feature-dependencies.md",
+  "order": ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll",
+            "looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "pc-force-reload", "identity-tag"],
+  "patches": {
+    "version-2.0": {"needs": [], "optional": []},
+    "boot-logo": {"needs": [], "optional": []},
+    "midi-cc": {"needs": [], "optional": []},
+    "midi-clock": {"needs": [], "optional": []},
+    "midi-settings": {"needs": ["midi-cc", "midi-clock"], "optional": []},
+    "tempo-hold": {"needs": [], "optional": []},
+    "scroll": {"needs": [], "optional": []},
+    "looper": {"needs": ["midi-cc", "midi-clock", "tempo-hold"], "optional": []},
+    "mixer-m2": {"needs": ["midi-cc", "midi-clock", "midi-settings"], "optional": ["looper"]},
+    "diag": {"needs": ["midi-clock", "midi-settings"], "optional": []},
+    "dsp-limit": {"needs": [], "optional": []},
+    "fx-category": {"needs": [], "optional": []},
+    "pc-force-reload": {"needs": [], "optional": []},
+    "identity-tag": {"needs": [], "optional": []}
+  },
+  "base": ["midi-cc", "midi-clock", "midi-settings"]
+}
