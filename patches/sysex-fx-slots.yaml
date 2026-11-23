@@ -1,0 +1,19 @@
+# SysEx 0x31 edits reach all six effect slots (issue #72). MS-70CDR 2.10 OS.
+# The 0x31 handler sends slot bytes 0-2 to the effect-edit path at 0xC00AEBC6
+# (on/off: compares the patch's on/off word at 0xC009BF58 + slot*44; knobs:
+# Semaphore_pend, fx_set_param(slot, param, value, 0, 1) 0xC00BB600, post) and
+# every other byte to 0xC00AEBA0, where byte 4 edits a patch-name character
+# (0xC00C058C) and 3, 5+ are ignored. Raising the limit to 5 sends 0-5 to the
+# effect path, the one the CC handler already uses for all six slots.
+# Trade-off: the SysEx patch-name edit (byte 4) stops working; editors rename
+# by writing the whole patch (0x28). Byte 3 now edits effect 4 instead of being
+# ignored (the pedal sends 31 03 08/09 for its tempo, only outbound).
+name: sysex-fx-slots
+description: SysEx parameter edits (0x31) work on all six effects, not only the first three
+builds: [ms70cdr-2.10]
+write:
+  # cmpltu .L2 2,b4,b0 (0x00104BDA) -> cmpltu .L2 5,b4,b0 (0x0010ABDA): ucst5, bits 13-17; little-endian bytes
+  - model: ms70cdr-2.10
+    addr: 0xC00AEB94
+    expect: "da4b1000"
+    data: "daab1000"
