@@ -457,7 +457,7 @@ function drawPlay() {   // custom screen, built from the stock pieces
     mid(lab(c.tgt).toUpperCase(), 19);
     drawCtl(c.tgt, v, x, { fader: 25, toggle: 24, trig: 24 }[par(c.tgt).t] ?? 27);
     mid(String(valTxt(c.tgt, v)).toUpperCase(), 50);
-    if (pendAt(c) !== Infinity && shown(c)) invert(40 * i + 5, 12, 40 * i + 41, 23);   // a waiting move: its title blinks with the loop bar
+    if (pendAt(c) !== Infinity && shown(c)) invert(40 * i + 5, 12, 40 * i + 41, 24);   // a waiting move: its title blinks with the loop bar
   });
   // the cursor buttons: their arrow over a stock knob-page softkey with the target's name.
   // A waiting move blinks it between the filled box and just the arrow and name.
