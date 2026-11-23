@@ -32,6 +32,8 @@ BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "t
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
 OUT_NAME_MAC = "MIDISTOMP V2.0 Updater.app"
+OUT_NAME_OC = "MIDISTOMP V2.0 Updater (360MHz OC).exe"
+OUT_NAME_OC_MAC = "MIDISTOMP V2.0 Updater (360MHz OC).app"
 
 
 def identity_tag(name: str = NAME) -> str:
@@ -101,27 +103,35 @@ def run(args: list[str]) -> int:
         print(f"{updater.name} is not Zoom's official MS-70CDR v2.10 updater.\n"
               f"sha256 {got}\nexpected {want}\nNothing was written.")
         return 1
-    out = updater.with_name(OUT_NAME_MAC if mac else OUT_NAME)
-    if mac and out.exists():
-        print(f"{out} already exists; move it away first. Nothing was written.")
-        return 1
-    try:
-        failed = build(updater, out, mac)
-    except ValueError as e:
-        print(f"error: {e}")
-        failed = 1
-    if failed:
-        print("Build failed, nothing usable was written.")
-        return 1
-    if mac:
-        sign = f'  xattr -cr "{out}"\n  codesign --force --deep --sign - "{out}"'
-        if sys.platform != "darwin":
-            print(f"\nOn the Mac, sign it before opening it:\n{sign}")
-        elif sign_for_this_mac(out):
-            print(f"\nSigned {out.name} for this Mac.")
-        else:
-            print(f"\nCould not sign it. In Terminal run:\n{sign}")
-    print(f"\nDone: {out}\nFlash it in update mode (see the MIDISTOMP user guide).")
+    # Two files from one drag: stock 300 MHz, and an opt-in 360 MHz overclock
+    # build for pedals that have been tested at that clock (70CDR, 60B).
+    builds = [(updater.with_name(OUT_NAME_MAC if mac else OUT_NAME), None),
+              (updater.with_name(OUT_NAME_OC_MAC if mac else OUT_NAME_OC), "360f")]
+    for out, cpu in builds:
+        if mac and out.exists():
+            print(f"{out} already exists; move it away first. Nothing was written.")
+            return 1
+    done = []
+    for out, cpu in builds:
+        try:
+            failed = build(updater, out, mac, cpu)
+        except ValueError as e:
+            print(f"error: {e}")
+            failed = 1
+        if failed:
+            print("Build failed, nothing usable was written.")
+            return 1
+        if mac:
+            sign = f'  xattr -cr "{out}"\n  codesign --force --deep --sign - "{out}"'
+            if sys.platform != "darwin":
+                print(f"\nOn the Mac, sign it before opening it:\n{sign}")
+            elif sign_for_this_mac(out):
+                print(f"\nSigned {out.name} for this Mac.")
+            else:
+                print(f"\nCould not sign it. In Terminal run:\n{sign}")
+        done.append(out)
+    print(f"\nDone: {done[0]}\nAlso built: {done[1]} (360 MHz overclock, only on a pedal tested at that clock)"
+          "\nFlash the one you want in update mode (see the MIDISTOMP user guide).")
     return 0
 
 
