@@ -1,0 +1,17 @@
+# Program Change always reloads the saved patch (issue #68). MS-70CDR 2.10 OS.
+# Stock midi_channel_msg (0xC00ADF20) loads a PC through 0xC00B8A74(new, old, 0)
+# with old = the current patch (B14+324). With old != -1 the loader
+# (0xC00B88E4) first saves the live patch into old's flash record when it
+# differs from the saved copy, so a PC to the same patch saved the edits and
+# reloaded them. Passing old = -1, as the prompt (B14+340) path right below
+# already does, skips that save: the patch comes back from flash as saved.
+# Also covers the CC 80/81 step and PROG CH START paths, which enter as a PC.
+name: pc-force-reload
+description: Program Change reloads the patch as saved, dropping unsaved edits
+builds: [ms70cdr-2.10]
+write:
+  # callp 0xC00B8A74 || mv .L2 b1,b4 -> || mvk .L2 -1,b4 (compact, same packet header)
+  - model: ms70cdr-2.10
+    addr: 0xC00ADF90
+    expect: "c780"
+    data: "27fe"

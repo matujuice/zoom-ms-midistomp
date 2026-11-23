@@ -29,7 +29,7 @@ from zoomms import cli, macapp, models
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 NAME = "MIDISTOMP V2.0.3"
 BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
-PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
+PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "pc-force-reload", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
 OUT_NAME_MAC = "MIDISTOMP V2.0 Updater.app"
 OUT_NAME_OC = "MIDISTOMP V2.0 Updater (360MHz OC).exe"
