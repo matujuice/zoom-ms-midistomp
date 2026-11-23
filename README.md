@@ -199,9 +199,8 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
   pitfalls, and the write-up on the MS-series' DSP power sag under input-impedance load that's behind the 360 MHz
   overclock.
 - Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
-- Issue reports and ideas behind this release: [Andrhodes](https://github.com/Andrhodes) (Program Change reload, #68),
-  [grungebit-exe](https://github.com/grungebit-exe) (the digital whine write-up, #67), and Roman Rusinov (themanro)
-  again for the SysEx slot-routing report (#72).
+- Issue reports and ideas behind this release: [Andrhodes](https://github.com/Andrhodes) (Program Change reload, #68)
+  and Roman Rusinov (themanro) again for the SysEx slot-routing report (#72).
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 
