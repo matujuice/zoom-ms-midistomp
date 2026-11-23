@@ -402,7 +402,7 @@ static void play(void)
         ctl(t, n, 42 * i + 7, p.look == FADER ? 25 : p.look == KNOB ? 27 : 24);
         nat_text(t, n, v); upper(v);
         small(v, 42 * i + 22 - ((softw(v) - 1) >> 1), 50);
-        if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 55);   /* a waiting move: the column fills when the loop bar fills */
+        if (perf_pending(i) >= 0 && shown(i)) invert(42 * i + 2, 12, 42 * i + 41, 23);   /* a waiting move: its title blinks with the loop bar (rows 12-23: 2 LCD pages to send, not 6) */
     }
     for (i = 0; i < 3; i++) {                    /* the cursor buttons: their arrow over a stock menu softkey (42 px pitch) with the target's name */
         t = perf_patch.target[3 + i];
