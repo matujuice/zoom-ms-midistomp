@@ -49,6 +49,7 @@ def test_ask_path_reads_a_dragged_mac_path(monkeypatch):
 def test_identity_tag_follows_the_version():
     assert builder.identity_tag("MIDISTOMP V2.0.1") == "M201"
     assert builder.identity_tag("MIDISTOMP V2.1.0") == "M210"
+    assert builder.identity_tag("MIDISTOMP V2.0.4.1") == "M204"
     with pytest.raises(ValueError):
         builder.identity_tag("MIDISTOMP V2.1")
 
