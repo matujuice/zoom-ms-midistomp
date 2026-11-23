@@ -221,15 +221,22 @@ static void put(const Tgt *t, int v)
 }
 
 /* The waiting effect writes, from the 16 ms poll with interrupts on, under the
- * effect-edit lock as midi_cc handler.S. A load or swap running: next poll. */
+ * effect-edit lock as midi_cc handler.S. A load or swap running: next poll.
+ * Knobs of one effect slot per poll, round robin (on / off always at once): lags
+ * on several effects all wait in the same poll, and written together their
+ * coefficient maths (DJFilter, Washout) lands in the same audio block every 48 ms,
+ * which crackled a full chain. 16 ms apart, the busy blocks no longer stack. */
 static void fx_flush(void)
 {
-    int s, p, v;
-    for (s = 0; s < 6; s++)
-        for (p = 0; p < 11; p++) {
+    static int rr;
+    int i, s, p, v, done = -1;
+    for (i = 0; i < 6; i++)
+        for (s = rr + i < 6 ? rr + i : rr + i - 6, p = 0; p < 11; p++) {
             if ((v = fxw[s][p]) < 0) continue;
             if (p == 1 || s >= COUNT || FX_REC(s)[p] == v) { fxw[s][p] = -1; continue; }   /* never the effect type */
             if (LOADING || FX_TABLE[s] == FX_MUTE) continue;
+            if (p && done >= 0 && done != s) continue;
+            if (p) done = s;
             SEM_PEND(SEM_FX, -1);
             {
                 int clean = FX_SAVED(s)[p] == FX_REC(s)[p];
@@ -244,6 +251,7 @@ static void fx_flush(void)
                 RINT;
             }
         }
+    if (done >= 0) rr = done < 5 ? done + 1 : 0;
 }
 
 /* ---- Moves -------------------------------------------------------------- */
