@@ -142,7 +142,8 @@ static void grid(float n)       /* n: the blocks since the last call */
     }
     g.was_on = perf_on != 0;
     g.gf += g.du * n;
-    while (g.gf >= 1.0f) { g.gf -= 1.0f; g.gu++; }
+    h = (int)(g.gf + 8.0f) - 8;                         /* floor: a clock behind the grid (err < 0) leaves gf in (-4, 0) */
+    g.gu += h; g.gf -= (float)h;
     perf_grid.beat = g.gu < 0 ? -1 : g.gu >> 3;
     perf_grid.frac = g.gu < 0 ? 0 : (int)(((float)(g.gu & 7) + g.gf) * 8191.875f);
     perf_grid.running = g.run || (perf_on && !g.anchor);   /* no clock: tap tempo drives the grid, the first FOOTSW press (bar 1) starts it */
