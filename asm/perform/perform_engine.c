@@ -505,9 +505,10 @@ static void led(void)
 /* ---- Audio block and poll ------------------------------------------------ */
 static int need_load = 1;
 
+static int nb;                  /* blocks since the last grid() */
+
 void perf_block(void)
 {
-    static int nb;
     int p = CUR_PATCH;
     if (p != g.patch) {                         /* patch change: cancel all, the poll loads */
         g.patch = p;
@@ -518,7 +519,8 @@ void perf_block(void)
         g.was_on = 0;
         return;
     }
-    if (++nb >= 8 || busy) {    /* nothing waits or lags: the grid only feeds the screen, every 8th block (1.5 ms) */
+    nb++;
+    if (busy) {                 /* nothing waits or lags: the grid only feeds the screen, perf_poll16 runs it */
         grid((float)nb);
         nb = 0;
     }
@@ -563,6 +565,12 @@ void perf_poll16(void)
         Tgt x = tgt(perf_patch.target[C_FTSW]);
         DINT;
         led_x = x;
+        RINT;
+    }
+    if (perf_on && !busy) {     /* the grid for the screen, out of the audio block: its code missing the cache each block crackled a full chain */
+        DINT;
+        grid((float)nb);        /* busy set meanwhile: the next block runs it with n 0, harmless */
+        nb = 0;
         RINT;
     }
     fx_flush();
