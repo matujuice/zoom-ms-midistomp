@@ -507,6 +507,8 @@ def run(outdir):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] in (["-h"], ["--help"]):
+        sys.exit(__doc__)
     r = run(Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build/out/perform-preview")
     if r is None:
         sys.exit("no host C compiler found (gcc, clang, or `pip install ziglang`)")
