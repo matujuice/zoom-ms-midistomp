@@ -195,7 +195,7 @@ async function readMixer() {
     var r = expect(function (m) { return mstReply(m, 0x43, n) && m.length === 28 && m[7] === n; }, 500);
     await send(MST.concat([0x02, n, n, 0xf7]));
     var m = await r;
-    if (!m) { entries = []; throw new Error('No MIXER settings for patch ' + (n + 1) + ' from the pedal.'); }
+    if (!m) { entries = []; perfs = []; throw new Error('No MIXER settings for patch ' + (n + 1) + ' from the pedal.'); }
     entries[n] = Patch.mixerEntry(m);
   }
 }
@@ -225,11 +225,6 @@ var ALL = Array.from({ length: 50 }, function (_, n) { return n; });
 // The pedal's own files, with the stock file commands (as zoom-zt2): FLST_SEQ.ZDT lists the effects on it,
 // each .ZDL carries its id (header) and its picture (the picEffectType_* symbol). Inside PC mode (52 on, 53 off).
 var installed = null, zdlFile = {}, pics = {};   // installed: keys of the pedal's effects (null: not read); zdlFile[key]: its file
-function unpack7(d) {   // 8 bytes carry 7: the first holds their top bits
-  var o = [];
-  for (var i = 0; i < d.length; i += 8) for (var j = 1; j < 8 && i + j < d.length; j++) o.push(d[i + j] | (d[i] & 0x40 >> j - 1 ? 0x80 : 0));
-  return o;
-}
 async function fileCmd(body) {
   var r = expect(function (m) { return m[1] === 0x52 && m[3] === dev && m[4] === 0x60; }, 1500);
   await send(zoom([0x60].concat(body)));
@@ -244,7 +239,7 @@ async function readFile(name, first) {   // first: just the first block (512 byt
       await fileCmd([0x22, 0x14, 0x2f, 0x60, 0x00, 0x0c, 0x00, 0x04, 0x00, 0x00, 0x00]);
       var m = await fileCmd([0x05, 0x00]), n = m && m[5] === 4 ? m[10] * 128 + m[9] : 0;
       if (!n) break;
-      out = out.concat(unpack7(m.slice(11, 12 + n + Math.floor(n / 7))).slice(0, n));
+      out = out.concat(Patch.unpack7(m.slice(11, 12 + n + Math.floor(n / 7))).slice(0, n));
       if (first) break;
     }
   } finally { await fileCmd([0x21, 0x40, 0, 0, 0, 0]); await fileCmd([0x09]); }

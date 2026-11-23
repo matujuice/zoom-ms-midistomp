@@ -27,6 +27,7 @@ jobs:
           python-version: "3.12"
       - run: pip install . pytest pyinstaller
       - run: python -m pytest -q
+      - run: node editor/test-patch.js
       - run: pyinstaller --onefile --console --name MIDISTOMP-builder-Windows --add-data "patches;patches" --add-data "models;models" scripts/midistomp_builder.py
       - name: Refuses a file that is not the stock updater
         run: |
