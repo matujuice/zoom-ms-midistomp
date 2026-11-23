@@ -200,6 +200,8 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - Issue reports and ideas behind this release: [Andrhodes](https://github.com/Andrhodes) (Program Change reload, #68),
   [grungebit-exe](https://github.com/grungebit-exe) (the digital whine write-up, #67), and Roman Rusinov (themanro)
   again for the SysEx slot-routing report (#72).
+- leemuzkho: the technical write-up on the MS-series' DSP power sag under input-impedance load, the reasoning behind
+  the 360 MHz overclock.
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 
