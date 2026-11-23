@@ -56,3 +56,25 @@ def test_bin133_checks_stock_hash():
 def test_boot_logo_patch_is_one_screen():
     p = patcher.load(Path(__file__).resolve().parent.parent / "patches/boot-logo.yaml")
     assert [(b["offset"], len(bytes.fromhex(b["data"]))) for b in p["bin133"]] == [(0, 1024)]
+
+
+def test_boot_changes_function_and_set_args():
+    img = ais.parse(make_ais())
+    patch = {"name": "t", "boot": [
+        {"model": "m", "function": 5, "expect": [0x11, 0x22], "data": [0x33, 0x44]},
+        {"model": "m", "set": 0x01C14188, "expect": 5, "data": 0}]}
+    assert len(patcher.apply(img, patch, "m")) == 2
+    out = ais.parse(ais.build(img))
+    assert out.functions == [(5, [0x33, 0x44])] and out.sets == [(0x20004, 0x01C14188, 0, 0)]
+
+
+def test_boot_wrong_stock_args_fail():
+    with pytest.raises(patcher.PatchError):
+        patcher.apply(ais.parse(make_ais()), {"name": "t", "boot": [
+            {"model": "m", "function": 5, "expect": [0x11, 0x99], "data": [0x33, 0x44]}]}, "m")
+
+
+def test_boot_changes_jump():
+    img = ais.parse(make_ais())
+    patcher.apply(img, {"name": "t", "boot": [{"model": "m", "jump": 0x11816000, "expect": 0x11800000}]}, "m")
+    assert img.entry == ais.parse(ais.build(img)).entry == 0x11816000
