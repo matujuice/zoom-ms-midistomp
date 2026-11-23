@@ -84,6 +84,19 @@ high bits, first byte's bit = `0x40`). The hash tells whether the entry belongs 
 stored at n: FNV-1a over the six effect ids (`b0&FE b1 b2 b3&1F`) and name bytes 111-121.
 n >= 50 gets no reply.
 
+Command 03, write the MIXER settings of entry n:
+
+    F0 7D 4D 53 54 03 <nonce> <n> <18 bytes> F7      27 bytes in all
+    F0 7D 4D 53 54 44 <nonce> <n> <status> F7        status 0 = saved, 1 = a value over its max
+
+The 18 bytes pack the hash (4 bytes LE) and settings 0-10. Any value over its max (`0xC00F6128`)
+writes nothing. Otherwise the entry is written and record 50 is saved to flash
+(`0xC00BA3E4`, as the stock MIXER store, also from Task_MIDI). If n is the patch played
+(`B14+324`), the live and saved copies (`0xC00F60E0`, `0xC00F60F8`) change too and the UI is
+redrawn (event 64). The editor uses it to edit settings and to keep them on a rename or move
+(write the old settings under the new hash). ponytail: no PEDAL-mono Mode limit and no
+Input→Input R / Master→Master R mirroring, as the CC path does.
+
 **Firmware work for step B** (1 session plus a hardware test):
 1. Find the 70CDR transmit routine used by the identity reply and the SysEx executor
    (`0xC00AE880`-equivalent). **Done** for the 70CDR, see the map below.
