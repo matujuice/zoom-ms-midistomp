@@ -88,7 +88,7 @@ static int len(int n)           /* NEXT in units; 0 = NOW */
     return 32 << ((n < NX_N ? n : NX_N - 1) - NX_BAR);   /* a v2.0 CYC value: 32 bars */
 }
 
-static void grid(void)
+static void grid(float n)       /* n: the blocks since the last call */
 {
     volatile const unsigned *w = ZT;
     unsigned t, q, ok = 0, rn = 0, starts = 0, clocks = 0, r, mk, k;
@@ -120,7 +120,7 @@ static void grid(void)
         if (clocks == 0) { g.clk = 0; g.sub = 0.0f; g.du = 0.0f; g.gf = 0.999f; }  /* waiting for clock 1 */
         else {
             if (clocks != g.clk || start) g.sub = 0.0f;
-            else if ((g.sub += g.bpm * 7.2562358e-5f) > 0.999f) g.sub = 0.999f;
+            else if ((g.sub += g.bpm * 7.2562358e-5f * n) > 0.999f) g.sub = 0.999f;
             g.clk = clocks;
             if (clocks != g.rc || start) {
                 r = clocks - 1;         /* r = that mod 2304, wraps = the 96-beat turns: right after the grid sat out */
@@ -141,7 +141,7 @@ static void grid(void)
         g.gu = 0; g.gf = 0.0f; g.anchor = 1;            /* then the first footswitch press */
     }
     g.was_on = perf_on != 0;
-    g.gf += g.du;
+    g.gf += g.du * n;
     while (g.gf >= 1.0f) { g.gf -= 1.0f; g.gu++; }
     perf_grid.beat = g.gu < 0 ? -1 : g.gu >> 3;
     perf_grid.frac = g.gu < 0 ? 0 : (int)(((float)(g.gu & 7) + g.gf) * 8191.875f);
@@ -507,6 +507,7 @@ static int need_load = 1;
 
 void perf_block(void)
 {
+    static int nb;
     int p = CUR_PATCH;
     if (p != g.patch) {                         /* patch change: cancel all, the poll loads */
         g.patch = p;
@@ -517,7 +518,10 @@ void perf_block(void)
         g.was_on = 0;
         return;
     }
-    grid();
+    if (++nb >= 8 || busy) {    /* nothing waits or lags: the grid only feeds the screen, every 8th block (1.5 ms) */
+        grid((float)nb);
+        nb = 0;
+    }
     if (busy) tick();           /* nothing waits or lags: no slot loop (wait sets busy) */
     led();
 }
