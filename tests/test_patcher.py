@@ -30,6 +30,10 @@ def test_write_checks_expected_bytes():
     assert img.sections[0].data == b"abXXef"
     with pytest.raises(patcher.PatchError):
         patcher.apply(img, p, "m")
+    p["write"][0].update(expect="5858", data="595959")
+    with pytest.raises(patcher.PatchError):
+        patcher.apply(img, p, "m")
+    assert img.sections[0].data == b"abXXef"
 
 
 def test_build_round_trip_and_new_section():

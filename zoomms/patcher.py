@@ -95,6 +95,8 @@ def apply(img: ais.AisImage, patch: dict, build_id: str, stamp: dict | None = No
             continue
         data = bytes.fromhex(w["data"])
         expects = w["expect"] if isinstance(w["expect"], list) else [w["expect"]]   # a list: any of them
+        if any(len(e) != len(w["data"]) for e in expects):   # else unchecked bytes get overwritten
+            raise PatchError(f"{patch['name']}: write at 0x{w['addr']:08X} is not the length of its expect")
         if not any(img.read(w["addr"], len(e) // 2) == bytes.fromhex(e) for e in expects):
             raise PatchError(f"{patch['name']}: bytes at 0x{w['addr']:08X} are not the expected ones")
         img.write(w["addr"], data)
