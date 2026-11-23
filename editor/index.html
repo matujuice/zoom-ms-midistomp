@@ -152,7 +152,7 @@ function buttons() {
   $('connect').disabled = busy;
   $('readAll').disabled = !on;
   $('writeChanged').disabled = !on || !patches.some(dirty);
-  $('backup').disabled = busy || !patches.length;
+  $('backup').disabled = busy || patches.filter(Boolean).length !== 50;   // a restore needs all 50
   $('restore').disabled = busy;
 }
 function recDirty(p) { return p && (!p.orig || p.rec.some(function (b, i) { return b !== p.orig[i]; })); }
