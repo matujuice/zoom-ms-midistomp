@@ -136,7 +136,12 @@ def run(args: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    code = run(sys.argv[1:])
+    try:
+        code = run(sys.argv[1:])
+    except Exception:  # e.g. a write fails: show it before the window closes
+        import traceback
+        traceback.print_exc()
+        code = 1
     if getattr(sys, "frozen", False):
         input("\nPress Enter to close.")
     sys.exit(code)
