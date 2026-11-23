@@ -197,6 +197,9 @@ the TI C6000 DSP and the same updater layout), so this repo is one codebase with
 - [zoom-zt2](https://github.com/mungewell/zoom-zt2) by mungewell: SysEx file transfer.
 - Alexander Lim. The live screens and the zvis kit, the pedal's file-size cap and DSP limit, and linker pitfalls.
 - Testers: Jannik Aßfalg, Roman Rusinov, nilsjesper and Snozaz. Thank you for flashing betas onto your pedals.
+- Issue reports and ideas behind this release: [Andrhodes](https://github.com/Andrhodes) (Program Change reload, #68),
+  [grungebit-exe](https://github.com/grungebit-exe) (the digital whine write-up, #67), and Roman Rusinov (themanro)
+  again for the SysEx slot-routing report (#72).
 
 > Not affiliated with or supported by Zoom. Flashing modified firmware can brick a pedal.
 
