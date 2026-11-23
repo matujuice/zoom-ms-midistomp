@@ -533,6 +533,7 @@ void perf_block(void)
 }
 
 extern unsigned r50_live_hash;  /* pages.c mix_get: the hash of the patch played */
+extern int pu_scr;               /* perform_keys.c: the SETUP screen (0 top, 7 ENTER / SETUP) */
 
 void perf_poll16(void)
 {
@@ -549,6 +550,7 @@ void perf_poll16(void)
         for (s = 0; s < 6; s++)                 /* no effect write waits (.bss starts at 0: a write of 0) */
             for (p = 0; p < 11; p++) fxw[s][p] = -1;
         perf_load(CUR_PATCH);
+        if (pu_scr != 7) pu_scr = 0;            /* SETUP's sub-screens point into the old chain (its FX count): back to the top */
     }
     if (SV_OK) {
         SV[W_CYCLE] = perf_patch.loop_on ? perf_patch.cycle : 0;   /* PERFORM's looper off: the GRDLOOP keeps its own Cycle */

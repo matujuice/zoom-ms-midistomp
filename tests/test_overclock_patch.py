@@ -21,3 +21,11 @@ def test_jumps_to_section_then_os(speed):
     sec, jump = p["section"][0], p["boot"][0]
     assert jump["jump"] == sec["addr"] and jump["expect"] == 0xC00DD800
     assert sec["addr"] + len(bytes.fromhex(sec["data"])) <= 0x11817000  # below MAIN's own L2 sections
+
+
+@pytest.mark.parametrize("speed", SPEEDS)
+def test_dsp_limit_write_expects_dsp_limit_result(speed):
+    # cpu-* comes after dsp-limit and rewrites the same word: its expect must be what dsp-limit wrote
+    lim = {w["addr"]: w["data"] for w in patcher.load(ROOT / "patches/dsp-limit.yaml")["write"]}
+    for w in patcher.load(ROOT / f"patches/cpu-{speed}.yaml")["write"]:
+        assert w["expect"] == lim[w["addr"]]
