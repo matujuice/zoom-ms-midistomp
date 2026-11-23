@@ -12,6 +12,7 @@ def test_refuses_other_files(tmp_path):
     f.write_bytes(b"not zoom")
     assert builder.run([str(f)]) == 1
     assert not (tmp_path / builder.OUT_NAME).exists()
+    assert not (tmp_path / builder.OUT_NAME_OC).exists()
 
 
 def test_patch_files_exist():
@@ -34,6 +35,7 @@ def test_refuses_other_mac_apps(tmp_path):
     exe.write_bytes(b"not zoom")
     assert builder.run([str(app)]) == 1
     assert not (tmp_path / builder.OUT_NAME_MAC).exists()
+    assert not (tmp_path / builder.OUT_NAME_OC_MAC).exists()
 
 
 def test_ask_path_reads_a_dragged_mac_path(monkeypatch):
