@@ -1,81 +1,35 @@
-# Handoff: v2.0 work, 2026-10-16 (updated after probe v2 round 1)
+# Handoff: where the work stands (2026-11-24, after v2.0.4.1)
 
 For a new Claude session running **locally on Luca's Windows PC**. Read this, then each repo's
-CLAUDE.md. It replaces a cloud session that could not reach the PC.
+CLAUDE.md. The October handoff it replaces (v2.0 probe rounds) is in git history.
 
-## Repos and branch
+## Repos
 
-Both on branch `claude/epic-thompson-rggzx8`; pull both first.
+| Repo | What |
+|---|---|
+| [zoom-ms-midistomp](https://github.com/matujuice/zoom-ms-midistomp) | firmware mod (patches, asm, builder) |
+| [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack) | the custom effects (.ZDL) |
 
-| Repo | Head at handoff | What |
-|---|---|---|
-| [zoom-ms-midistomp](https://github.com/matujuice/zoom-ms-midistomp) | `f3e6bd9` probe v2 round 1 results | firmware mod (patches, asm, builder) |
-| [zoom-ms-zdl-effects-pack](https://github.com/matujuice/zoom-ms-zdl-effects-pack) | `e5c854c` DirtBox/Choral shrink | the custom effects (.ZDL) |
+Local paths: the effects pack clone is in `Documenti\GitHub`. ZDLs also go to
+`C:\Users\lucam\OneDrive\Desktop\ZOOM MS FX\ZoomMultistompZDL-main\ZoomMultistompZDL-main\dist`.
+TI compiler `ti-cgt-c6000_8.5.0.LTS` is in Downloads.
 
-Local paths: the effects pack clone is in `Documenti\GitHub`. ZDLs go to
-`C:\Users\lucam\OneDrive\Desktop\ZOOM MS FX\ZoomMultistompZDL-main\ZoomMultistompZDL-main\dist`
-(old builds backed up in its `backup-before-cpu-opt`). TI compiler `ti-cgt-c6000_8.5.0.LTS` is in
-Downloads. **Locally you can build both repos yourself**; the cloud session could not.
-
-- ZDLs: `py build_all.py [effect]` in the effects pack.
-- Firmware: needs Zoom's official MS-70CDR v2.10 updater (never committed; ask Luca where it is,
-  set `MIDISTOMP_70CDR_UPDATER` for the tests). Build line in
-  [mixer-mode-m0.md, "Probe build"](mixer-mode-m0.md#probe-build-how-to-read-it).
-  Releases are built and published by the `builder` GitHub workflow (`workflow_dispatch` with
-  `release = vX.Y`); Luca never uploads anything by hand.
+- Firmware: needs Zoom's official MS-70CDR v2.10 updater (never committed; set
+  `MIDISTOMP_70CDR_UPDATER` for the tests). Release: push a `vX.Y.Z` tag; the `builder` workflow
+  builds the Windows and Mac builders (no Zoom code) and publishes them with
+  `docs/releases/vX.Y.Z.md`. Each builder makes a stock and a "(360MHz OC)" updater.
+- Effects pack: `py build_all.py`, then `py make_release.py`, then a GitHub release with
+  `dist/*.ZDL` and the zip (no CI).
 
 ## Where things stand
 
-- **v1.2 released** (no Looper): https://github.com/matujuice/zoom-ms-midistomp/releases/tag/v1.2
-- **Looper** (v2.0 step 1): status bar always visible, only the bar blinks, countdown blinks capped
-  at 1/8, Roll repeats the first slice. Done, not released.
-- **Mixer Mode** (v2.0 step 3): plan [mixer-mode-plan.md](mixer-mode-plan.md) (M0-M4), research
-  [mixer-mode-m0.md](mixer-mode-m0.md). M0 done; Route A for per-patch storage (repack P8 to free
-  bytes 14, 15, 17 of each slot block). Probe v1 results are in mixer-mode-m0.md.
-- **Probe v2** built and sent (`build/out/MIDISTOMP M0 probe v2.exe`, sha256 `6cfe2f50…270e`):
-  version page 0, measures only while its screen is open, honest load vs 54,422 cycles/block,
-  P6 CTX/BUS (where stock delays write), cursor fix, **DSP limit 300** (test only).
-  **Round 1 photos read** (P2 + P3 CYC on two patches): results in
-  [mixer-mode-m0.md, "Probe v2 results, round 1"](mixer-mode-m0.md#probe-v2-results-round-1-2026-10-16).
-  P2 names match P3 rows (photos had only been paired wrong). Patch B summed ~71,500 cycles
-  (> 54,422: overrun, its numbers are inflated). Cursor lookup still fails sometimes
-  ("CUR 5 SLOT -107"). The rest of the v2 checklist is still open.
-- **Effects CPU rewrite** (all 11 effects, host A/B vs old code: identical or below -80 dB, except
-  Choral fix 3 at -23 dB worst on fast vowel moves, judged inaudible). First TI build: no errors, no
-  `.switch`/`push_rts`. WaveFold's main loop may not pipeline ("did not find schedule").
-- **DirtBox/Choral shrink done** (`e5c854c`, built locally): DirtBox 25,274 B, Choral 28,866 B.
-  CGT 8.5 has no per-loop `NOSWP` and `--opt_for_space` pulls in `pop_rts`, so: DirtBox's
-  per-model loops and `ab_prepare` became single `-O1` functions (`AB_SMALL_FUNC`); Choral uses
-  `SR_NOSWP` (an asm NOP) on cold loops and `-O1` copies of init/text helpers. Host tests pass
-  (run in the cloud after the commit). Not yet loaded on the pedal.
-- **Did the rewrite raise CPU?** Possibly. In patch A, EuGate 3,338 / Scrub 4,288 / DubSiren 5,683
-  avg vs 2,284 / 2,765 / 3,807 in the old table (STEREO.md); S.GN_L is 10% lower. Settings and
-  patch differ, so not proven. Suspect: software pipelining grows code, and six effects + OS
-  share L1P, so cache misses may eat the gain (host A/B can't see that). **Decide with an A/B on
-  the pedal**: each effect alone, same knobs, new ZDL vs `backup-before-cpu-opt`, P3 CYC each.
-  If new loses: smaller code (`SR_NOSWP`-style / `-O1` on loops) or revert that effect.
-- **Declared DSP costs** (`dsp_cost` in each manifest, written by `build/linker.py`) are the
-  pre-rewrite measurements; lower them after the probe measures the new builds (P3 CYC, about
-  100 cycles per cost unit). Choral is 150 for now (it measured ~240).
-
-## Next, in order
-
-1. Pedal A/B (above): EuGate, Scrub, DubSiren alone, new vs old ZDL, P3 CYC; patch B again, P1
-   only. Also load the shrunk DirtBox and Choral and check they run.
-2. From those numbers: keep, shrink or revert each effect; then update `dsp_cost` in the manifests
-   and the effects pack's docs/STEREO.md table. Fix the P2 cursor lookup (-107) in the probe.
-3. Builder: **probe in every build except releases** (the release workflow input decides; no
-   option to forget). The probe must move above the Mixer engine's DDR region (`0xC00F3100`+)
-   before M1 uses it. Every dev build stamps page 0 (`--stamp label=...`).
-4. **M1**: bus engine with fixed test layouts (mixer-mode-plan.md).
-5. Small fixes: Looper `asm/looper/services.inc` `CURSOR_SLOT` is wrong (`0xC00EE948`; the cursor
-   table is `0xC00EE748 + 24 x cursor`); `zt_update` in the pack's `src/custom/common/zmt.h` has a
-   20-iteration mod loop per block (CPU, all tempo effects); EuGate's unused `ch_prepare` warning
-   (used by host tests, harmless).
-6. Later: stereo ports per the pack's [docs/STEREO.md](https://github.com/matujuice/zoom-ms-zdl-effects-pack/blob/claude/epic-thompson-rggzx8/docs/STEREO.md)
-   (port most effects, the rest get mono-sum input (L+R)/2); Looper cost measurement; the final
-   DSP limit value; Choral zipper check on fast vowels (fallback: always recompute, ~+900 cycles).
-
+- **v2.0.4.1 released** on both repos (Latest). Release notes: [docs/releases](../releases/).
+- **On hold** (Luca): the patch editor (PR 64, branch `claude/sysex-editor`, merge only when the
+  editor is done) and the DSP bench (PR 76, with the Washout knob-crackle fix). The pack's synth
+  effects (issues 45, 46) are paused too.
+- **Waiting on others**: Roman's hardware check of the SysEx slot routing (issue 72); the Modwerk
+  board question on model byte 0x57.
+- Open issues live on GitHub; nothing else is in flight.
 ## How to work (Luca's preferences)
 
 - Short English replies (he sometimes writes Italian). Link docs directly with GitHub URLs.

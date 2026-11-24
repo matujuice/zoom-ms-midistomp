@@ -1,6 +1,6 @@
 # CPU overclock for MIDISTOMP: plan
 
-Status (2026-11-12): the 360F build option exists and builds, but it has **not been tested on hardware**.
+Status (2026-11-24): shipped in v2.0.4 as the opt-in "(360MHz OC)" updater, tested OK on an MS-70CDR and an MS-60B (2026-11-23). The rest of this page is the plan as written on 2026-11-12.
 The tester app is not built yet. Goal: "just a boost", that is more DSP time per audio block, with low risk.
 
 ## What we know
