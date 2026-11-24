@@ -11,7 +11,7 @@ Status is as of the v2.0 release candidate. Details: [v2.0-brief.md](v2.0-brief.
 
 | Feature | Where it lives in the OS | Status | Notes |
 |---|---|---|---|
-| Flash a modified OS and boot it | build pipeline | **done** | `patches/hello.yaml`, see [flashing.md](../flashing.md) |
+| Flash a modified OS and boot it | build pipeline | **done** | `patches/hello.yaml` (tag v1.1), see [flashing.md](../flashing.md) |
 | MIDI: program change, CC for parameters and on/off, clock sets tempo, Start/Stop | `Task_MIDI`, USB MIDI | **done** (v1.x) | MS pedals only have USB MIDI, so this needs a computer or a USB-MIDI host box |
 | Button combos, HOLD FOR, Tempo Lock, faster scrolling | `Task_UpdateUI` | **done** (v1.2) | |
 | MS-70CDR base OS for all three pedals, PEDAL INPUT setting | whole OS | **done** (v2.0) | |

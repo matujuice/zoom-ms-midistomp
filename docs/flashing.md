@@ -29,40 +29,10 @@ matches. Windows SmartScreen will warn; choose "More info" then "Run anyway".
 ## Build
 
 ```sh
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/hello.yaml --out build/out/ms50g-3.10-hello.exe
+# MS-50G 3.10 builds (hello, v0.2-v1.1 test and release builds): check out tag v1.1;
+# their version-0.x, hello and midi-clock-diag patch files were removed after v2.0.4.
 zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
   --out build/out/ms50g-3.10-stock-keepboot.exe      # recovery: stock OS, bootloader untouched
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-0.2.yaml --patch patches/midi-cc.yaml --build-id ms50g-3.10 \
-  --out build/out/ms50g-3.10-mod0.2-midicc.exe     # v0.2 test build
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-0.3.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.3-midiclock-fix7.exe   # v0.3 test build
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-0.4.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.4-transport.exe   # v0.4 test build
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-0.5.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --patch patches/midi-settings.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.5-midisettings-r2.exe   # v0.5 test build
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-0.6.yaml --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.6-tempohold.exe   # v0.6 test build
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/midi-cc.yaml --patch patches/midi-clock.yaml \
-  --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml --patch patches/ram-test.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-mod0.6-ramtest.exe   # RAM test (#19), diagnostic only
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-1.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
-  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.0.exe   # MIDISTOMP V1.0
-zoomms build "firmware/MS-50G_v3.10_Win_E/ZOOM MS-50G System v3.10 Updater.exe" \
-  --patch patches/version-1.1.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
-  --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
-  --patch patches/scroll.yaml \
-  --build-id ms50g-3.10 --out build/out/ms50g-3.10-midistomp-1.1.exe   # MIDISTOMP V1.1 (frozen, tag v1.1)
 zoomms build "firmware/MS-70CDR_v2.10_Win_E/ZOOM MS-70CDR v2.10 Updater.exe" \
   --patch patches/version-2.0.yaml --patch patches/boot-logo.yaml --patch patches/midi-cc.yaml \
   --patch patches/midi-clock.yaml --patch patches/midi-settings.yaml --patch patches/tempo-hold.yaml \
