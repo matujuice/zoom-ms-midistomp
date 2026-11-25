@@ -17,6 +17,7 @@ drags the app into the Terminal window.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import tempfile
 import shlex
@@ -27,7 +28,7 @@ from pathlib import Path
 from zoomms import cli, macapp, models
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-NAME = "MIDISTOMP V2.0.4.1"
+NAME = "MIDISTOMP V2.0.4.2"
 BASE = ["version-2.0", "boot-logo", "midi-cc", "midi-clock", "midi-settings", "tempo-hold", "scroll"]   # the v1.2 set
 PATCHES = BASE + ["looper", "mixer-m2", "diag", "dsp-limit", "fx-category", "pc-force-reload", "sysex-fx-slots", "identity-tag"]   # looper, then mixer-m2, then diag; m0-probe stays test-only
 OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
@@ -111,6 +112,9 @@ def ask_pedal() -> str | None:
               foreground="gray").pack(padx=24, pady=(10, 0), anchor="w")
     ttk.Button(root, text="Next", command=next_, default="active").pack(padx=24, pady=18, anchor="e")
     root.bind("<Return>", lambda e: next_())
+    test_pick = os.environ.get("MIDISTOMP_TEST_PICK")   # CI: picks this pedal and presses Next, to test the frozen window
+    if test_pick:
+        root.after(2000, lambda: (choice.set(test_pick), next_()))
     root.lift()
     root.attributes("-topmost", True)   # in front of the console window that started it
     root.after_idle(root.attributes, "-topmost", False)

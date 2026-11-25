@@ -34,6 +34,20 @@ jobs:
           if ($LASTEXITCODE -ne 1) { exit 1 }
           if (Test-Path "MIDISTOMP V2.0 Updater.exe") { exit 1 }
           exit 0
+      # Zoom's updater is downloaded here only to test; no upload contains it.
+      - name: Builds from Zoom's updater, MS-60B picked in the window
+        env:
+          MIDISTOMP_TEST_PICK: ms60b
+        run: |
+          $z = "$env:RUNNER_TEMP\zoom"; New-Item -ItemType Directory $z | Out-Null
+          curl.exe -sSfL -o "$z\w.zip" https://zoomcorp.com/documents/93/MS-70CDR_v2.10_Win_E.zip
+          Expand-Archive "$z\w.zip" $z
+          $u = Get-ChildItem $z -Recurse -Filter "ZOOM MS-70CDR v2.10 Updater.exe" | Select-Object -First 1
+          '' | .\dist\MIDISTOMP-builder-Windows.exe $u.FullName
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($n in "MIDISTOMP V2.0 MS-60B Updater.exe", "MIDISTOMP V2.0 MS-60B Updater (360MHz OC).exe") {
+            if (-not (Test-Path (Join-Path $u.DirectoryName $n))) { "missing $n"; exit 1 }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: MIDISTOMP-builder-Windows
@@ -59,6 +73,31 @@ jobs:
           set +e
           echo | ./dist/${{ matrix.name }} README.md
           test $? -eq 1 && test ! -e "MIDISTOMP V2.0 Updater.app"
+      # Zoom's updater is downloaded here only to test; no upload contains it.
+      - name: Builds from Zoom's Mac updater, MS-60B picked in the window
+        env:
+          MIDISTOMP_TEST_PICK: ms60b
+        run: |
+          z="$RUNNER_TEMP/zoom"; mkdir "$z"; cd "$z"
+          curl -sSfL -o m.zip https://zoomcorp.com/documents/94/MS-70CDR_v2.10_Mac_E.zip && unzip -q m.zip
+          app="$(find "$z" -maxdepth 4 -name 'ZOOM MS-70CDR v2.10 Updater.app' -not -path '*__MACOSX*' | head -1)"
+          d="$(dirname "$app")"
+          (sleep 1; screencapture -x "$GITHUB_WORKSPACE/pedal-window.png") &
+          echo | "$GITHUB_WORKSPACE/dist/${{ matrix.name }}" "$app"
+          for n in "MIDISTOMP V2.0 MS-60B Updater.app" "MIDISTOMP V2.0 MS-60B Updater (360MHz OC).app"; do
+            codesign --verify --deep "$d/$n"
+            test "$(xxd -p -s 0x2C00 -l 1 "$d/$n/Contents/Resources/Preset.bin")" = 5f   # MS-60B model byte
+          done
+          open "$d/MIDISTOMP V2.0 MS-60B Updater (360MHz OC).app"; sleep 6
+          screencapture -x "$GITHUB_WORKSPACE/updater-window.png"
+          pgrep -f "EFX Updater" || echo "::warning::the built updater did not stay open"
+          pkill -f "EFX Updater" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens-${{ matrix.name }}   # not MIDISTOMP-builder-*, so the release doesn't get them
+          path: "*.png"
+          if-no-files-found: ignore
       - name: Zip it, keeping the program runnable
         run: cd dist && zip ${{ matrix.name }}.zip ${{ matrix.name }}
       - uses: actions/upload-artifact@v4
