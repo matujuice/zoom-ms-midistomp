@@ -115,7 +115,8 @@ flashed to an MS-50G from an Apple Silicon Mac.
 4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
    Enter. It asks which pedal you will flash (as on Windows, step 3), then writes two apps next to Zoom's app
    and signs them for your Mac: **MIDISTOMP V2.0 Updater.app** (stock
-   clock — use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).app** (see [Overclock](#overclock-opt-in-360-mhz)).
+   clock — use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).app** (see [Overclock](#overclock-opt-in-360-mhz));
+   for the MS-60B and MS-50G the names say the pedal, like **MIDISTOMP V2.0 MS-50G Updater.app**.
    It refuses anything that is not Zoom's original.
 5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0 Updater.app**. It is
    an Intel app, so Apple Silicon Macs run it through Rosetta (macOS offers to install it). Its window reads
@@ -130,12 +131,14 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.app"
 ```
 
-It writes and signs both updater apps the same way. If signing fails, it prints the two Terminal lines
-(`xattr -cr` and `codesign --force --deep --sign -`) to run on each app yourself.
+It asks which pedal you will flash, then writes and signs both updater apps the same way. If signing fails, it prints
+the two Terminal lines (`xattr -cr` and `codesign --force --deep --sign -`) to run on each app yourself.
 
-After MIDISTOMP is installed, the pedal reports itself as an MS-70CDR over USB, whichever pedal it is. Zoom's MS-50G
-Mac updater only accepts its own model, so it will refuse the pedal ("Illegal device connected"). On a Mac, recover
-with Zoom's MS-70CDR Mac updater (it accepts an MS-50G running MIDISTOMP) or the MIDISTOMP one.
+After MIDISTOMP is installed, the pedal reports the model you picked in the builder, so pick your real pedal. Zoom's
+MS-50G Mac updater refuses a pedal that reports another model ("Illegal device connected"); with the MS-50G picked,
+Zoom's own MS-50G updater is the one to recover with. A pedal flashed with v2.0.4.1 or older reports itself as an
+MS-70CDR whichever pedal it is: on a Mac, recover it with Zoom's MS-70CDR Mac updater (it accepts an MS-50G running
+MIDISTOMP) or the MIDISTOMP one.
 
 ### On Linux
 
@@ -148,7 +151,8 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/python scripts/midistomp_builder.py "/path/to/ZOOM MS-70CDR v2.10 Updater.exe"
 ```
 
-It writes both **MIDISTOMP V2.0 Updater.exe** and **MIDISTOMP V2.0 Updater (360MHz OC).exe** next to Zoom's updater.
+It asks which pedal you will flash, then writes both **MIDISTOMP V2.0 Updater.exe** and
+**MIDISTOMP V2.0 Updater (360MHz OC).exe** next to Zoom's updater (with the pedal in the name for an MS-60B or MS-50G).
 Running the updaters under Wine, or in a virtual machine with USB passed through, is not tested.
 
 ### Overclock, opt-in: 360 MHz
@@ -165,7 +169,8 @@ If the pedal doesn't boot, or you want the stock firmware back:
 
 1. Enter update mode (hold up + down while plugging in USB). This works even when the firmware is broken.
 2. Run Zoom's original updater for your pedal: the MS-70CDR 2.10 one, or the MS-50G or MS-60B one you had before.
-   It puts back the stock firmware and the stock boot screen. On a Mac, use the MS-70CDR one (see above).
+   It puts back the stock firmware and the stock boot screen. On a Mac, see [On a Mac](#on-a-mac) for which one
+   accepts the pedal.
 
 On an MS-60B you can also run Zoom's MS-60B updater to go back to the bass firmware (4 effects per patch).
 

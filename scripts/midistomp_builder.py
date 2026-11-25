@@ -165,7 +165,8 @@ def run(args: list[str]) -> int:
         print(f"{updater.name} is not Zoom's official MS-70CDR v2.10 updater.\n"
               f"sha256 {got}\nexpected {want}\nNothing was written.")
         return 1
-    pedal = ask_pedal() if getattr(sys, "frozen", False) else PEDALS[0][0]
+    interactive = getattr(sys, "frozen", False) or (sys.stdin is not None and sys.stdin.isatty())   # also from source in a terminal; tests keep the default
+    pedal = ask_pedal() if interactive else PEDALS[0][0]
     if pedal is None:
         print("No pedal chosen. Nothing was written.")
         return 1
