@@ -114,7 +114,7 @@ def ask_pedal() -> str | None:
     root.bind("<Return>", lambda e: next_())
     test_pick = os.environ.get("MIDISTOMP_TEST_PICK")   # CI: picks this pedal and presses Next, to test the frozen window
     if test_pick:
-        root.after(2000, lambda: (choice.set(test_pick), next_()))
+        root.after(8000, lambda: (choice.set(test_pick), next_()))
     root.lift()
     root.attributes("-topmost", True)   # in front of the console window that started it
     root.after_idle(root.attributes, "-topmost", False)
