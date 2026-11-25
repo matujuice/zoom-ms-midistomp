@@ -50,7 +50,13 @@ static unsigned pt_magic = 0x50524633u;
 #endif
 #define PT_MAGIC_W pt_magic
 #define STAMP(i) "V2.0.1"
+static struct {
+    unsigned per, ch, chmax, own, cyc[7], cmax[7], late, win, midi, late_total, period, dsp[6];
+} pub = { 30000, 20000, 41000, 300, { 1, 2, 3, 4, 5, 6, 7 }, { 11, 12, 13, 14, 15, 16, 17 }, 2, 0x12345678, 500, 9,
+          54422 };
+static unsigned hold;
 @BLOCK@
+static int slot(int s, char *name, int *dsp) { (void)name; *dsp = s == 1 ? 0 : 100 + s; return s != 1; }
 int main(void)
 {
     unsigned b;
@@ -215,3 +221,14 @@ def test_perform_no_table(exe_off):
     assert out[1][7:10] == bytes([3, 0, 0]) and unpack7(list(out[1][10:-1])) == [0] * 14
     assert len(out) == 2                                   # chunk 15 and patch 50: no reply
 
+
+
+def test_bench(exe):
+    (r,) = run(exe, "F0 7D 4D 53 54 06 11 F7")
+    assert r[:7] == bytes.fromhex("F07D4D53544711") and r[-1] == 0xF7
+    assert all(b < 0x80 for b in r[1:-1])
+    b = bytes(unpack7(list(r[7:-1])))
+    assert len(b) == 116
+    w = [int.from_bytes(b[i:i + 4], "little") for i in range(0, 116, 4)]
+    assert w[:4] == [30000, 20000, 41000, 300] and w[4:11] == list(range(1, 8)) and w[11:18] == list(range(11, 18))
+    assert w[18:23] == [2, 0x12345678, 500, 9, 54422] and w[23:] == [100, 0, 102, 103, 104, 105]

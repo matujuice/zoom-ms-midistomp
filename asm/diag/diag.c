@@ -37,14 +37,17 @@
 extern __cregister volatile unsigned int TSCL;
 
 #define PERIOD 54422.0f         /* cycles per 8-frame block: 300 MHz x 8 / 44100 */
-#define LATE 60000u             /* a longer period: the block started late */
+#define LATE 60000u             /* a longer period: the block started late (71837 at 360 MHz) */
+#define OC_WORD (*(volatile unsigned *)0xC00BB52Cu)   /* DSP Full limit mvkh: 340 = cpu-360f.yaml */
 #define WIN 12                  /* 1 << WIN blocks per window */
 
 /* ---- audio side ------------------------------------------------------------------------ */
-static unsigned w_n, w_per, w_ch, w_chmax, w_own, w_cyc[7], w_late;
-static unsigned prev, own, late_total, polls;
+static unsigned w_n, w_per, w_ch, w_chmax, w_own, w_cyc[7], w_cmax[7], w_late;
+static unsigned prev, own, polls, late_at, hold;
 static volatile int restart;            /* diag_poll turned the timing on: skip a block */
-static struct { unsigned per, ch, chmax, own, cyc[7], late, win, midi; } pub;
+static struct {                         /* SysEx 06 sends it as it is */
+    unsigned per, ch, chmax, own, cyc[7], cmax[7], late, win, midi, late_total, period, dsp[6];
+} pub;
 static volatile unsigned aud_total;     /* busy cycles of all blocks so far (chain + diag) */
 static volatile unsigned m_acc;         /* Task_MIDI's cycles so far, audio taken out */
 static unsigned m_last, m_t, m_aud;
@@ -60,21 +63,21 @@ void diag_end(unsigned t0, unsigned *cyc)
     if (restart) {              /* the first block after the timing turned on has no period */
         restart = 0;
         w_n = w_per = w_ch = w_chmax = w_own = w_late = 0;
-        for (i = 0; i < 7; i++) w_cyc[i] = 0;
+        for (i = 0; i < 7; i++) w_cyc[i] = w_cmax[i] = 0;
         m_last = m_acc;
     } else {
-        if (per > LATE) { w_late++; late_total++; }
+        if (per > late_at) { w_late++; pub.late_total++; }
         w_per += per;
         w_ch += ch;
         if (ch > w_chmax) w_chmax = ch;
         w_own += own;
-        for (i = 0; i < 7; i++) w_cyc[i] += cyc[i];
+        for (i = 0; i < 7; i++) { w_cyc[i] += cyc[i]; if (cyc[i] > w_cmax[i]) w_cmax[i] = cyc[i]; }
         if (++w_n == 1u << WIN) {
             pub.per = w_per >> WIN;
             pub.ch = w_ch >> WIN;
             pub.chmax = w_chmax;
             pub.own = w_own >> WIN;
-            for (i = 0; i < 7; i++) { pub.cyc[i] = w_cyc[i] >> WIN; w_cyc[i] = 0; }
+            for (i = 0; i < 7; i++) { pub.cyc[i] = w_cyc[i] >> WIN; pub.cmax[i] = w_cmax[i]; w_cyc[i] = w_cmax[i] = 0; }
             pub.late = w_late;
             pub.midi = (m_acc - m_last) >> WIN;
             m_last = m_acc;
@@ -118,6 +121,9 @@ void diag_mwake(void)
  *      (ok 0: no PERFORM table yet, the bytes mean nothing; bytes past 208 are 0)
  *   05 n k + 14 bytes packed: write chunk k -> 46 n k status (0 written, 1 no PERFORM table).
  *      Chunk 14 saves record 50. The PERFORM engine reads the entry when the patch loads.
+ *   06: DSP bench (scripts/dsp_bench.py) -> 47 + pub, packed: 29 little-endian words, the last
+ *      window's per ch chmax own cyc[7] cmax[7] late win midi, then late_total, the PERIOD in
+ *      use and each slot's declared DSP (tenths). Keeps the timing on for 4 s (250 polls) without the screen.
  * ponytail: state is 0x7F (unknown) until the editor mode and looper flags are mapped. */
 #define MIDI_BYTE (*(volatile unsigned char *)(B14 + 226))       /* the byte just taken */
 #define MIDI_SEND FN(0xC00AD664, void, (const unsigned char *, int))
@@ -135,12 +141,13 @@ void diag_mwake(void)
 /* in every build with this code: CC, MIDI settings, tempo-hold, mixer, PERFORM, MASTER, KALEIDO, diag, DSP 300 */
 #define FEATURES (1u | 1u << 2 | 1u << 3 | 1u << 5 | 1u << 6 | 1u << 7 | 1u << 8 | 1u << 9 | 1u << 10)
 
+static int slot(int s, char *name, int *dsp);
 static unsigned char sx[25];    /* the bytes after F0 */
 static int sx_n;                /* 1 + bytes in sx while in a message, 0 otherwise */
 
 static void sx_reply(int cmd, const unsigned char *d, int n)
 {
-    unsigned char m[32];
+    unsigned char m[141];
     int i;
     m[0] = 0xF0; m[1] = 0x7D; m[2] = 'M'; m[3] = 'S'; m[4] = 'T'; m[5] = cmd; m[6] = sx[5];
     for (i = 0; i < n; i++) m[7 + i] = d[i];
@@ -169,6 +176,17 @@ static void unpack(const unsigned char *s, int n, unsigned char *d)
     }
 }
 
+static void sx_bench(void)
+{
+    unsigned char d[133];
+    int i;
+    char nm[9];
+    hold = 250;
+    for (i = 0; i < 6; i++) slot(i, nm, (int *)pub.dsp + i);
+    /* ponytail: a window ending during the send mixes two windows (about 1 read in 10^6) */
+    sx_reply(0x47, d, pack((volatile unsigned char *)&pub, 116, d));
+}
+
 static void sx_done(int n)
 {
     unsigned char d[20];
@@ -184,6 +202,8 @@ static void sx_done(int n)
         f = FEATURES | (TRANSPORT_MAGIC == 0x5A4D5401u) << 1 | (SERVICES_MAGIC == 0x5A4C5301u) << 4;
         d[0] = f & 127; d[1] = f >> 7 & 127; d[2] = f >> 14 & 127; d[3] = 0x7F;
         sx_reply(0x42, d, 4);
+    } else if (sx[4] == 6 && n == 6) {
+        sx_bench();
     } else if (sx[4] == 2 && n == 7 && sx[6] < 50) {
         d[0] = sx[6];
         sx_reply(0x43, d, 1 + pack(R50_ENT(sx[6]), 16, d + 1));
@@ -336,7 +356,7 @@ static void page_load(void)
     put("AUDIO MAX", pc(b1, pub.chmax), 0);
     put("FREE", dec(b1, 1000 - (int)(pub.per * (1000.0f / PERIOD) + 0.5f), "%"), 0);
     SNPRINTF(b1, 12, "%d", pub.late); put("LATE", b1, 0);
-    SNPRINTF(b1, 12, "%d", late_total); put("LATE TOTAL", b1, 0);
+    SNPRINTF(b1, 12, "%d", pub.late_total); put("LATE TOTAL", b1, 0);
     SNPRINTF(b1, 12, "%d/300", (int)((unsigned)(dsp_total() + 5) * 52429u >> 19)); put("DSP", b1, 0);
 }
 
@@ -411,16 +431,22 @@ int diag_keys(int ev, int steps)
 }
 
 /* 16 ms: the timing on only while the SYSTEM screen or the MENU list (its CPU badge) is open,
- * and a redraw about twice a second there. */
+ * or for 4 s after a SysEx 06, and a redraw about twice a second on the screen. */
 int diag_poll(void)
 {
-    int menu = MODE == 11, v = menu && SCREEN == 9, on = menu && (v || SCREEN == 0);
+    int menu = MODE == 11, v = menu && SCREEN == 9, ui = menu && (v || SCREEN == 0), on = ui || hold;
     polls++;
-    if (on && !MAGIC) { restart = 1; MAGIC = 0x47414944u; }   /* "DIAG" */
-    else if (!on) MAGIC = 0;
+    if (hold) hold--;
+    if (on && !MAGIC) {
+        int oc = OC_WORD == 0x0221D56Au;
+        late_at = oc ? 71837u : LATE;
+        pub.period = oc ? 65306 : 54422;
+        restart = 1;
+        MAGIC = 0x47414944u;                    /* "DIAG" */
+    } else if (!on) MAGIC = 0;
     if (v && !open) { page = top = 0; peak = 0; }
     open = v;
-    if (on && !(++tick & 31)) EVENT_POST(UI_EVENT, 64);
+    if (ui && !(++tick & 31)) EVENT_POST(UI_EVENT, 64);
     return POLL_TRAMP();
 }
 
