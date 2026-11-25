@@ -196,7 +196,7 @@ def cmd_build_mac(args) -> int:
         app_out = Path(tmp) / f"{out.stem}.app" if as_zip else out
         try:
             steps = macapp.build_app(args.app, app_out, new_os, new_133=new_133, skip_boot=not args.keep_boot_steps,
-                                     title=out.stem)
+                                     title=args.title or out.stem)
         except (ValueError, FileExistsError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
@@ -301,7 +301,8 @@ def main(argv: list[str] | None = None) -> int:
                         "instead of applying patches")
     p.add_argument("--out", required=True,
                    help="new .app, or .zip holding the app (works on Windows too); must not exist; "
-                        "its name is also the window title")
+                        "its name is also the window title unless --title is given")
+    p.add_argument("--title", help="window title, at most as long as Zoom's (27 characters for the MS-70CDR)")
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader (and, in the MS-70CDR app, the effects file system, "
                         "which deletes installed effects) like the stock updater does (not recommended)")

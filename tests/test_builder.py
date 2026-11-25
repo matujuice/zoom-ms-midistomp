@@ -60,3 +60,14 @@ def test_feature_dependencies_json_matches_release():
     assert d["order"] == builder.PATCHES == list(d["patches"])
     for p, v in d["patches"].items():   # every need is applied earlier
         assert all(d["order"].index(n) < d["order"].index(p) for n in v["needs"] + v["optional"]), p
+
+
+def test_mac_titles_fit_zooms(monkeypatch, tmp_path):
+    # Zoom's Mac title "ZOOM MS-70CDR v2.10 Updater" is 27 characters; ours is written over it
+    zoom = len("ZOOM MS-70CDR v2.10 Updater")
+    assert len(Path(builder.OUT_NAME_MAC).stem) <= zoom and len(builder.TITLE_OC_MAC) <= zoom
+    seen = []
+    monkeypatch.setattr(builder.cli, "main", lambda argv: seen.append(argv) or 0)
+    builder.build(tmp_path / "z.app", tmp_path / builder.OUT_NAME_OC_MAC, mac=True, cpu="360f")
+    builder.build(tmp_path / "z.app", tmp_path / builder.OUT_NAME_MAC, mac=True)
+    assert seen[0][seen[0].index("--title") + 1] == builder.TITLE_OC_MAC and "--title" not in seen[1]

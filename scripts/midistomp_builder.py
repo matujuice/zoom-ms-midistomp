@@ -34,6 +34,7 @@ OUT_NAME = "MIDISTOMP V2.0 Updater.exe"
 OUT_NAME_MAC = "MIDISTOMP V2.0 Updater.app"
 OUT_NAME_OC = "MIDISTOMP V2.0 Updater (360MHz OC).exe"
 OUT_NAME_OC_MAC = "MIDISTOMP V2.0 Updater (360MHz OC).app"
+TITLE_OC_MAC = "MIDISTOMP V2.0 OC Updater"   # the Mac title can't be longer than Zoom's 27 characters
 
 
 def identity_tag(name: str = NAME) -> str:
@@ -49,6 +50,8 @@ def build(updater: Path, out: Path, mac: bool = False, cpu: str | None = None) -
     """cpu: an overclock patch (e.g. "360f" -> patches/cpu-360f.yaml); None keeps stock 300 MHz."""
     argv = ["build-mac" if mac else "build", str(updater), "--build-id", "ms70cdr-2.10", "--out", str(out),
             "--stamp", f"version={NAME.split()[-1]}"]   # SYSTEM page shows the full V2.0.3; boot and menu stay V2.0
+    if mac and cpu:
+        argv += ["--title", TITLE_OC_MAC]
     with tempfile.TemporaryDirectory() as tmp:
         for p in PATCHES + ([f"cpu-{cpu}"] if cpu else []):
             path = ROOT / "patches" / f"{p}.yaml"
@@ -120,7 +123,8 @@ def run(args: list[str]) -> int:
             print(f"error: {e}")
             failed = 1
         if failed:
-            print("Build failed, nothing usable was written.")
+            print(f"Done: {done[0]}\nThe {out.name} build failed; only the one above was written." if done
+                  else "Build failed, nothing usable was written.")
             return 1
         if mac:
             sign = f'  xattr -cr "{out}"\n  codesign --force --deep --sign - "{out}"'
