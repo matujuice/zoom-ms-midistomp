@@ -1,4 +1,4 @@
-# Handoff: where the work stands (2026-11-24, after v2.0.4.1)
+# Handoff: where the work stands (2026-11-25, after v2.0.4.2)
 
 For a new Claude session running **locally on Luca's Windows PC**. Read this, then each repo's
 CLAUDE.md. The October handoff it replaces (v2.0 probe rounds) is in git history.
@@ -23,12 +23,14 @@ TI compiler `ti-cgt-c6000_8.5.0.LTS` is in Downloads.
 
 ## Where things stand
 
-- **v2.0.4.1 released** on both repos (Latest). Release notes: [docs/releases](../releases/).
+- **v2.0.4.1 released** on both repos; the firmware repo's Latest is now v2.0.4.2 (below). Release notes: [docs/releases](../releases/).
 - **On hold** (Luca): the patch editor (PR 64, branch `claude/sysex-editor`, merge only when the
   editor is done) and the DSP bench (PR 76, with the Washout knob-crackle fix). The pack's synth
   effects (issues 45, 46) are paused too.
+- **v2.0.4.2** (builder only, 2026-11-25): the builder asks which pedal and writes its model byte
+  (issue 79, Nils); Mac builders tested end to end in CI with Zoom's own Mac updater.
 - **Waiting on others**: Roman's hardware check of the SysEx slot routing (issue 72); the Modwerk
-  board question on model byte 0x57.
+  board question on model byte 0x57; Nils (issue 79) and Jannik (issue 50) have open threads.
 - Open issues live on GitHub; nothing else is in flight.
 ## How to work (Luca's preferences)
 

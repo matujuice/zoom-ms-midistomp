@@ -111,8 +111,8 @@ Synced gates, pitch shifters, delays, filters, the looper, a choir and more. New
 | **MS-50G** | tested (v2.0, and v1.2 from a Mac), mono input |
 | MS-50G+, MS-70CDR+, MS-200D+ and the Four series | not supported: different hardware |
 
-One build runs on all three pedals. It is made from Zoom's MS-70CDR 2.10 firmware, so after the update every pedal
-reports itself as an MS-70CDR over USB. If you run it on a pedal not listed as tested, please
+One build runs on all three pedals. It is made from Zoom's MS-70CDR 2.10 firmware; the builder asks which pedal you
+have, so the pedal keeps reporting its own model over USB. If you run it on a pedal not listed as tested, please
 [tell me how it went](https://github.com/matujuice/zoom-ms-midistomp/issues).
 
 ## Install
