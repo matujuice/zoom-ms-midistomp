@@ -90,7 +90,37 @@ def ask_path() -> list[str]:
 
 
 def ask_pedal() -> str | None:
-    """Which pedal the updater is for: its model byte. Enter keeps the MS-70CDR."""
+    """Which pedal the updater is for (its model byte), in a window; None if closed.
+    Falls back to the typed question when no window can open."""
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+        root = tk.Tk()
+    except Exception:  # no Tk in this build, or no display
+        return ask_pedal_typed()
+    root.title(f"{NAME} builder")
+    root.resizable(False, False)
+    choice, picked = tk.StringVar(value=PEDALS[0][0]), []
+    def next_():
+        picked.append(choice.get())
+        root.destroy()
+    ttk.Label(root, text="Which pedal will you flash?").pack(padx=24, pady=(18, 8), anchor="w")
+    for key, name in PEDALS:
+        ttk.Radiobutton(root, text=name, value=key, variable=choice).pack(padx=36, pady=2, anchor="w")
+    ttk.Label(root, text="Sets the model the pedal reports to editors and Zoom's updaters.",
+              foreground="gray").pack(padx=24, pady=(10, 0), anchor="w")
+    ttk.Button(root, text="Next", command=next_, default="active").pack(padx=24, pady=18, anchor="e")
+    root.bind("<Return>", lambda e: next_())
+    root.lift()
+    root.attributes("-topmost", True)   # in front of the console window that started it
+    root.after_idle(root.attributes, "-topmost", False)
+    root.focus_force()
+    root.mainloop()
+    return picked[0] if picked else None
+
+
+def ask_pedal_typed() -> str | None:
+    """The same question in the console: Enter keeps the MS-70CDR."""
     print("\nWhich pedal will you flash?")
     for i, (_, name) in enumerate(PEDALS, 1):
         print(f"  {i}) {name}" + ("  (press Enter)" if i == 1 else ""))
@@ -133,6 +163,7 @@ def run(args: list[str]) -> int:
         return 1
     pedal = ask_pedal() if getattr(sys, "frozen", False) else PEDALS[0][0]
     if pedal is None:
+        print("No pedal chosen. Nothing was written.")
         return 1
     # Two files from one drag: stock 300 MHz, and an opt-in 360 MHz overclock
     # build for pedals that have been tested at that clock (70CDR, 60B).

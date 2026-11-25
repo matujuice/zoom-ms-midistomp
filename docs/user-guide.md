@@ -74,8 +74,7 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
 3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
    and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
-   window and asks which pedal you will flash: press Enter for the MS-70CDR, or type 2 (MS-60B) or 3 (MS-50G) and
-   press Enter. Then it writes two new files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock —
+   window that asks which pedal you will flash: click yours and press **Next**. Then it writes two new files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock —
    use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).exe** (see [Overclock](#overclock-opt-in-360-mhz)); for
    the MS-60B and MS-50G the names say the pedal, like **MIDISTOMP V2.0 MS-50G Updater.exe**. It
    refuses any file that is not Zoom's original, so a wrong download can't produce a broken updater.

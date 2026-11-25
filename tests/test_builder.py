@@ -77,7 +77,7 @@ def test_mac_titles_fit_zooms(monkeypatch, tmp_path):
 def test_pedal_choice(monkeypatch):
     for typed, want in (("", "ms70cdr"), ("2", "ms60b"), ("3", "ms50g"), ("x", None)):
         monkeypatch.setattr("builtins.input", lambda: typed)
-        assert builder.ask_pedal() == want
+        assert builder.ask_pedal_typed() == want
     assert builder.out_name(builder.OUT_NAME_OC_MAC, "ms70cdr") == builder.OUT_NAME_OC_MAC
     assert builder.out_name(builder.OUT_NAME_OC, "ms50g") == "MIDISTOMP V2.0 MS-50G Updater (360MHz OC).exe"
     assert {k for k, _ in builder.PEDALS} == set(builder.models.load_all(builder.ROOT / "models"))
