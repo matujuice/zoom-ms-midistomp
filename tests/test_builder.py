@@ -70,4 +70,25 @@ def test_mac_titles_fit_zooms(monkeypatch, tmp_path):
     monkeypatch.setattr(builder.cli, "main", lambda argv: seen.append(argv) or 0)
     builder.build(tmp_path / "z.app", tmp_path / builder.OUT_NAME_OC_MAC, mac=True, cpu="360f")
     builder.build(tmp_path / "z.app", tmp_path / builder.OUT_NAME_MAC, mac=True)
-    assert seen[0][seen[0].index("--title") + 1] == builder.TITLE_OC_MAC and "--title" not in seen[1]
+    title = lambda argv: argv[argv.index("--title") + 1]
+    assert title(seen[0]) == builder.TITLE_OC_MAC and title(seen[1]) == builder.TITLE_MAC
+
+
+def test_pedal_choice(monkeypatch):
+    for typed, want in (("", "ms70cdr"), ("2", "ms60b"), ("3", "ms50g"), ("x", None)):
+        monkeypatch.setattr("builtins.input", lambda: typed)
+        assert builder.ask_pedal() == want
+    assert builder.out_name(builder.OUT_NAME_OC_MAC, "ms70cdr") == builder.OUT_NAME_OC_MAC
+    assert builder.out_name(builder.OUT_NAME_OC, "ms50g") == "MIDISTOMP V2.0 MS-50G Updater (360MHz OC).exe"
+    assert {k for k, _ in builder.PEDALS} == set(builder.models.load_all(builder.ROOT / "models"))
+
+
+def test_set_pedal_writes_only_the_model_byte():
+    from zoomms import cli
+    stock = bytes(0x2C00) + b"\x61" + bytes(0x3FF)
+    assert cli._set_pedal(stock, None, None) is None and cli._set_pedal(stock, None, "ms70cdr") is None
+    new = cli._set_pedal(stock, None, "ms50g")
+    assert new[cli.MODEL_AT] == 0x58 and new[:cli.MODEL_AT] == stock[:cli.MODEL_AT] and new[cli.MODEL_AT + 1:] == stock[cli.MODEL_AT + 1:]
+    assert cli._set_pedal(stock, stock[:5] + b"x" + stock[6:], "ms60b")[:6] == stock[:5] + b"x"   # keeps patch changes
+    with pytest.raises(ValueError):
+        cli._set_pedal(bytes(0x3000), None, "ms50g")   # byte isn't a model id: wrong file or offset

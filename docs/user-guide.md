@@ -74,9 +74,13 @@ Your patches are kept, but back them up first anyway, just in case (with your us
    [release page](https://github.com/matujuice/zoom-ms-midistomp/releases).
 3. Put both files in one folder and open it in File Explorer. With the mouse, drag `ZOOM MS-70CDR v2.10 Updater.exe`
    and drop it on the `MIDISTOMP-builder-Windows.exe` icon (don't run either of them yet). The builder opens a
-   window for a moment and writes two new files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock —
-   use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).exe** (see [Overclock](#overclock-opt-in-360-mhz)). It
+   window and asks which pedal you will flash: press Enter for the MS-70CDR, or type 2 (MS-60B) or 3 (MS-50G) and
+   press Enter. Then it writes two new files in the same folder: **MIDISTOMP V2.0 Updater.exe** (stock clock —
+   use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).exe** (see [Overclock](#overclock-opt-in-360-mhz)); for
+   the MS-60B and MS-50G the names say the pedal, like **MIDISTOMP V2.0 MS-50G Updater.exe**. It
    refuses any file that is not Zoom's original, so a wrong download can't produce a broken updater.
+   The pedal you pick only sets which model the pedal reports to editors and to Zoom's updaters; MIDISTOMP itself
+   is the same for all three. Picked the wrong one? Build again and flash again.
 4. Windows may warn that the program is unknown (it is not signed). Choose "More info", then "Run anyway".
 5. Pedal off. Hold the **up and down cursor keys** while you plug in the USB cable (the mini-USB port next to the
    power jack): the pedal shows the update screen.
@@ -110,7 +114,8 @@ flashed to an MS-50G from an Apple Silicon Mac.
 3. Double-click **MIDISTOMP-builder-Mac-…**. It is not notarized, so the first time macOS refuses it: open System
    Settings > Privacy & Security, click **Open Anyway** next to it, and double-click it again.
 4. A Terminal window asks for Zoom's updater: drag `ZOOM MS-70CDR v2.10 Updater.app` onto that window and press
-   Enter. It writes two apps next to Zoom's app and signs them for your Mac: **MIDISTOMP V2.0 Updater.app** (stock
+   Enter. It asks which pedal you will flash (as on Windows, step 3), then writes two apps next to Zoom's app
+   and signs them for your Mac: **MIDISTOMP V2.0 Updater.app** (stock
    clock — use this one) and **MIDISTOMP V2.0 Updater (360MHz OC).app** (see [Overclock](#overclock-opt-in-360-mhz)).
    It refuses anything that is not Zoom's original.
 5. Put the pedal in update mode (step 5 of the Windows steps above) and open **MIDISTOMP V2.0 Updater.app**. It is
