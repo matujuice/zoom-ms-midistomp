@@ -107,6 +107,19 @@ def _apply_patches(original: bytes, stock_133: bytes, patch_paths: list[str], bu
 
 
 WIN_TITLE = "MIDISTOMP V2.0.3 Updater"  # Windows window title
+MODEL_AT = 0x2C00  # the model byte the pedal reports, in BIN/133 (flash 0x3FFC00)
+
+
+def _set_pedal(stock_133: bytes, new_133: bytes | None, pedal: str | None) -> bytes | None:
+    """new_133 with the model byte of pedal (a models/*.yaml key); None when it equals stock."""
+    d133 = bytearray(new_133 or stock_133)
+    if pedal:
+        ids = {k: cfg["sysex_model_id"] for k, cfg in models.load_all().items()}
+        if d133[MODEL_AT] not in ids.values():
+            raise ValueError(f"BIN/133 byte 0x{MODEL_AT:X} is 0x{d133[MODEL_AT]:02X}, not a model byte; "
+                             "--pedal works only on the MS-50G/60B/70CDR updaters")
+        d133[MODEL_AT] = ids[pedal]
+    return None if d133 == stock_133 else bytes(d133)
 
 
 def cmd_build(args) -> int:
@@ -120,6 +133,11 @@ def cmd_build(args) -> int:
     if patched is None:
         return 1
     new_os, new_133, img = patched
+    try:
+        new_133 = _set_pedal(stock_133, new_133, args.pedal)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     d133 = new_133 or stock_133
     exe = flash.build_updater(args.updater, new_os, skip_boot=not args.keep_boot_steps, new_133=new_133,
                                title=WIN_TITLE)
@@ -191,6 +209,11 @@ def cmd_build_mac(args) -> int:
             return 1
         new_os, new_133, img = patched
         sections = [s.addr for s in img.sections]
+    try:
+        new_133 = _set_pedal(stock_133, new_133, args.pedal)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
     with tempfile.TemporaryDirectory() as tmp:
         app_out = Path(tmp) / f"{out.stem}.app" if as_zip else out
@@ -289,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader like the stock updater does (not recommended)")
+    p.add_argument("--pedal", choices=sorted(models.load_all()),
+                   help="write this pedal's model byte, so it keeps reporting its own model (default: the updater's)")
     p.set_defaults(func=cmd_build)
     p = sub.add_parser("build-mac", help="build a modified Mac updater app from Zoom's Mac one plus patch files")
     p.add_argument("app", help="stock official updater .app")
@@ -303,6 +328,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="new .app, or .zip holding the app (works on Windows too); must not exist; "
                         "its name is also the window title unless --title is given")
     p.add_argument("--title", help="window title, at most as long as Zoom's (27 characters for the MS-70CDR)")
+    p.add_argument("--pedal", choices=sorted(models.load_all()),
+                   help="write this pedal's model byte, so it keeps reporting its own model (default: the updater's)")
     p.add_argument("--keep-boot-steps", action="store_true",
                    help="also rewrite the bootloader (and, in the MS-70CDR app, the effects file system, "
                         "which deletes installed effects) like the stock updater does (not recommended)")
